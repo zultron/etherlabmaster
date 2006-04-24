@@ -1,12 +1,32 @@
 /******************************************************************************
  *
- *  d e v i c e . c
- *
- *  EtherCAT device methods.
- *
  *  $Id$
  *
+ *  Copyright (C) 2006  Florian Pose, Ingenieurgemeinschaft IgH
+ *
+ *  This file is part of the IgH EtherCAT Master.
+ *
+ *  The IgH EtherCAT Master is free software; you can redistribute it
+ *  and/or modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; version 2 of the License.
+ *
+ *  The IgH EtherCAT Master is distributed in the hope that it will be
+ *  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with the IgH EtherCAT Master; if not, write to the Free Software
+ *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
  *****************************************************************************/
+
+/**
+   \file
+   EtherCAT device methods.
+*/
+
+/*****************************************************************************/
 
 #include <linux/module.h>
 #include <linux/skbuff.h>
@@ -168,6 +188,9 @@ void ec_device_send(ec_device_t *device, /**< EtherCAT device */
 
 /**
    Calls the interrupt service routine of the assigned net_device.
+   The master itself works without using interrupts. Therefore the processing
+   of received data and status changes of the network device has to be
+   done by the master calling the ISR "manually".
 */
 
 void ec_device_call_isr(ec_device_t *device /**< EtherCAT device */)
@@ -181,7 +204,9 @@ void ec_device_call_isr(ec_device_t *device /**< EtherCAT device */)
 
 /**
    Accepts a received frame.
-   Forwards the received data to the master.
+   Forwards the received data to the master. The master will analyze the frame
+   and dispatch the received commands to the sending instances.
+   \ingroup DeviceInterface
 */
 
 void ecdev_receive(ec_device_t *device, /**< EtherCAT device */
@@ -201,6 +226,9 @@ void ecdev_receive(ec_device_t *device, /**< EtherCAT device */
 
 /**
    Sets a new link state.
+   If the device notifies the master about the link being down, the master
+   will not try to send frames using this device.
+   \ingroup DeviceInterface
 */
 
 void ecdev_link_state(ec_device_t *device, /**< EtherCAT device */
@@ -220,7 +248,11 @@ void ecdev_link_state(ec_device_t *device, /**< EtherCAT device */
 
 /*****************************************************************************/
 
+/** \cond */
+
 EXPORT_SYMBOL(ecdev_receive);
 EXPORT_SYMBOL(ecdev_link_state);
+
+/** \endcond */
 
 /*****************************************************************************/

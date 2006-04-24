@@ -1,12 +1,32 @@
 /******************************************************************************
  *
- *  d o m a i n . c
- *
- *  EtherCAT domain methods.
- *
  *  $Id$
  *
+ *  Copyright (C) 2006  Florian Pose, Ingenieurgemeinschaft IgH
+ *
+ *  This file is part of the IgH EtherCAT Master.
+ *
+ *  The IgH EtherCAT Master is free software; you can redistribute it
+ *  and/or modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; version 2 of the License.
+ *
+ *  The IgH EtherCAT Master is distributed in the hope that it will be
+ *  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with the IgH EtherCAT Master; if not, write to the Free Software
+ *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
  *****************************************************************************/
+
+/**
+   \file
+   EtherCAT domain methods.
+*/
+
+/*****************************************************************************/
 
 #include "globals.h"
 #include "domain.h"
@@ -18,6 +38,8 @@ void ec_domain_clear_field_regs(ec_domain_t *);
 ssize_t ec_show_domain_attribute(struct kobject *, struct attribute *, char *);
 
 /*****************************************************************************/
+
+/** \cond */
 
 EC_SYSFS_READ_ATTR(data_size);
 
@@ -36,6 +58,8 @@ static struct kobj_type ktype_ec_domain = {
     .sysfs_ops = &sysfs_ops,
     .default_attrs = def_attrs
 };
+
+/** \endcond */
 
 /*****************************************************************************/
 
@@ -327,6 +351,7 @@ ssize_t ec_show_domain_attribute(struct kobject *kobj, /**< kobject */
    - If \a field_count is greater then 1, it is assumed that \a data_ptr
    is an array of the respective size.
    \return pointer to the slave on success, else NULL
+   \ingroup RealtimeInterface
 */
 
 ec_slave_t *ecrt_domain_register_field(ec_domain_t *domain,
@@ -418,6 +443,7 @@ ec_slave_t *ecrt_domain_register_field(ec_domain_t *domain,
    Registeres a bunch of data fields.
    Caution! The list has to be terminated with a NULL structure ({})!
    \return 0 in case of success, else < 0
+   \ingroup RealtimeInterface
 */
 
 int ecrt_domain_register_field_list(ec_domain_t *domain,
@@ -443,6 +469,7 @@ int ecrt_domain_register_field_list(ec_domain_t *domain,
 
 /**
    Places all process data commands in the masters command queue.
+   \ingroup RealtimeInterface
 */
 
 void ecrt_domain_queue(ec_domain_t *domain /**< EtherCAT domain */)
@@ -458,6 +485,7 @@ void ecrt_domain_queue(ec_domain_t *domain /**< EtherCAT domain */)
 
 /**
    Processes received process data.
+   \ingroup RealtimeInterface
 */
 
 void ecrt_domain_process(ec_domain_t *domain /**< EtherCAT domain */)
@@ -481,6 +509,7 @@ void ecrt_domain_process(ec_domain_t *domain /**< EtherCAT domain */)
 /**
    Returns the state of a domain.
    \return 0 if all commands were received, else -1.
+   \ingroup RealtimeInterface
 */
 
 int ecrt_domain_state(ec_domain_t *domain /**< EtherCAT domain */)
@@ -496,10 +525,14 @@ int ecrt_domain_state(ec_domain_t *domain /**< EtherCAT domain */)
 
 /*****************************************************************************/
 
+/** \cond */
+
 EXPORT_SYMBOL(ecrt_domain_register_field);
 EXPORT_SYMBOL(ecrt_domain_register_field_list);
 EXPORT_SYMBOL(ecrt_domain_queue);
 EXPORT_SYMBOL(ecrt_domain_process);
 EXPORT_SYMBOL(ecrt_domain_state);
+
+/** \endcond */
 
 /*****************************************************************************/

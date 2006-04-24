@@ -1,12 +1,32 @@
 /******************************************************************************
  *
- *  c o m m a n d . c
- *
- *  Methods of an EtherCAT command.
- *
  *  $Id$
  *
+ *  Copyright (C) 2006  Florian Pose, Ingenieurgemeinschaft IgH
+ *
+ *  This file is part of the IgH EtherCAT Master.
+ *
+ *  The IgH EtherCAT Master is free software; you can redistribute it
+ *  and/or modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; version 2 of the License.
+ *
+ *  The IgH EtherCAT Master is distributed in the hope that it will be
+ *  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with the IgH EtherCAT Master; if not, write to the Free Software
+ *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
  *****************************************************************************/
+
+/**
+   \file
+   Methods of an EtherCAT command.
+*/
+
+/*****************************************************************************/
 
 #include <linux/slab.h>
 #include <linux/delay.h>
@@ -15,6 +35,8 @@
 #include "master.h"
 
 /*****************************************************************************/
+
+/** \cond */
 
 #define EC_FUNC_HEADER \
     if (unlikely(ec_command_prealloc(command, data_size))) \
@@ -28,13 +50,15 @@
     memset(command->data, 0x00, data_size); \
     return 0;
 
+/** \endcond */
+
 /*****************************************************************************/
 
 /**
    Command constructor.
 */
 
-void ec_command_init(ec_command_t *command)
+void ec_command_init(ec_command_t *command /**< EtherCAT command */)
 {
     command->type = EC_CMD_NONE;
     command->address.logical = 0x00000000;
@@ -52,7 +76,7 @@ void ec_command_init(ec_command_t *command)
    Command destructor.
 */
 
-void ec_command_clear(ec_command_t *command)
+void ec_command_clear(ec_command_t *command /**< EtherCAT command */)
 {
     if (command->data) kfree(command->data);
 }
@@ -61,10 +85,13 @@ void ec_command_clear(ec_command_t *command)
 
 /**
    Allocates command data memory.
+   If the allocated memory is already larger than requested, nothing ist done.
    \return 0 in case of success, else < 0
 */
 
-int ec_command_prealloc(ec_command_t *command, size_t size)
+int ec_command_prealloc(ec_command_t *command, /**< EtherCAT command */
+                        size_t size /**< New size in bytes */
+                        )
 {
     if (size <= command->mem_size) return 0;
 

@@ -1,12 +1,32 @@
 /******************************************************************************
  *
- *  m a s t e r . c
- *
- *  EtherCAT master methods.
- *
  *  $Id$
  *
+ *  Copyright (C) 2006  Florian Pose, Ingenieurgemeinschaft IgH
+ *
+ *  This file is part of the IgH EtherCAT Master.
+ *
+ *  The IgH EtherCAT Master is free software; you can redistribute it
+ *  and/or modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; version 2 of the License.
+ *
+ *  The IgH EtherCAT Master is distributed in the hope that it will be
+ *  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with the IgH EtherCAT Master; if not, write to the Free Software
+ *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
  *****************************************************************************/
+
+/**
+   \file
+   EtherCAT master methods.
+*/
+
+/*****************************************************************************/
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -31,6 +51,8 @@ void ec_master_process_watch_command(ec_master_t *);
 
 /*****************************************************************************/
 
+/** \cond */
+
 EC_SYSFS_READ_ATTR(slave_count);
 EC_SYSFS_READ_ATTR(mode);
 
@@ -50,6 +72,8 @@ static struct kobj_type ktype_ec_master = {
     .sysfs_ops = &ec_sysfs_ops,
     .default_attrs = ec_def_attrs
 };
+
+/** \endcond */
 
 /*****************************************************************************/
 
@@ -678,113 +702,6 @@ void ec_master_freerun(unsigned long data /**< private timer data = master */)
 /*****************************************************************************/
 
 /**
-   Translates an ASCII coded bus-address to a slave pointer.
-   These are the valid addressing schemes:
-   - \a "X" = the X. slave on the bus,
-   - \a "X:Y" = the Y. slave after the X. branch (bus coupler),
-   - \a "#X" = the slave with alias X,
-   - \a "#X:Y" = the Y. slave after the branch (bus coupler) with alias X.
-   X and Y are zero-based indices and may be provided in hexadecimal or octal
-   notation (with respective prefix).
-   \return pointer to the slave on success, else NULL
-*/
-
-ec_slave_t *ecrt_master_get_slave(const ec_master_t *master, /**< Master */
-                                  const char *address /**< address string */
-                                  )
-{
-    unsigned long first, second;
-    char *remainder, *remainder2;
-    unsigned int alias_requested, alias_found;
-    ec_slave_t *alias_slave = NULL, *slave;
-
-    if (!address || address[0] == 0) return NULL;
-
-    alias_requested = 0;
-    if (address[0] == '#') {
-        alias_requested = 1;
-        address++;
-    }
-
-    first = simple_strtoul(address, &remainder, 0);
-    if (remainder == address) {
-        EC_ERR("Slave address \"%s\" - First number empty!\n", address);
-        return NULL;
-    }
-
-    if (alias_requested) {
-        alias_found = 0;
-        list_for_each_entry(alias_slave, &master->slaves, list) {
-            if (alias_slave->sii_alias == first) {
-                alias_found = 1;
-                break;
-            }
-        }
-        if (!alias_found) {
-            EC_ERR("Slave address \"%s\" - Alias not found!\n", address);
-            return NULL;
-        }
-    }
-
-    if (!remainder[0]) { // absolute position
-        if (alias_requested) {
-            return alias_slave;
-        }
-        else {
-            list_for_each_entry(slave, &master->slaves, list) {
-                if (slave->ring_position == first) return slave;
-            }
-            EC_ERR("Slave address \"%s\" - Absolute position invalid!\n",
-                   address);
-        }
-    }
-    else if (remainder[0] == ':') { // field position
-        remainder++;
-        second = simple_strtoul(remainder, &remainder2, 0);
-
-        if (remainder2 == remainder) {
-            EC_ERR("Slave address \"%s\" - Second number empty!\n", address);
-            return NULL;
-        }
-
-        if (remainder2[0]) {
-            EC_ERR("Slave address \"%s\" - Invalid trailer!\n", address);
-            return NULL;
-        }
-
-        if (alias_requested) {
-            if (!alias_slave->type ||
-                alias_slave->type->special != EC_TYPE_BUS_COUPLER) {
-                EC_ERR("Slave address \"%s\": Alias slave must be bus coupler"
-                       " in colon mode.\n", address);
-                return NULL;
-            }
-            list_for_each_entry(slave, &master->slaves, list) {
-                if (slave->coupler_index == alias_slave->coupler_index
-                    && slave->coupler_subindex == second)
-                    return slave;
-            }
-            EC_ERR("Slave address \"%s\" - Bus coupler %i has no %lu. slave"
-                   " following!\n", address, alias_slave->ring_position,
-                   second);
-            return NULL;
-        }
-        else {
-            list_for_each_entry(slave, &master->slaves, list) {
-                if (slave->coupler_index == first
-                    && slave->coupler_subindex == second) return slave;
-            }
-        }
-    }
-    else
-        EC_ERR("Slave address \"%s\" - Invalid format!\n", address);
-
-    return NULL;
-}
-
-/*****************************************************************************/
-
-/**
    Initializes a sync manager configuration page.
    The referenced memory (\a data) must be at least EC_SYNC_SIZE bytes.
 */
@@ -918,6 +835,21 @@ void ec_master_process_watch_command(ec_master_t *master
     }
 }
 
+/*****************************************************************************/
+
+/**
+   Does the Ethernet-over-EtherCAT processing.
+*/
+
+void ec_master_run_eoe(ec_master_t *master /**< EtherCAT master */)
+{
+    ec_eoe_t *eoe;
+
+    list_for_each_entry(eoe, &master->eoe_slaves, list) {
+        ec_eoe_run(eoe);
+    }
+}
+
 /******************************************************************************
  *  Realtime interface
  *****************************************************************************/
@@ -925,6 +857,7 @@ void ec_master_process_watch_command(ec_master_t *master
 /**
    Creates a domain.
    \return pointer to new domain on success, else NULL
+   \ingroup RealtimeInterface
 */
 
 ec_domain_t *ecrt_master_create_domain(ec_master_t *master /**< master */)
@@ -970,6 +903,7 @@ ec_domain_t *ecrt_master_create_domain(ec_master_t *master /**< master */)
    managers and FMMUs, and does the appropriate transitions, until the slave
    is operational.
    \return 0 in case of success, else < 0
+   \ingroup RealtimeInterface
 */
 
 int ecrt_master_activate(ec_master_t *master /**< EtherCAT master */)
@@ -1156,6 +1090,7 @@ int ecrt_master_activate(ec_master_t *master /**< EtherCAT master */)
 
 /**
    Resets all slaves to INIT state.
+   \ingroup RealtimeInterface
 */
 
 void ecrt_master_deactivate(ec_master_t *master /**< EtherCAT master */)
@@ -1175,6 +1110,7 @@ void ecrt_master_deactivate(ec_master_t *master /**< EtherCAT master */)
    Fetches the SDO dictionaries of all slaves.
    Slaves that do not support the CoE protocol are left out.
    \return 0 in case of success, else < 0
+   \ingroup RealtimeInterface
 */
 
 int ecrt_master_fetch_sdo_lists(ec_master_t *master /**< EtherCAT master */)
@@ -1198,6 +1134,7 @@ int ecrt_master_fetch_sdo_lists(ec_master_t *master /**< EtherCAT master */)
 
 /**
    Sends queued commands and waits for their reception.
+   \ingroup RealtimeInterface
 */
 
 void ecrt_master_sync_io(ec_master_t *master /**< EtherCAT master */)
@@ -1253,6 +1190,7 @@ void ecrt_master_sync_io(ec_master_t *master /**< EtherCAT master */)
 
 /**
    Asynchronous sending of commands.
+   \ingroup RealtimeInterface
 */
 
 void ecrt_master_async_send(ec_master_t *master /**< EtherCAT master */)
@@ -1279,6 +1217,7 @@ void ecrt_master_async_send(ec_master_t *master /**< EtherCAT master */)
 
 /**
    Asynchronous receiving of commands.
+   \ingroup RealtimeInterface
 */
 
 void ecrt_master_async_receive(ec_master_t *master /**< EtherCAT master */)
@@ -1313,6 +1252,7 @@ void ecrt_master_async_receive(ec_master_t *master /**< EtherCAT master */)
    Prepares synchronous IO.
    Queues all domain commands and sends them. Then waits a certain time, so
    that ecrt_master_sasync_receive() can be called securely.
+   \ingroup RealtimeInterface
 */
 
 void ecrt_master_prepare_async_io(ec_master_t *master /**< EtherCAT master */)
@@ -1340,6 +1280,7 @@ void ecrt_master_prepare_async_io(ec_master_t *master /**< EtherCAT master */)
 
 /**
    Does all cyclic master work.
+   \ingroup RealtimeInterface
 */
 
 void ecrt_master_run(ec_master_t *master /**< EtherCAT master */)
@@ -1358,10 +1299,119 @@ void ecrt_master_run(ec_master_t *master /**< EtherCAT master */)
 /*****************************************************************************/
 
 /**
+   Translates an ASCII coded bus-address to a slave pointer.
+   These are the valid addressing schemes:
+   - \a "X" = the X. slave on the bus,
+   - \a "X:Y" = the Y. slave after the X. branch (bus coupler),
+   - \a "#X" = the slave with alias X,
+   - \a "#X:Y" = the Y. slave after the branch (bus coupler) with alias X.
+   X and Y are zero-based indices and may be provided in hexadecimal or octal
+   notation (with respective prefix).
+   \return pointer to the slave on success, else NULL
+   \ingroup RealtimeInterface
+*/
+
+ec_slave_t *ecrt_master_get_slave(const ec_master_t *master, /**< Master */
+                                  const char *address /**< address string */
+                                  )
+{
+    unsigned long first, second;
+    char *remainder, *remainder2;
+    unsigned int alias_requested, alias_found;
+    ec_slave_t *alias_slave = NULL, *slave;
+
+    if (!address || address[0] == 0) return NULL;
+
+    alias_requested = 0;
+    if (address[0] == '#') {
+        alias_requested = 1;
+        address++;
+    }
+
+    first = simple_strtoul(address, &remainder, 0);
+    if (remainder == address) {
+        EC_ERR("Slave address \"%s\" - First number empty!\n", address);
+        return NULL;
+    }
+
+    if (alias_requested) {
+        alias_found = 0;
+        list_for_each_entry(alias_slave, &master->slaves, list) {
+            if (alias_slave->sii_alias == first) {
+                alias_found = 1;
+                break;
+            }
+        }
+        if (!alias_found) {
+            EC_ERR("Slave address \"%s\" - Alias not found!\n", address);
+            return NULL;
+        }
+    }
+
+    if (!remainder[0]) { // absolute position
+        if (alias_requested) {
+            return alias_slave;
+        }
+        else {
+            list_for_each_entry(slave, &master->slaves, list) {
+                if (slave->ring_position == first) return slave;
+            }
+            EC_ERR("Slave address \"%s\" - Absolute position invalid!\n",
+                   address);
+        }
+    }
+    else if (remainder[0] == ':') { // field position
+        remainder++;
+        second = simple_strtoul(remainder, &remainder2, 0);
+
+        if (remainder2 == remainder) {
+            EC_ERR("Slave address \"%s\" - Second number empty!\n", address);
+            return NULL;
+        }
+
+        if (remainder2[0]) {
+            EC_ERR("Slave address \"%s\" - Invalid trailer!\n", address);
+            return NULL;
+        }
+
+        if (alias_requested) {
+            if (!alias_slave->type ||
+                alias_slave->type->special != EC_TYPE_BUS_COUPLER) {
+                EC_ERR("Slave address \"%s\": Alias slave must be bus coupler"
+                       " in colon mode.\n", address);
+                return NULL;
+            }
+            list_for_each_entry(slave, &master->slaves, list) {
+                if (slave->coupler_index == alias_slave->coupler_index
+                    && slave->coupler_subindex == second)
+                    return slave;
+            }
+            EC_ERR("Slave address \"%s\" - Bus coupler %i has no %lu. slave"
+                   " following!\n", address, alias_slave->ring_position,
+                   second);
+            return NULL;
+        }
+        else {
+            list_for_each_entry(slave, &master->slaves, list) {
+                if (slave->coupler_index == first
+                    && slave->coupler_subindex == second) return slave;
+            }
+        }
+    }
+    else
+        EC_ERR("Slave address \"%s\" - Invalid format!\n", address);
+
+    return NULL;
+}
+
+/*****************************************************************************/
+
+/**
    Sets the debug level of the master.
    The following levels are valid:
    - 1: only output positions marks and basic data
    - 2: additional frame data output
+   \ingroup RealtimeInterface
 */
 
 void ecrt_master_debug(ec_master_t *master, /**< EtherCAT master */
@@ -1382,6 +1432,7 @@ void ecrt_master_debug(ec_master_t *master, /**< EtherCAT master */
    - 0: Only slave types and positions
    - 1: with EEPROM contents
    - >1: with SDO dictionaries
+   \ingroup RealtimeInterface
 */
 
 void ecrt_master_print(const ec_master_t *master, /**< EtherCAT master */
@@ -1408,20 +1459,7 @@ void ecrt_master_print(const ec_master_t *master, /**< EtherCAT master */
 
 /*****************************************************************************/
 
-/**
-   Does the Ethernet-over-EtherCAT processing.
-*/
-
-void ec_master_run_eoe(ec_master_t *master /**< EtherCAT master */)
-{
-    ec_eoe_t *eoe;
-
-    list_for_each_entry(eoe, &master->eoe_slaves, list) {
-        ec_eoe_run(eoe);
-    }
-}
-
-/*****************************************************************************/
+/** \cond */
 
 EXPORT_SYMBOL(ecrt_master_create_domain);
 EXPORT_SYMBOL(ecrt_master_activate);
@@ -1435,5 +1473,7 @@ EXPORT_SYMBOL(ecrt_master_run);
 EXPORT_SYMBOL(ecrt_master_debug);
 EXPORT_SYMBOL(ecrt_master_print);
 EXPORT_SYMBOL(ecrt_master_get_slave);
+
+/** \endcond */
 
 /*****************************************************************************/

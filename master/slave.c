@@ -1,12 +1,32 @@
 /******************************************************************************
  *
- *  s l a v e . c
- *
- *  EtherCAT slave methods.
- *
  *  $Id$
  *
+ *  Copyright (C) 2006  Florian Pose, Ingenieurgemeinschaft IgH
+ *
+ *  This file is part of the IgH EtherCAT Master.
+ *
+ *  The IgH EtherCAT Master is free software; you can redistribute it
+ *  and/or modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; version 2 of the License.
+ *
+ *  The IgH EtherCAT Master is distributed in the hope that it will be
+ *  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with the IgH EtherCAT Master; if not, write to the Free Software
+ *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
  *****************************************************************************/
+
+/**
+   \file
+   EtherCAT slave methods.
+*/
+
+/*****************************************************************************/
 
 #include <linux/module.h>
 #include <linux/delay.h>
@@ -27,6 +47,8 @@ int ec_slave_locate_string(ec_slave_t *, unsigned int, char **);
 ssize_t ec_show_slave_attribute(struct kobject *, struct attribute *, char *);
 
 /*****************************************************************************/
+
+/** \cond */
 
 EC_SYSFS_READ_ATTR(ring_position);
 EC_SYSFS_READ_ATTR(coupler_address);
@@ -55,6 +77,8 @@ static struct kobj_type ktype_ec_slave = {
     .sysfs_ops = &sysfs_ops,
     .default_attrs = def_attrs
 };
+
+/** \endcond */
 
 /*****************************************************************************/
 
@@ -722,9 +746,13 @@ int ec_slave_fetch_pdo(ec_slave_t *slave, /**< EtherCAT slave */
 /**
    Searches the string list for an index and allocates a new string.
    \return 0 in case of success, else < 0
+   \todo documentation
 */
 
-int ec_slave_locate_string(ec_slave_t *slave, unsigned int index, char **ptr)
+int ec_slave_locate_string(ec_slave_t *slave, /**< EtherCAT slave */
+                           unsigned int index, /**< string index */
+                           char **ptr /**< Address of the string pointer */
+                           )
 {
     ec_eeprom_string_t *string;
     char *err_string;
@@ -822,7 +850,7 @@ void ec_slave_state_ack(ec_slave_t *slave, /**< EtherCAT slave */
 /**
    Reads the AL status code of a slave and displays it.
    If the AL status code is not supported, or if no error occurred (both
-   resulting in code=0), nothing is displayed.
+   resulting in code = 0), nothing is displayed.
 */
 
 void ec_slave_read_al_status_code(ec_slave_t *slave /**< EtherCAT slave */)
@@ -1179,22 +1207,9 @@ int ec_slave_check_crc(ec_slave_t *slave /**< EtherCAT slave */)
 /*****************************************************************************/
 
 /**
-   Writes the "configured station alias" to the slave's EEPROM.
-   \return 0 in case of success, else < 0
-*/
-
-int ecrt_slave_write_alias(ec_slave_t *slave, /** EtherCAT slave */
-                           uint16_t alias /** new alias */
-                           )
-{
-    return ec_slave_sii_write16(slave, 0x0004, alias);
-}
-
-/*****************************************************************************/
-
-/**
    Formats attribute data for SysFS read access.
    \return number of bytes to read
+   \ingroup RealTimeInterface
 */
 
 ssize_t ec_show_slave_attribute(struct kobject *kobj, /**< slave's kobject */
@@ -1237,6 +1252,10 @@ ssize_t ec_show_slave_attribute(struct kobject *kobj, /**< slave's kobject */
 
 /*****************************************************************************/
 
+/**
+   Application layer status messages.
+*/
+
 const ec_code_msg_t al_status_messages[] = {
     {0x0001, "Unspecified error"},
     {0x0011, "Invalud requested state change"},
@@ -1257,8 +1276,29 @@ const ec_code_msg_t al_status_messages[] = {
     {}
 };
 
+/******************************************************************************
+ *  Realtime interface
+ *****************************************************************************/
+
+/**
+   Writes the "configured station alias" to the slave's EEPROM.
+   \return 0 in case of success, else < 0
+   \ingroup RealtimeInterface
+*/
+
+int ecrt_slave_write_alias(ec_slave_t *slave, /**< EtherCAT slave */
+                           uint16_t alias /**< new alias */
+                           )
+{
+    return ec_slave_sii_write16(slave, 0x0004, alias);
+}
+
 /*****************************************************************************/
 
+/**< \cond */
+
 EXPORT_SYMBOL(ecrt_slave_write_alias);
+
+/**< \endcond */
 
 /*****************************************************************************/

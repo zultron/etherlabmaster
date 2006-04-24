@@ -1,12 +1,32 @@
 /******************************************************************************
  *
- *  m a s t e r . h
- *
- *  EtherCAT master structure.
- *
  *  $Id$
  *
+ *  Copyright (C) 2006  Florian Pose, Ingenieurgemeinschaft IgH
+ *
+ *  This file is part of the IgH EtherCAT Master.
+ *
+ *  The IgH EtherCAT Master is free software; you can redistribute it
+ *  and/or modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; version 2 of the License.
+ *
+ *  The IgH EtherCAT Master is distributed in the hope that it will be
+ *  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with the IgH EtherCAT Master; if not, write to the Free Software
+ *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
  *****************************************************************************/
+
+/**
+   \file
+   EtherCAT master structure.
+*/
+
+/*****************************************************************************/
 
 #ifndef _EC_MASTER_H_
 #define _EC_MASTER_H_
@@ -35,7 +55,7 @@ ec_master_mode_t;
 /*****************************************************************************/
 
 /**
-   Cyclic EtherCAT statistics.
+   Cyclic statistics.
 */
 
 typedef struct
@@ -52,7 +72,7 @@ ec_stats_t;
 /*****************************************************************************/
 
 /**
-   EtherCAT-Master.
+   EtherCAT master.
    Manages slaves, domains and IO.
 */
 
@@ -100,7 +120,6 @@ int ec_master_simple_io(ec_master_t *, ec_command_t *);
 int ec_master_bus_scan(ec_master_t *);
 
 // misc.
-void ec_master_debug(const ec_master_t *);
 void ec_master_output_stats(ec_master_t *);
 void ec_master_run_eoe(ec_master_t *);
 
