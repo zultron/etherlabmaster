@@ -33,70 +33,65 @@
 
 /**
    \file
-   Ethernet-over-EtherCAT (EoE)
+   EtherCAT finite state machines.
 */
 
 /*****************************************************************************/
 
-#include <linux/list.h>
-#include <linux/netdevice.h>
+#ifndef __EC_STATES__
+#define __EC_STATES__
 
 #include "../include/ecrt.h"
-#include "globals.h"
-#include "slave.h"
 #include "command.h"
+#include "slave.h"
+
+/*****************************************************************************/
+
+typedef struct ec_fsm ec_fsm_t;
 
 /*****************************************************************************/
 
 /**
-   Queued frame structure.
+   Finite state machine of an EtherCAT master.
 */
 
-typedef struct
+struct ec_fsm
 {
-    struct list_head queue; /**< list item */
-    struct sk_buff *skb; /**< socket buffer */
-}
-ec_eoe_frame_t;
+    ec_master_t *master; /**< master the FSM runs on */
+    ec_slave_t *slave; /**< slave the FSM runs on */
+    ec_command_t command; /**< command used in the state machine */
 
-/*****************************************************************************/
+    void (*master_state)(ec_fsm_t *); /**< master state function */
+    unsigned int master_slaves_responding; /**< number of responding slaves */
+    ec_slave_state_t master_slave_states; /**< states of responding slaves */
+    unsigned int master_validation; /**< non-zero, if validation to do */
 
-typedef struct ec_eoe ec_eoe_t;
+    void (*slave_state)(ec_fsm_t *); /**< slave state function */
+    uint8_t slave_sii_num; /**< SII value iteration counter */
+    uint8_t *slave_cat_data; /**< temporary memory for category data */
+    uint16_t slave_cat_offset; /**< current category word offset in EEPROM */
+    uint16_t slave_cat_data_offset; /**< current offset in category data */
+    uint16_t slave_cat_type; /**< type of current category */
+    uint16_t slave_cat_words; /**< number of words of current category */
 
-/**
-   Ethernet-over-EtherCAT (EoE) handler.
-   The master creates one of these objects for each slave that supports the
-   EoE protocol.
-*/
+    void (*sii_state)(ec_fsm_t *); /**< SII state function */
+    uint16_t sii_offset; /**< input: offset in SII */
+    unsigned int sii_mode; /**< SII reading done by APRD (0) or NPRD (1) */
+    uint32_t sii_result; /**< output: read SII value (32bit) */
+    cycles_t sii_start; /**< sii start */
 
-struct ec_eoe
-{
-    struct list_head list; /**< list item */
-    ec_slave_t *slave; /**< pointer to the corresponding slave */
-    void (*state)(ec_eoe_t *); /**< state function for the state machine */
-    struct net_device *dev; /**< net_device for virtual ethernet device */
-    struct net_device_stats stats; /**< device statistics */
-    unsigned int opened; /**< net_device is opened */
-    struct sk_buff *rx_skb; /**< current rx socket buffer */
-    off_t rx_skb_offset; /**< current write pointer in the socket buffer */
-    size_t rx_skb_size; /**< size of the allocated socket buffer memory */
-    uint8_t rx_expected_fragment; /**< next expected fragment number */
-    struct list_head tx_queue; /**< queue for frames to send */
-    unsigned int tx_queue_active; /**< kernel netif queue started */
-    unsigned int tx_queued_frames; /**< number of frames in the queue */
-    spinlock_t tx_queue_lock; /**< spinlock for the send queue */
-    ec_eoe_frame_t *tx_frame; /**< current TX frame */
-    uint8_t tx_frame_number; /**< number of the transmitted frame */
-    uint8_t tx_fragment_number; /**< number of the fragment */
-    size_t tx_offset; /**< number of octets sent */
+    void (*change_state)(ec_fsm_t *); /**< slave state change state function */
+    uint8_t change_new; /**< input: new state */
+    cycles_t change_start; /**< change start */
 };
 
 /*****************************************************************************/
 
-int ec_eoe_init(ec_eoe_t *);
-void ec_eoe_clear(ec_eoe_t *);
-void ec_eoe_run(ec_eoe_t *);
-unsigned int ec_eoe_active(const ec_eoe_t *);
-void ec_eoe_print(const ec_eoe_t *);
+int ec_fsm_init(ec_fsm_t *, ec_master_t *);
+void ec_fsm_clear(ec_fsm_t *);
+void ec_fsm_reset(ec_fsm_t *);
+void ec_fsm_execute(ec_fsm_t *);
 
 /*****************************************************************************/
+
+#endif

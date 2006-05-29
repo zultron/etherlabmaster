@@ -1,8 +1,8 @@
+#!/bin/sh
+
 #------------------------------------------------------------------------------
 #
-#  kbuild Makefile
-#
-#  IgH EtherCAT master device modules
+#  EtherCAT install script
 #
 #  $Id$
 #
@@ -35,40 +35,80 @@
 #
 #------------------------------------------------------------------------------
 
-ifneq ($(KERNELRELEASE),)
+# Fetch parameters
+
+if [ $# -ne 1 ]; then
+    echo "This script is called by \"make\". Run \"make install\" instead."
+    exit 1
+fi
+
+KERNEL=$1
+
+if [ ! -d /lib/modules/$KERNEL ]; then
+    echo "Kernel \"$KERNEL\" does not exist in /lib/modules!"
+    exit 1
+fi
 
 #------------------------------------------------------------------------------
-#  kbuild section
 
-obj-m := ec_8139too.o
+# Copy files
 
-ec_8139too-objs := 8139too.o
+INSTALLDIR=/lib/modules/$KERNEL/kernel/drivers/net
+MODULES=(master/ec_master.ko devices/ec_8139too.ko)
 
-REV := $(shell svnversion $(src) 2>/dev/null)
+echo "EtherCAT installer - Kernel: $KERNEL"
+echo "  Installing modules"
 
-EXTRA_CFLAGS = -DEC_REV=$(REV) -DEC_USER=$(USER)
+for mod in ${MODULES[*]}; do
+    echo "    $mod"
+    cp $mod $INSTALLDIR || exit 1
+done
 
 #------------------------------------------------------------------------------
 
+# Update dependencies
+
+echo "  Building module dependencies"
+depmod
+
+#------------------------------------------------------------------------------
+
+# Create configuration file
+
+CONFIGFILE=/etc/sysconfig/ethercat
+
+if [ -s $CONFIGFILE ]; then
+    echo "  Note: Using existing configuration file."
 else
-
-#------------------------------------------------------------------------------
-#  default section
-
-ifneq ($(wildcard ../ethercat.conf),)
-include ../ethercat.conf
-else
-KERNEL := $(shell uname -r)
-endif
-
-KERNELDIR := /lib/modules/$(KERNEL)/build
-
-modules:
-	$(MAKE) -C $(KERNELDIR) M=`pwd`
-
-clean:
-	$(MAKE) -C $(KERNELDIR) M=`pwd` clean
+    echo "  Creating $CONFIGFILE"
+    cp script/sysconfig $CONFIGFILE || exit 1
+    echo "  Note: Please edit DEVICE_INDEX in $CONFIGFILE!"
+fi
 
 #------------------------------------------------------------------------------
 
-endif
+# Install rc script
+
+echo "  Installing startup script"
+cp script/ethercat.sh /etc/init.d/ethercat || exit 1
+chmod +x /etc/init.d/ethercat || exit 1
+if [ ! -L /usr/sbin/rcethercat ]; then
+    ln -s /etc/init.d/ethercat /usr/sbin/rcethercat || exit 1
+fi
+
+#------------------------------------------------------------------------------
+
+# Install tools
+
+echo "  Installing tools"
+cp script/ec_list.pl /usr/local/bin/ec_list || exit 1
+chmod +x /usr/local/bin/ec_list || exit 1
+
+#------------------------------------------------------------------------------
+
+# Finish
+
+echo "Done"
+exit 0
+
+#------------------------------------------------------------------------------

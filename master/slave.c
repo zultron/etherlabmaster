@@ -8,7 +8,8 @@
  *
  *  The IgH EtherCAT Master is free software; you can redistribute it
  *  and/or modify it under the terms of the GNU General Public License
- *  as published by the Free Software Foundation; version 2 of the License.
+ *  as published by the Free Software Foundation; either version 2 of the
+ *  License, or (at your option) any later version.
  *
  *  The IgH EtherCAT Master is distributed in the hope that it will be
  *  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,6 +19,15 @@
  *  You should have received a copy of the GNU General Public License
  *  along with the IgH EtherCAT Master; if not, write to the Free Software
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ *  The right to use EtherCAT Technology is granted and comes free of
+ *  charge under condition of compatibility of product made by
+ *  Licensee. People intending to distribute/sell products based on the
+ *  code, have to sign an agreement to guarantee that products using
+ *  software based on IgH EtherCAT master stay compatible with the actual
+ *  EtherCAT specification (which are released themselves as an open
+ *  standard) as the (only) precondition to have the right to use EtherCAT
+ *  Technology, IP and trade marks.
  *
  *****************************************************************************/
 
@@ -38,13 +48,14 @@
 
 /*****************************************************************************/
 
+extern const ec_code_msg_t al_status_messages[];
+
+/*****************************************************************************/
+
 int ec_slave_fetch_categories(ec_slave_t *);
-int ec_slave_fetch_strings(ec_slave_t *, const uint8_t *);
-int ec_slave_fetch_general(ec_slave_t *, const uint8_t *);
-int ec_slave_fetch_sync(ec_slave_t *, const uint8_t *, size_t);
-int ec_slave_fetch_pdo(ec_slave_t *, const uint8_t *, size_t, ec_pdo_type_t);
-int ec_slave_locate_string(ec_slave_t *, unsigned int, char **);
 ssize_t ec_show_slave_attribute(struct kobject *, struct attribute *, char *);
+ssize_t ec_store_slave_attribute(struct kobject *, struct attribute *,
+                                 const char *, size_t);
 
 /*****************************************************************************/
 
@@ -55,7 +66,9 @@ EC_SYSFS_READ_ATTR(coupler_address);
 EC_SYSFS_READ_ATTR(vendor_name);
 EC_SYSFS_READ_ATTR(product_name);
 EC_SYSFS_READ_ATTR(product_desc);
+EC_SYSFS_READ_ATTR(sii_name);
 EC_SYSFS_READ_ATTR(type);
+EC_SYSFS_READ_WRITE_ATTR(state);
 
 static struct attribute *def_attrs[] = {
     &attr_ring_position,
@@ -63,13 +76,15 @@ static struct attribute *def_attrs[] = {
     &attr_vendor_name,
     &attr_product_name,
     &attr_product_desc,
+    &attr_sii_name,
     &attr_type,
+    &attr_state,
     NULL,
 };
 
 static struct sysfs_ops sysfs_ops = {
-    .show = &ec_show_slave_attribute,
-    .store = NULL
+    .show = ec_show_slave_attribute,
+    .store = ec_store_slave_attribute
 };
 
 static struct kobj_type ktype_ec_slave = {
@@ -79,10 +94,6 @@ static struct kobj_type ktype_ec_slave = {
 };
 
 /** \endcond */
-
-/*****************************************************************************/
-
-const ec_code_msg_t al_status_messages[];
 
 /*****************************************************************************/
 
@@ -134,9 +145,14 @@ int ec_slave_init(ec_slave_t *slave, /**< EtherCAT slave */
     slave->type = NULL;
     slave->registered = 0;
     slave->fmmu_count = 0;
-    slave->eeprom_name = NULL;
     slave->eeprom_group = NULL;
-    slave->eeprom_desc = NULL;
+    slave->eeprom_image = NULL;
+    slave->eeprom_order = NULL;
+    slave->eeprom_name = NULL;
+    slave->requested_state = EC_SLAVE_STATE_UNKNOWN;
+    slave->current_state = EC_SLAVE_STATE_UNKNOWN;
+    slave->state_error = 0;
+    slave->online = 1;
 
     ec_command_init(&slave->mbox_command);
 
@@ -200,9 +216,10 @@ void ec_slave_clear(struct kobject *kobj /**< kobject of the slave */)
         kfree(pdo);
     }
 
-    if (slave->eeprom_name) kfree(slave->eeprom_name);
     if (slave->eeprom_group) kfree(slave->eeprom_group);
-    if (slave->eeprom_desc) kfree(slave->eeprom_desc);
+    if (slave->eeprom_image) kfree(slave->eeprom_image);
+    if (slave->eeprom_order) kfree(slave->eeprom_order);
+    if (slave->eeprom_name) kfree(slave->eeprom_name);
 
     // free all SDOs
     list_for_each_entry_safe(sdo, next_sdo, &slave->sdo_dictionary, list) {
@@ -492,6 +509,7 @@ int ec_slave_sii_write16(ec_slave_t *slave,
 /**
    Fetches data from slave's EEPROM.
    \return 0 in case of success, else < 0
+   \todo memory allocation
 */
 
 int ec_slave_fetch_categories(ec_slave_t *slave /**< EtherCAT slave */)
@@ -632,9 +650,11 @@ int ec_slave_fetch_general(ec_slave_t *slave, /**< EtherCAT slave */
 
     if (ec_slave_locate_string(slave, data[0], &slave->eeprom_group))
         return -1;
-    if (ec_slave_locate_string(slave, data[1], &slave->eeprom_name))
+    if (ec_slave_locate_string(slave, data[1], &slave->eeprom_image))
         return -1;
-    if (ec_slave_locate_string(slave, data[3], &slave->eeprom_desc))
+    if (ec_slave_locate_string(slave, data[2], &slave->eeprom_order))
+        return -1;
+    if (ec_slave_locate_string(slave, data[3], &slave->eeprom_name))
         return -1;
 
     for (i = 0; i < 4; i++)
@@ -824,6 +844,7 @@ void ec_slave_state_ack(ec_slave_t *slave, /**< EtherCAT slave */
         if (ec_command_nprd(command, slave->station_address, 0x0130, 2))
             return;
         if (unlikely(ec_master_simple_io(slave->master, command))) {
+            slave->current_state = EC_SLAVE_STATE_UNKNOWN;
             EC_WARN("Acknowledge checking failed on slave %i!\n",
                     slave->ring_position);
             return;
@@ -832,12 +853,14 @@ void ec_slave_state_ack(ec_slave_t *slave, /**< EtherCAT slave */
         end = get_cycles();
 
         if (likely(EC_READ_U8(command->data) == state)) {
+            slave->current_state = state;
             EC_INFO("Acknowleged state 0x%02X on slave %i.\n", state,
                     slave->ring_position);
             return;
         }
 
         if (unlikely((end - start) >= timeout)) {
+            slave->current_state = EC_SLAVE_STATE_UNKNOWN;
             EC_WARN("Failed to acknowledge state 0x%02X on slave %i"
                     " - Timeout!\n", state, slave->ring_position);
             return;
@@ -897,6 +920,8 @@ int ec_slave_state_change(ec_slave_t *slave, /**< EtherCAT slave */
 
     command = &slave->master->simple_command;
 
+    slave->requested_state = state;
+
     if (ec_command_npwr(command, slave->station_address, 0x0120, 2)) return -1;
     EC_WRITE_U16(command->data, state);
     if (unlikely(ec_master_simple_io(slave->master, command))) {
@@ -915,6 +940,7 @@ int ec_slave_state_change(ec_slave_t *slave, /**< EtherCAT slave */
         if (ec_command_nprd(command, slave->station_address, 0x0130, 2))
             return -1;
         if (unlikely(ec_master_simple_io(slave->master, command))) {
+            slave->current_state = EC_SLAVE_STATE_UNKNOWN;
             EC_ERR("Failed to check state 0x%02X on slave %i!\n",
                    state, slave->ring_position);
             return -1;
@@ -926,16 +952,20 @@ int ec_slave_state_change(ec_slave_t *slave, /**< EtherCAT slave */
             EC_ERR("Failed to set state 0x%02X - Slave %i refused state change"
                    " (code 0x%02X)!\n", state, slave->ring_position,
                    EC_READ_U8(command->data));
-            state = EC_READ_U8(command->data) & 0x0F;
+            slave->current_state = EC_READ_U8(command->data);
+            state = slave->current_state & 0x0F;
             ec_slave_read_al_status_code(slave);
             ec_slave_state_ack(slave, state);
             return -1;
         }
 
-        if (likely(EC_READ_U8(command->data) == (state & 0x0F)))
+        if (likely(EC_READ_U8(command->data) == (state & 0x0F))) {
+            slave->current_state = state;
             return 0; // state change successful
+        }
 
         if (unlikely((end - start) >= timeout)) {
+            slave->current_state = EC_SLAVE_STATE_UNKNOWN;
             EC_ERR("Failed to check state 0x%02X of slave %i - Timeout!\n",
                    state, slave->ring_position);
             return -1;
@@ -1100,12 +1130,14 @@ void ec_slave_print(const ec_slave_t *slave, /**< EtherCAT slave */
     EC_INFO("    Revision number: 0x%08X, Serial number: 0x%08X\n",
             slave->sii_revision_number, slave->sii_serial_number);
 
-    if (slave->eeprom_name)
-        EC_INFO("    Name: %s\n", slave->eeprom_name);
     if (slave->eeprom_group)
         EC_INFO("    Group: %s\n", slave->eeprom_group);
-    if (slave->eeprom_desc)
-        EC_INFO("    Description: %s\n", slave->eeprom_desc);
+    if (slave->eeprom_image)
+        EC_INFO("    Image: %s\n", slave->eeprom_image);
+    if (slave->eeprom_order)
+        EC_INFO("    Order#: %s\n", slave->eeprom_order);
+    if (slave->eeprom_name)
+        EC_INFO("    Name: %s\n", slave->eeprom_name);
 
     if (!list_empty(&slave->eeprom_syncs)) {
         EC_INFO("    Sync-Managers:\n");
@@ -1209,7 +1241,6 @@ int ec_slave_check_crc(ec_slave_t *slave /**< EtherCAT slave */)
 /**
    Formats attribute data for SysFS read access.
    \return number of bytes to read
-   \ingroup RealTimeInterface
 */
 
 ssize_t ec_show_slave_attribute(struct kobject *kobj, /**< slave's kobject */
@@ -1238,12 +1269,30 @@ ssize_t ec_show_slave_attribute(struct kobject *kobj, /**< slave's kobject */
         if (slave->type)
             return sprintf(buffer, "%s\n", slave->type->description);
     }
+    else if (attr == &attr_sii_name) {
+        if (slave->eeprom_name)
+            return sprintf(buffer, "%s\n", slave->eeprom_name);
+    }
     else if (attr == &attr_type) {
         if (slave->type) {
             if (slave->type->special == EC_TYPE_BUS_COUPLER)
                 return sprintf(buffer, "coupler\n");
             else
                 return sprintf(buffer, "normal\n");
+        }
+    }
+    else if (attr == &attr_state) {
+        switch (slave->current_state) {
+            case EC_SLAVE_STATE_INIT:
+                return sprintf(buffer, "INIT\n");
+            case EC_SLAVE_STATE_PREOP:
+                return sprintf(buffer, "PREOP\n");
+            case EC_SLAVE_STATE_SAVEOP:
+                return sprintf(buffer, "SAVEOP\n");
+            case EC_SLAVE_STATE_OP:
+                return sprintf(buffer, "OP\n");
+            default:
+                return sprintf(buffer, "UNKNOWN\n");
         }
     }
 
@@ -1253,28 +1302,45 @@ ssize_t ec_show_slave_attribute(struct kobject *kobj, /**< slave's kobject */
 /*****************************************************************************/
 
 /**
-   Application layer status messages.
+   Formats attribute data for SysFS write access.
+   \return number of bytes processed, or negative error code
 */
 
-const ec_code_msg_t al_status_messages[] = {
-    {0x0001, "Unspecified error"},
-    {0x0011, "Invalud requested state change"},
-    {0x0012, "Unknown requested state"},
-    {0x0013, "Bootstrap not supported"},
-    {0x0014, "No valid firmware"},
-    {0x0015, "Invalid mailbox configuration"},
-    {0x0016, "Invalid mailbox configuration"},
-    {0x0017, "Invalid sync manager configuration"},
-    {0x0018, "No valid inputs available"},
-    {0x0019, "No valid outputs"},
-    {0x001A, "Synchronisation error"},
-    {0x001B, "Sync manager watchdog"},
-    {0x0020, "Slave needs cold start"},
-    {0x0021, "Slave needs INIT"},
-    {0x0022, "Slave needs PREOP"},
-    {0x0023, "Slave needs SAVEOP"},
-    {}
-};
+ssize_t ec_store_slave_attribute(struct kobject *kobj, /**< slave's kobject */
+                                 struct attribute *attr, /**< attribute */
+                                 const char *buffer, /**< memory with data */
+                                 size_t size /**< size of data to store */
+                                 )
+{
+    ec_slave_t *slave = container_of(kobj, ec_slave_t, kobj);
+
+    if (attr == &attr_state) {
+        if (!strcmp(buffer, "INIT\n")) {
+            slave->requested_state = EC_SLAVE_STATE_INIT;
+            slave->state_error = 0;
+            return size;
+        }
+        else if (!strcmp(buffer, "PREOP\n")) {
+            slave->requested_state = EC_SLAVE_STATE_PREOP;
+            slave->state_error = 0;
+            return size;
+        }
+        else if (!strcmp(buffer, "SAVEOP\n")) {
+            slave->requested_state = EC_SLAVE_STATE_SAVEOP;
+            slave->state_error = 0;
+            return size;
+        }
+        else if (!strcmp(buffer, "OP\n")) {
+            slave->requested_state = EC_SLAVE_STATE_OP;
+            slave->state_error = 0;
+            return size;
+        }
+
+        EC_ERR("Failed to set slave state!\n");
+    }
+
+    return -EINVAL;
+}
 
 /******************************************************************************
  *  Realtime interface

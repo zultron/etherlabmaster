@@ -12,7 +12,8 @@
  *
  *  The IgH EtherCAT Master is free software; you can redistribute it
  *  and/or modify it under the terms of the GNU General Public License
- *  as published by the Free Software Foundation; version 2 of the License.
+ *  as published by the Free Software Foundation; either version 2 of the
+ *  License, or (at your option) any later version.
  *
  *  The IgH EtherCAT Master is distributed in the hope that it will be
  *  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -23,13 +24,24 @@
  *  along with the IgH EtherCAT Master; if not, write to the Free Software
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *
+ *  The right to use EtherCAT Technology is granted and comes free of
+ *  charge under condition of compatibility of product made by
+ *  Licensee. People intending to distribute/sell products based on the
+ *  code, have to sign an agreement to guarantee that products using
+ *  software based on IgH EtherCAT master stay compatible with the actual
+ *  EtherCAT specification (which are released themselves as an open
+ *  standard) as the (only) precondition to have the right to use EtherCAT
+ *  Technology, IP and trade marks.
+ *
  *****************************************************************************/
 
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
+#include <linux/spinlock.h>
+#include <linux/interrupt.h>
 
-#include "../include/ecrt.h" // EtherCAT realtime interface
+#include "../../include/ecrt.h" // EtherCAT realtime interface
 
 #define ASYNC
 #define FREQUENCY 100
@@ -41,6 +53,7 @@ struct timer_list timer;
 // EtherCAT
 ec_master_t *master = NULL;
 ec_domain_t *domain1 = NULL;
+spinlock_t master_lock = SPIN_LOCK_UNLOCKED;
 
 // data fields
 //void *r_ssi_input, *r_ssi_status, *r_4102[3];
@@ -50,7 +63,7 @@ uint32_t k_pos;
 uint8_t k_stat;
 
 ec_field_init_t domain1_fields[] = {
-    {NULL, "1", "Beckhoff", "EL5001", "InputValue",   0},
+    {NULL, "3", "Beckhoff", "EL5001", "InputValue",   0},
     {NULL, "2", "Beckhoff", "EL4132", "OutputValue",  0},
     {}
 };
@@ -60,6 +73,8 @@ ec_field_init_t domain1_fields[] = {
 void run(unsigned long data)
 {
     static unsigned int counter = 0;
+
+    spin_lock(&master_lock);
 
 #ifdef ASYNC
     // receive
@@ -83,6 +98,8 @@ void run(unsigned long data)
     ecrt_master_async_send(master);
 #endif
 
+    spin_unlock(&master_lock);
+
     if (counter) {
         counter--;
     }
@@ -99,6 +116,21 @@ void run(unsigned long data)
 
 /*****************************************************************************/
 
+int request_lock(void *data)
+{
+    spin_lock_bh(&master_lock);
+    return 0; // access allowed
+}
+
+/*****************************************************************************/
+
+void release_lock(void *data)
+{
+    spin_unlock_bh(&master_lock);
+}
+
+/*****************************************************************************/
+
 int __init init_mini_module(void)
 {
     printk(KERN_INFO "=== Starting Minimal EtherCAT environment... ===\n");
@@ -107,6 +139,8 @@ int __init init_mini_module(void)
         printk(KERN_ERR "Requesting master 0 failed!\n");
         goto out_return;
     }
+
+    ecrt_master_callbacks(master, request_lock, release_lock, NULL);
 
     printk(KERN_INFO "Registering domain...\n");
     if (!(domain1 = ecrt_master_create_domain(master)))
@@ -136,7 +170,6 @@ int __init init_mini_module(void)
 #else
     ecrt_master_print(master, 0);
 #endif
-
 
 #if 0
     if (!(slave = ecrt_master_get_slave(master, "5"))) {
@@ -171,6 +204,13 @@ int __init init_mini_module(void)
     ecrt_master_prepare_async_io(master);
 #endif
 
+#if 1
+    if (ecrt_master_start_eoe(master)) {
+        printk(KERN_ERR "Failed to start EoE processing!\n");
+        goto out_deactivate;
+    }
+#endif
+
     printk("Starting cyclic sample thread.\n");
     init_timer(&timer);
     timer.function = run;
@@ -180,7 +220,7 @@ int __init init_mini_module(void)
     printk(KERN_INFO "=== Minimal EtherCAT environment started. ===\n");
     return 0;
 
-#if 0
+#if 1
  out_deactivate:
     ecrt_master_deactivate(master);
 #endif

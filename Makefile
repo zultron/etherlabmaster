@@ -10,7 +10,8 @@
 #
 #  The IgH EtherCAT Master is free software; you can redistribute it
 #  and/or modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; version 2 of the License.
+#  as published by the Free Software Foundation; either version 2 of the
+#  License, or (at your option) any later version.
 #
 #  The IgH EtherCAT Master is distributed in the hope that it will be
 #  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,36 +22,43 @@
 #  along with the IgH EtherCAT Master; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #
+#  The right to use EtherCAT Technology is granted and comes free of
+#  charge under condition of compatibility of product made by
+#  Licensee. People intending to distribute/sell products based on the
+#  code, have to sign an agreement to guarantee that products using
+#  software based on IgH EtherCAT master stay compatible with the actual
+#  EtherCAT specification (which are released themselves as an open
+#  standard) as the (only) precondition to have the right to use EtherCAT
+#  Technology, IP and trade marks.
+#
 #------------------------------------------------------------------------------
-
-ifneq ($(KERNELRELEASE),)
 
 #------------------------------------------------------------------------------
 #  kbuild section
 
+ifneq ($(KERNELRELEASE),)
+
 obj-m := master/ devices/
-
-#------------------------------------------------------------------------------
-
-else
 
 #------------------------------------------------------------------------------
 #  default section
 
+else
+
 ifneq ($(wildcard ethercat.conf),)
 include ethercat.conf
 else
-KERNEL := `uname -r`
-DEVICEINDEX := 99
+KERNEL := $(shell uname -r)
 endif
 
-KERNELDIR := /lib/modules/$(KERNEL)/build
+KERNEL_DIR := /lib/modules/$(KERNEL)/build
+CURRENT_DIR := $(shell pwd)
 
 modules:
-	$(MAKE) -C $(KERNELDIR) M=`pwd`
+	$(MAKE) -C $(KERNEL_DIR) M=$(CURRENT_DIR)
 
 clean: cleandoc
-	$(MAKE) -C $(KERNELDIR) M=`pwd` clean
+	$(MAKE) -C $(KERNEL_DIR) M=$(CURRENT_DIR) clean
 
 doc:
 	doxygen Doxyfile
@@ -58,9 +66,8 @@ doc:
 cleandoc:
 	@rm -rf doc
 
-
 install:
-	@./install.sh $(KERNEL) $(DEVICEINDEX)
+	@script/install.sh $(KERNEL)
 
 #------------------------------------------------------------------------------
 

@@ -8,7 +8,8 @@
  *
  *  The IgH EtherCAT Master is free software; you can redistribute it
  *  and/or modify it under the terms of the GNU General Public License
- *  as published by the Free Software Foundation; version 2 of the License.
+ *  as published by the Free Software Foundation; either version 2 of the
+ *  License, or (at your option) any later version.
  *
  *  The IgH EtherCAT Master is distributed in the hope that it will be
  *  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,6 +19,15 @@
  *  You should have received a copy of the GNU General Public License
  *  along with the IgH EtherCAT Master; if not, write to the Free Software
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ *  The right to use EtherCAT Technology is granted and comes free of
+ *  charge under condition of compatibility of product made by
+ *  Licensee. People intending to distribute/sell products based on the
+ *  code, have to sign an agreement to guarantee that products using
+ *  software based on IgH EtherCAT master stay compatible with the actual
+ *  EtherCAT specification (which are released themselves as an open
+ *  standard) as the (only) precondition to have the right to use EtherCAT
+ *  Technology, IP and trade marks.
  *
  *****************************************************************************/
 
@@ -32,6 +42,7 @@
 #define _EC_COMMAND_H_
 
 #include <linux/list.h>
+#include <linux/timex.h>
 
 #include "globals.h"
 
@@ -106,6 +117,7 @@ typedef struct
     uint8_t index; /**< command index (set by master) */
     uint16_t working_counter; /**< working counter */
     ec_command_state_t state; /**< command state */
+    cycles_t t_sent; /**< time, the commands was sent */
 }
 ec_command_t;
 
@@ -113,6 +125,7 @@ ec_command_t;
 
 void ec_command_init(ec_command_t *);
 void ec_command_clear(ec_command_t *);
+int ec_command_prealloc(ec_command_t *, size_t);
 
 int ec_command_nprd(ec_command_t *, uint16_t, uint16_t, size_t);
 int ec_command_npwr(ec_command_t *, uint16_t, uint16_t, size_t);

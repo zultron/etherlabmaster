@@ -8,7 +8,8 @@
  *
  *  The IgH EtherCAT Master is free software; you can redistribute it
  *  and/or modify it under the terms of the GNU General Public License
- *  as published by the Free Software Foundation; version 2 of the License.
+ *  as published by the Free Software Foundation; either version 2 of the
+ *  License, or (at your option) any later version.
  *
  *  The IgH EtherCAT Master is distributed in the hope that it will be
  *  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,6 +19,15 @@
  *  You should have received a copy of the GNU General Public License
  *  along with the IgH EtherCAT Master; if not, write to the Free Software
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ *  The right to use EtherCAT Technology is granted and comes free of
+ *  charge under condition of compatibility of product made by
+ *  Licensee. People intending to distribute/sell products based on the
+ *  code, have to sign an agreement to guarantee that products using
+ *  software based on IgH EtherCAT master stay compatible with the actual
+ *  EtherCAT specification (which are released themselves as an open
+ *  standard) as the (only) precondition to have the right to use EtherCAT
+ *  Technology, IP and trade marks.
  *
  *****************************************************************************/
 
@@ -255,13 +265,19 @@ struct ec_slave
     struct list_head eeprom_syncs; /**< EEPROM SYNC MANAGER categories */
     struct list_head eeprom_pdos; /**< EEPROM [RT]XPDO categories */
 
-    char *eeprom_name; /**< slave name acc. to EEPROM */
     char *eeprom_group; /**< slave group acc. to EEPROM */
-    char *eeprom_desc; /**< slave description acc. to EEPROM */
+    char *eeprom_image; /**< slave image name acc. to EEPROM */
+    char *eeprom_order; /**< slave order number acc. to EEPROM */
+    char *eeprom_name; /**< slave name acc. to EEPROM */
 
     struct list_head sdo_dictionary; /**< SDO directory list */
 
     ec_command_t mbox_command; /**< mailbox command */
+
+    ec_slave_state_t requested_state; /**< requested slave state */
+    ec_slave_state_t current_state; /**< current slave state */
+    unsigned int state_error; /**< a state error has happened */
+    unsigned int online; /**< non-zero, if the slave responds. */
 };
 
 /*****************************************************************************/
@@ -281,6 +297,13 @@ int ec_slave_prepare_fmmu(ec_slave_t *, const ec_domain_t *,
 
 // CoE
 int ec_slave_fetch_sdo_list(ec_slave_t *);
+
+// state machine
+int ec_slave_fetch_strings(ec_slave_t *, const uint8_t *);
+int ec_slave_fetch_general(ec_slave_t *, const uint8_t *);
+int ec_slave_fetch_sync(ec_slave_t *, const uint8_t *, size_t);
+int ec_slave_fetch_pdo(ec_slave_t *, const uint8_t *, size_t, ec_pdo_type_t);
+int ec_slave_locate_string(ec_slave_t *, unsigned int, char **);
 
 // misc.
 void ec_slave_print(const ec_slave_t *, unsigned int);

@@ -8,7 +8,8 @@
  *
  *  The IgH EtherCAT Master is free software; you can redistribute it
  *  and/or modify it under the terms of the GNU General Public License
- *  as published by the Free Software Foundation; version 2 of the License.
+ *  as published by the Free Software Foundation; either version 2 of the
+ *  License, or (at your option) any later version.
  *
  *  The IgH EtherCAT Master is distributed in the hope that it will be
  *  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,6 +19,15 @@
  *  You should have received a copy of the GNU General Public License
  *  along with the IgH EtherCAT Master; if not, write to the Free Software
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ *  The right to use EtherCAT Technology is granted and comes free of
+ *  charge under condition of compatibility of product made by
+ *  Licensee. People intending to distribute/sell products based on the
+ *  code, have to sign an agreement to guarantee that products using
+ *  software based on IgH EtherCAT master stay compatible with the actual
+ *  EtherCAT specification (which are released themselves as an open
+ *  standard) as the (only) precondition to have the right to use EtherCAT
+ *  Technology, IP and trade marks.
  *
  *****************************************************************************/
 
@@ -120,7 +130,7 @@
 
 */
 
-#define DRV_NAME	"8139too_ec"
+#define DRV_NAME	"ec_8139too"
 #define DRV_VERSION	"0.9.27"
 
 #include <linux/config.h>
@@ -329,7 +339,12 @@ static struct pci_device_id rtl8139_pci_tbl[] = {
 
 	{0,}
 };
-MODULE_DEVICE_TABLE (pci, rtl8139_pci_tbl);
+
+/* EtherCAT >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>*/
+
+//MODULE_DEVICE_TABLE (pci, rtl8139_pci_tbl);
+
+/* EtherCAT <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
 
 static struct {
 	const char str[ETH_GSTRING_LEN];
@@ -2219,8 +2234,7 @@ no_early_rx:
                 else
                 {
                     ecdev_receive(rtl_ec_dev,
-                                  &rx_ring[ring_offset + 4] + ETH_HLEN,
-                                  pkt_size - ETH_HLEN);
+                                  &rx_ring[ring_offset + 4], pkt_size);
                     dev->last_rx = jiffies;
                     tp->stats.rx_bytes += pkt_size;
                     tp->stats.rx_packets++;

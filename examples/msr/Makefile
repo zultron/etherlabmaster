@@ -1,8 +1,8 @@
 #------------------------------------------------------------------------------
 #
-#  kbuild Makefile
+#  Makefile
 #
-#  IgH EtherCAT master device modules
+#  Sample module for use with IgH MSR library.
 #
 #  $Id$
 #
@@ -35,28 +35,42 @@
 #
 #------------------------------------------------------------------------------
 
-ifneq ($(KERNELRELEASE),)
+MODULE := ec_msr_sample
 
 #------------------------------------------------------------------------------
 #  kbuild section
+#------------------------------------------------------------------------------
 
-obj-m := ec_8139too.o
+ifneq ($(KERNELRELEASE),)
 
-ec_8139too-objs := 8139too.o
+obj-m := $(MODULE).o
 
-REV := $(shell svnversion $(src) 2>/dev/null)
+$(MODULE)-objs := msr_sample.o \
+			rt_lib/msr-core/msr_lists.o \
+			rt_lib/msr-core/msr_main.o \
+			rt_lib/msr-core/msr_charbuf.o \
+			rt_lib/msr-core/msr_reg.o \
+			rt_lib/msr-core/msr_interpreter.o \
+			rt_lib/msr-core/msr_messages.o \
+			rt_lib/msr-core/msr_proc.o \
+			rt_lib/msr-core/msr_error_reg.o \
+			rt_lib/msr-utils/msr_utils.o \
+			rt_lib/msr-utils/msr_time.o \
+			rt_lib/msr-math/msr_base64.o \
+			rt_lib/msr-math/msr_hex_bin.o \
+			libm.o
 
-EXTRA_CFLAGS = -DEC_REV=$(REV) -DEC_USER=$(USER)
+EXTRA_CFLAGS := -I$(src)/rt_lib/msr-include -I/usr/realtime/include \
+		-D_SIMULATION -mhard-float
 
+#------------------------------------------------------------------------------
+#  default section
 #------------------------------------------------------------------------------
 
 else
 
-#------------------------------------------------------------------------------
-#  default section
-
-ifneq ($(wildcard ../ethercat.conf),)
-include ../ethercat.conf
+ifneq ($(wildcard kernel.conf),)
+include kernel.conf
 else
 KERNEL := $(shell uname -r)
 endif
@@ -69,6 +83,9 @@ modules:
 clean:
 	$(MAKE) -C $(KERNELDIR) M=`pwd` clean
 
-#------------------------------------------------------------------------------
+install:
+	@./install.sh $(MODULE) $(KERNEL)
 
 endif
+
+#------------------------------------------------------------------------------

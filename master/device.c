@@ -8,7 +8,8 @@
  *
  *  The IgH EtherCAT Master is free software; you can redistribute it
  *  and/or modify it under the terms of the GNU General Public License
- *  as published by the Free Software Foundation; version 2 of the License.
+ *  as published by the Free Software Foundation; either version 2 of the
+ *  License, or (at your option) any later version.
  *
  *  The IgH EtherCAT Master is distributed in the hope that it will be
  *  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,6 +19,15 @@
  *  You should have received a copy of the GNU General Public License
  *  along with the IgH EtherCAT Master; if not, write to the Free Software
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ *  The right to use EtherCAT Technology is granted and comes free of
+ *  charge under condition of compatibility of product made by
+ *  Licensee. People intending to distribute/sell products based on the
+ *  code, have to sign an agreement to guarantee that products using
+ *  software based on IgH EtherCAT master stay compatible with the actual
+ *  EtherCAT specification (which are released themselves as an open
+ *  standard) as the (only) precondition to have the right to use EtherCAT
+ *  Technology, IP and trade marks.
  *
  *****************************************************************************/
 
@@ -61,9 +71,14 @@ int ec_device_init(ec_device_t *device, /**< EtherCAT device */
     device->open = 0;
     device->link_state = 0; // down
 
-    if (!(device->tx_skb = dev_alloc_skb(ETH_HLEN + EC_MAX_FRAME_SIZE))) {
+    if (ec_debug_init(&device->dbg)) {
+        EC_ERR("Failed to init debug device!\n");
+        goto out_return;
+    }
+
+    if (!(device->tx_skb = dev_alloc_skb(ETH_FRAME_LEN))) {
         EC_ERR("Error allocating device socket buffer!\n");
-        return -1;
+        goto out_debug;
     }
 
     device->tx_skb->dev = net_dev;
@@ -76,6 +91,11 @@ int ec_device_init(ec_device_t *device, /**< EtherCAT device */
     memset(eth->h_dest, 0xFF, net_dev->addr_len);
 
     return 0;
+
+ out_debug:
+    ec_debug_clear(&device->dbg);
+ out_return:
+    return -1;
 }
 
 /*****************************************************************************/
@@ -88,6 +108,7 @@ void ec_device_clear(ec_device_t *device /**< EtherCAT device */)
 {
     if (device->open) ec_device_close(device);
     if (device->tx_skb) dev_kfree_skb(device->tx_skb);
+    ec_debug_clear(&device->dbg);
 }
 
 /*****************************************************************************/
@@ -180,6 +201,8 @@ void ec_device_send(ec_device_t *device, /**< EtherCAT device */
         ec_print_data(device->tx_skb->data + ETH_HLEN, size);
     }
 
+    ec_debug_send(&device->dbg, device->tx_skb->data, ETH_HLEN + size);
+
     // start sending
     device->dev->hard_start_xmit(device->tx_skb, device->dev);
 }
@@ -210,16 +233,19 @@ void ec_device_call_isr(ec_device_t *device /**< EtherCAT device */)
 */
 
 void ecdev_receive(ec_device_t *device, /**< EtherCAT device */
-                   const void *data, /**< pointer to receibed data */
+                   const void *data, /**< pointer to received data */
                    size_t size /**< number of bytes received */
                    )
 {
     if (unlikely(device->master->debug_level > 1)) {
         EC_DBG("Received frame:\n");
-        ec_print_data_diff(device->tx_skb->data + ETH_HLEN, data, size);
+        ec_print_data_diff(device->tx_skb->data + ETH_HLEN,
+                           data + ETH_HLEN, size - ETH_HLEN);
     }
 
-    ec_master_receive(device->master, data, size);
+    ec_debug_send(&device->dbg, data, size);
+
+    ec_master_receive(device->master, data + ETH_HLEN, size - ETH_HLEN);
 }
 
 /*****************************************************************************/

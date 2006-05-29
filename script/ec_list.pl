@@ -6,7 +6,7 @@
 #
 #  Userspace tool for listing EtherCAT slaves.
 #
-#  $Id: slave.c 340 2006-04-11 10:17:30Z fp $
+#  $Id$
 #
 #  Copyright (C) 2006  Florian Pose, Ingenieurgemeinschaft IgH
 #
@@ -14,7 +14,8 @@
 #
 #  The IgH EtherCAT Master is free software; you can redistribute it
 #  and/or modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; version 2 of the License.
+#  as published by the Free Software Foundation; either version 2 of the
+#  License, or (at your option) any later version.
 #
 #  The IgH EtherCAT Master is distributed in the hope that it will be
 #  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -25,6 +26,15 @@
 #  along with the IgH EtherCAT Master; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #
+#  The right to use EtherCAT Technology is granted and comes free of
+#  charge under condition of compatibility of product made by
+#  Licensee. People intending to distribute/sell products based on the
+#  code, have to sign an agreement to guarantee that products using
+#  software based on IgH EtherCAT master stay compatible with the actual
+#  EtherCAT specification (which are released themselves as an open
+#  standard) as the (only) precondition to have the right to use EtherCAT
+#  Technology, IP and trade marks.
+#
 #------------------------------------------------------------------------------
 
 use strict;
@@ -32,6 +42,7 @@ use Getopt::Std;
 
 my $master_index;
 my $master_dir;
+my $show_sii_naming;
 
 #------------------------------------------------------------------------------
 
@@ -75,12 +86,18 @@ sub query_slaves
 	    &read_integer("$slave_dir/ring_position");
 	$slave->{'coupler_address'} =
 	    &read_string("$slave_dir/coupler_address");
-	$slave->{'vendor_name'} =
-	    &read_string("$slave_dir/vendor_name");
-	$slave->{'product_name'} =
-	    &read_string("$slave_dir/product_name");
-	$slave->{'product_desc'} =
-	    &read_string("$slave_dir/product_desc");
+	unless ($show_sii_naming) {
+	    $slave->{'vendor_name'} =
+		&read_string("$slave_dir/vendor_name");
+	    $slave->{'product_name'} =
+		&read_string("$slave_dir/product_name");
+	    $slave->{'product_desc'} =
+		&read_string("$slave_dir/product_desc");
+	}
+	else {
+	    $slave->{'sii_name'} =
+		&read_string("$slave_dir/sii_name");
+	}
 	$slave->{'type'} =
 	    &read_string("$slave_dir/type");
 
@@ -97,9 +114,14 @@ sub query_slaves
 	}
 
 	$abs = sprintf "%i", $slave->{'ring_position'};
-	printf(" %3s %8s   %-12s %-10s %s\n", $abs,
-	       $slave->{'coupler_address'}, $slave->{'vendor_name'},
-	       $slave->{'product_name'}, $slave->{'product_desc'});
+	printf(" %3s %8s   ", $abs, $slave->{'coupler_address'});
+	unless ($show_sii_naming) {
+	    printf("%-12s %-10s %s\n", $slave->{'vendor_name'},
+		   $slave->{'product_name'}, $slave->{'product_desc'});
+	}
+	else {
+	    printf("%s\n", $slave->{'sii_name'});
+	}
     }
 }
 
@@ -141,9 +163,9 @@ sub get_options
     my %opt;
     my $optret;
 
-    $optret = getopts "m:h", \%opt;
+    $optret = getopts "m:sh", \%opt;
 
-    &print_usage if defined $opt{'h'} or $#ARGV > -1;
+    &print_usage if defined $opt{'h'} or $#ARGV > -1 or !$optret;
 
     if (defined $opt{'m'}) {
 	$master_index = $opt{'m'};
@@ -151,6 +173,8 @@ sub get_options
     else {
 	$master_index = 0;
     }
+
+    $show_sii_naming = defined $opt{'s'};
 }
 
 #------------------------------------------------------------------------------
@@ -158,7 +182,9 @@ sub get_options
 sub print_usage
 {
     print "Usage: ec_list [OPTIONS]\n";
-    print "        -m <IDX>    Query master IDX.\n";
+    print "        -m <IDX>    Query master <IDX>.\n";
+    print "        -s          Show SII naming instead of";
+    print " vendor/product/description.\n";
     print "        -h          Show this help.\n";
     exit 0;
 }

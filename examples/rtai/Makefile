@@ -2,6 +2,8 @@
 #
 #  Makefile
 #
+#  RTAI sample module for the IgH EtherCAT master.
+#
 #  $Id$
 #
 #  Copyright (C) 2006  Florian Pose, Ingenieurgemeinschaft IgH
@@ -10,7 +12,8 @@
 #
 #  The IgH EtherCAT Master is free software; you can redistribute it
 #  and/or modify it under the terms of the GNU General Public License
-#  as published by the Free Software Foundation; version 2 of the License.
+#  as published by the Free Software Foundation; either version 2 of the
+#  License, or (at your option) any later version.
 #
 #  The IgH EtherCAT Master is distributed in the hope that it will be
 #  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,6 +24,15 @@
 #  along with the IgH EtherCAT Master; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #
+#  The right to use EtherCAT Technology is granted and comes free of
+#  charge under condition of compatibility of product made by
+#  Licensee. People intending to distribute/sell products based on the
+#  code, have to sign an agreement to guarantee that products using
+#  software based on IgH EtherCAT master stay compatible with the actual
+#  EtherCAT specification (which are released themselves as an open
+#  standard) as the (only) precondition to have the right to use EtherCAT
+#  Technology, IP and trade marks.
+#
 #------------------------------------------------------------------------------
 
 ifneq ($(KERNELRELEASE),)
@@ -29,32 +41,11 @@ ifneq ($(KERNELRELEASE),)
 #  kbuild section
 #------------------------------------------------------------------------------
 
-ifneq ($(wildcard $(src)/rt.conf),)
-include $(src)/rt.conf
-else
-MODULENAME := rt
-endif
+obj-m := ec_rtai_sample.o
 
-obj-m := $(MODULENAME).o
+ec_rtai_sample-objs := rtai_sample.o
 
-$(MODULENAME)-objs := msr_rt.o \
-			rt_lib/msr-core/msr_lists.o \
-			rt_lib/msr-core/msr_main.o \
-			rt_lib/msr-core/msr_charbuf.o \
-			rt_lib/msr-core/msr_reg.o \
-			rt_lib/msr-core/msr_interpreter.o \
-			rt_lib/msr-core/msr_messages.o \
-			rt_lib/msr-core/msr_proc.o \
-			rt_lib/msr-core/msr_error_reg.o \
-			rt_lib/msr-utils/msr_utils.o \
-			rt_lib/msr-utils/msr_time.o \
-			rt_lib/msr-math/msr_base64.o \
-			rt_lib/msr-math/msr_hex_bin.o \
-			libm.o
-
-EXTRA_CFLAGS := -I$(src)/rt_lib/msr-include -D_SIMULATION \
-		-I/usr/include -mhard-float \
-		-DSVNREV=$(shell svnversion $(src)) -DUSER=$(USER)
+EXTRA_CFLAGS := -I/usr/realtime/include -mhard-float
 
 #------------------------------------------------------------------------------
 
@@ -64,23 +55,17 @@ else
 #  default section
 #------------------------------------------------------------------------------
 
-ifneq ($(wildcard rt.conf),)
-include rt.conf
+ifneq ($(wildcard kernel.conf),)
+include kernel.conf
 else
-MODULENAME := msr_rt
-KERNEL := $(shell uname -r)
+KERNELDIR = /usr/src/linux
 endif
-
-KERNELDIR := /lib/modules/$(KERNEL)/build
 
 modules:
 	$(MAKE) -C $(KERNELDIR) M=`pwd`
 
 clean:
 	$(MAKE) -C $(KERNELDIR) M=`pwd` clean
-
-install:
-	@./install.sh $(MODULENAME) $(KERNEL)
 
 #------------------------------------------------------------------------------
 

@@ -8,7 +8,8 @@
  *
  *  The IgH EtherCAT Master is free software; you can redistribute it
  *  and/or modify it under the terms of the GNU General Public License
- *  as published by the Free Software Foundation; version 2 of the License.
+ *  as published by the Free Software Foundation; either version 2 of the
+ *  License, or (at your option) any later version.
  *
  *  The IgH EtherCAT Master is distributed in the hope that it will be
  *  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,6 +19,15 @@
  *  You should have received a copy of the GNU General Public License
  *  along with the IgH EtherCAT Master; if not, write to the Free Software
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ *  The right to use EtherCAT Technology is granted and comes free of
+ *  charge under condition of compatibility of product made by
+ *  Licensee. People intending to distribute/sell products based on the
+ *  code, have to sign an agreement to guarantee that products using
+ *  software based on IgH EtherCAT master stay compatible with the actual
+ *  EtherCAT specification (which are released themselves as an open
+ *  standard) as the (only) precondition to have the right to use EtherCAT
+ *  Technology, IP and trade marks.
  *
  *****************************************************************************/
 
@@ -57,19 +67,22 @@ void __exit ec_cleanup_module(void);
 /*****************************************************************************/
 
 static int ec_master_count = 1;
+static int ec_eoe_devices = 0;
 static struct list_head ec_masters;
 
 /*****************************************************************************/
 
 /** \cond */
 
-MODULE_AUTHOR ("Florian Pose <fp@igh-essen.com>");
-MODULE_DESCRIPTION ("EtherCAT master driver module");
+module_param(ec_master_count, int, S_IRUGO);
+module_param(ec_eoe_devices, int, S_IRUGO);
+
+MODULE_AUTHOR("Florian Pose <fp@igh-essen.com>");
+MODULE_DESCRIPTION("EtherCAT master driver module");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(COMPILE_INFO);
-
-module_param(ec_master_count, int, 1);
 MODULE_PARM_DESC(ec_master_count, "number of EtherCAT masters to initialize");
+MODULE_PARM_DESC(ec_eoe_devices, "number of EoE devices per master");
 
 /** \endcond */
 
@@ -104,7 +117,7 @@ int __init ec_init_module(void)
             goto out_free;
         }
 
-        if (ec_master_init(master, i)) // kobject_put is done inside...
+        if (ec_master_init(master, i, ec_eoe_devices))
             goto out_free;
 
         if (kobject_add(&master->kobj)) {
@@ -218,6 +231,41 @@ void ec_print_data_diff(const uint8_t *d1, /**< first data */
     printk("\n");
 }
 
+/*****************************************************************************/
+
+/**
+   Prints slave states in clear text.
+*/
+
+void ec_print_states(const uint8_t states /**< slave states */)
+{
+    unsigned int first = 1;
+
+    if (!states) {
+        printk("(unknown)");
+        return;
+    }
+
+    if (states & EC_SLAVE_STATE_INIT) {
+        printk("INIT");
+        first = 0;
+    }
+    if (states & EC_SLAVE_STATE_PREOP) {
+        if (!first) printk(", ");
+        printk("PREOP");
+        first = 0;
+    }
+    if (states & EC_SLAVE_STATE_SAVEOP) {
+        if (!first) printk(", ");
+        printk("SAVEOP");
+        first = 0;
+    }
+    if (states & EC_SLAVE_STATE_OP) {
+        if (!first) printk(", ");
+        printk("OP");
+    }
+}
+
 /******************************************************************************
  *  Device interface
  *****************************************************************************/
@@ -240,27 +288,18 @@ ec_device_t *ecdev_register(unsigned int master_index, /**< master index */
 {
     ec_master_t *master;
 
-    if (!net_dev) {
-        EC_WARN("Device is NULL!\n");
-        goto out_return;
-    }
-
     if (!(master = ec_find_master(master_index))) return NULL;
 
-    // critical section start
     if (master->device) {
         EC_ERR("Master %i already has a device!\n", master_index);
-        // critical section leave
         goto out_return;
     }
 
     if (!(master->device =
           (ec_device_t *) kmalloc(sizeof(ec_device_t), GFP_KERNEL))) {
         EC_ERR("Failed to allocate device!\n");
-        // critical section leave
         goto out_return;
     }
-    // critical section end
 
     if (ec_device_init(master->device, master, net_dev, isr, module)) {
         EC_ERR("Failed to init device!\n");
@@ -369,13 +408,11 @@ ec_master_t *ecrt_request_master(unsigned int master_index
 
     if (!(master = ec_find_master(master_index))) goto out_return;
 
-    // begin critical section
     if (master->reserved) {
         EC_ERR("Master %i is already in use!\n", master_index);
         goto out_return;
     }
     master->reserved = 1;
-    // end critical section
 
     if (!master->device) {
         EC_ERR("Master %i has no assigned device!\n", master_index);
@@ -404,6 +441,7 @@ ec_master_t *ecrt_request_master(unsigned int master_index
  out_module_put:
     module_put(master->device->module);
     ec_master_reset(master);
+    ec_master_freerun_start(master);
  out_release:
     master->reserved = 0;
  out_return:

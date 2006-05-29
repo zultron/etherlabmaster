@@ -8,7 +8,8 @@
  *
  *  The IgH EtherCAT Master is free software; you can redistribute it
  *  and/or modify it under the terms of the GNU General Public License
- *  as published by the Free Software Foundation; version 2 of the License.
+ *  as published by the Free Software Foundation; either version 2 of the
+ *  License, or (at your option) any later version.
  *
  *  The IgH EtherCAT Master is distributed in the hope that it will be
  *  useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,6 +19,15 @@
  *  You should have received a copy of the GNU General Public License
  *  along with the IgH EtherCAT Master; if not, write to the Free Software
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ *  The right to use EtherCAT Technology is granted and comes free of
+ *  charge under condition of compatibility of product made by
+ *  Licensee. People intending to distribute/sell products based on the
+ *  code, have to sign an agreement to guarantee that products using
+ *  software based on IgH EtherCAT master stay compatible with the actual
+ *  EtherCAT specification (which are released themselves as an open
+ *  standard) as the (only) precondition to have the right to use EtherCAT
+ *  Technology, IP and trade marks.
  *
  *****************************************************************************/
 
@@ -45,9 +55,9 @@
 
 /*****************************************************************************/
 
-void ec_master_freerun(unsigned long);
+void ec_master_freerun(void *);
+void ec_master_eoe_run(unsigned long);
 ssize_t ec_show_master_attribute(struct kobject *, struct attribute *, char *);
-void ec_master_process_watch_command(ec_master_t *);
 
 /*****************************************************************************/
 
@@ -83,19 +93,51 @@ static struct kobj_type ktype_ec_master = {
 */
 
 int ec_master_init(ec_master_t *master, /**< EtherCAT master */
-                   unsigned int index /**< master index */
+                   unsigned int index, /**< master index */
+                   unsigned int eoe_devices /**< number of EoE devices */
                    )
 {
+    ec_eoe_t *eoe, *next_eoe;
+    unsigned int i;
+
     EC_INFO("Initializing master %i.\n", index);
 
     master->index = index;
     master->device = NULL;
     master->reserved = 0;
-
     INIT_LIST_HEAD(&master->slaves);
     INIT_LIST_HEAD(&master->command_queue);
     INIT_LIST_HEAD(&master->domains);
-    INIT_LIST_HEAD(&master->eoe_slaves);
+    INIT_LIST_HEAD(&master->eoe_handlers);
+    ec_command_init(&master->simple_command);
+    INIT_WORK(&master->freerun_work, ec_master_freerun, (void *) master);
+    init_timer(&master->eoe_timer);
+    master->eoe_timer.function = ec_master_eoe_run;
+    master->eoe_timer.data = (unsigned long) master;
+    master->internal_lock = SPIN_LOCK_UNLOCKED;
+    master->eoe_running = 0;
+
+    // create workqueue
+    if (!(master->workqueue = create_singlethread_workqueue("EtherCAT"))) {
+        EC_ERR("Failed to create master workqueue.\n");
+        goto out_return;
+    }
+
+    // create EoE handlers
+    for (i = 0; i < eoe_devices; i++) {
+        if (!(eoe = (ec_eoe_t *) kmalloc(sizeof(ec_eoe_t), GFP_KERNEL))) {
+            EC_ERR("Failed to allocate EoE-Object.\n");
+            goto out_clear_eoe;
+        }
+        if (ec_eoe_init(eoe)) {
+            kfree(eoe);
+            goto out_clear_eoe;
+        }
+        list_add_tail(&eoe->list, &master->eoe_handlers);
+    }
+
+    // create state machine object
+    if (ec_fsm_init(&master->fsm, master)) goto out_clear_eoe;
 
     // init kobject and add it to the hierarchy
     memset(&master->kobj, 0x00, sizeof(struct kobject));
@@ -107,16 +149,18 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
         return -1;
     }
 
-    // init freerun timer
-    init_timer(&master->freerun_timer);
-    master->freerun_timer.function = ec_master_freerun;
-    master->freerun_timer.data = (unsigned long) master;
-
-    ec_command_init(&master->simple_command);
-    ec_command_init(&master->watch_command);
-
     ec_master_reset(master);
     return 0;
+
+ out_clear_eoe:
+    list_for_each_entry_safe(eoe, next_eoe, &master->eoe_handlers, list) {
+        list_del(&eoe->list);
+        ec_eoe_clear(eoe);
+        kfree(eoe);
+    }
+    destroy_workqueue(master->workqueue);
+ out_return:
+    return -1;
 }
 
 /*****************************************************************************/
@@ -130,20 +174,26 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 void ec_master_clear(struct kobject *kobj /**< kobject of the master */)
 {
     ec_master_t *master = container_of(kobj, ec_master_t, kobj);
+    ec_eoe_t *eoe, *next_eoe;
 
     EC_INFO("Clearing master %i...\n", master->index);
 
-    del_timer_sync(&master->freerun_timer);
-
     ec_master_reset(master);
+    ec_fsm_clear(&master->fsm);
+    ec_command_clear(&master->simple_command);
+    destroy_workqueue(master->workqueue);
+
+    // clear EoE objects
+    list_for_each_entry_safe(eoe, next_eoe, &master->eoe_handlers, list) {
+        list_del(&eoe->list);
+        ec_eoe_clear(eoe);
+        kfree(eoe);
+    }
 
     if (master->device) {
         ec_device_clear(master->device);
         kfree(master->device);
     }
-
-    ec_command_clear(&master->simple_command);
-    ec_command_clear(&master->watch_command);
 
     EC_INFO("Master %i cleared.\n", master->index);
 }
@@ -158,20 +208,12 @@ void ec_master_clear(struct kobject *kobj /**< kobject of the master */)
 
 void ec_master_reset(ec_master_t *master /**< EtherCAT master */)
 {
-    ec_slave_t *slave, *next_s;
     ec_command_t *command, *next_c;
     ec_domain_t *domain, *next_d;
-    ec_eoe_t *eoe, *next_eoe;
 
+    ec_master_eoe_stop(master);
     ec_master_freerun_stop(master);
-
-    // remove all slaves
-    list_for_each_entry_safe(slave, next_s, &master->slaves, list) {
-        list_del(&slave->list);
-        kobject_del(&slave->kobj);
-        kobject_put(&slave->kobj);
-    }
-    master->slave_count = 0;
+    ec_master_clear_slaves(master);
 
     // empty command queue
     list_for_each_entry_safe(command, next_c, &master->command_queue, queue) {
@@ -186,28 +228,41 @@ void ec_master_reset(ec_master_t *master /**< EtherCAT master */)
         kobject_put(&domain->kobj);
     }
 
-    // clear EoE objects
-    list_for_each_entry_safe(eoe, next_eoe, &master->eoe_slaves, list) {
-        list_del(&eoe->list);
-        ec_eoe_clear(eoe);
-        kfree(eoe);
-    }
-
     master->command_index = 0;
     master->debug_level = 0;
     master->timeout = 500; // 500us
-
-    master->slaves_responding = 0;
-    master->slave_states = EC_SLAVE_STATE_UNKNOWN;
 
     master->stats.timeouts = 0;
     master->stats.delayed = 0;
     master->stats.corrupted = 0;
     master->stats.unmatched = 0;
-    master->stats.eoe_errors = 0;
     master->stats.t_last = 0;
 
     master->mode = EC_MASTER_MODE_IDLE;
+
+    master->request_cb = NULL;
+    master->release_cb = NULL;
+    master->cb_data = NULL;
+
+    ec_fsm_reset(&master->fsm);
+}
+
+/*****************************************************************************/
+
+/**
+   Clears all slaves.
+*/
+
+void ec_master_clear_slaves(ec_master_t *master)
+{
+    ec_slave_t *slave, *next_slave;
+
+    list_for_each_entry_safe(slave, next_slave, &master->slaves, list) {
+        list_del(&slave->list);
+        kobject_del(&slave->kobj);
+        kobject_put(&slave->kobj);
+    }
+    master->slave_count = 0;
 }
 
 /*****************************************************************************/
@@ -249,15 +304,14 @@ void ec_master_send_commands(ec_master_t *master /**< EtherCAT master */)
     size_t command_size;
     uint8_t *frame_data, *cur_data;
     void *follows_word;
-    cycles_t start = 0, end;
+    cycles_t t_start, t_end;
     unsigned int frame_count, more_commands_waiting;
 
     frame_count = 0;
+    t_start = get_cycles();
 
-    if (unlikely(master->debug_level > 0)) {
+    if (unlikely(master->debug_level > 0))
         EC_DBG("ec_master_send_commands\n");
-        start = get_cycles();
-    }
 
     do {
         // fetch pointer to transmit socket buffer
@@ -273,12 +327,13 @@ void ec_master_send_commands(ec_master_t *master /**< EtherCAT master */)
             // does the current command fit in the frame?
             command_size = EC_COMMAND_HEADER_SIZE + command->data_size
                 + EC_COMMAND_FOOTER_SIZE;
-            if (cur_data - frame_data + command_size > EC_MAX_FRAME_SIZE) {
+            if (cur_data - frame_data + command_size > ETH_DATA_LEN) {
                 more_commands_waiting = 1;
                 break;
             }
 
             command->state = EC_CMD_SENT;
+            command->t_sent = t_start;
             command->index = master->command_index++;
 
             if (unlikely(master->debug_level > 0))
@@ -317,7 +372,7 @@ void ec_master_send_commands(ec_master_t *master /**< EtherCAT master */)
                                    - EC_FRAME_HEADER_SIZE) & 0x7FF) | 0x1000);
 
         // pad frame
-        while (cur_data - frame_data < EC_MIN_FRAME_SIZE)
+        while (cur_data - frame_data < ETH_ZLEN - ETH_HLEN)
             EC_WRITE_U8(cur_data++, 0x00);
 
         if (unlikely(master->debug_level > 0))
@@ -330,9 +385,9 @@ void ec_master_send_commands(ec_master_t *master /**< EtherCAT master */)
     while (more_commands_waiting);
 
     if (unlikely(master->debug_level > 0)) {
-        end = get_cycles();
+        t_end = get_cycles();
         EC_DBG("ec_master_send_commands sent %i frames in %ius.\n",
-               frame_count, (u32) (end - start) * 1000 / cpu_khz);
+               frame_count, (u32) (t_end - t_start) * 1000 / cpu_khz);
     }
 }
 
@@ -477,11 +532,10 @@ int ec_master_simple_io(ec_master_t *master, /**< EtherCAT master */
 
 int ec_master_bus_scan(ec_master_t *master /**< EtherCAT master */)
 {
-    ec_slave_t *slave, *next;
+    ec_slave_t *slave;
     ec_slave_ident_t *ident;
-    unsigned int i;
     ec_command_t *command;
-    ec_eoe_t *eoe;
+    unsigned int i;
     uint16_t coupler_index, coupler_subindex;
     uint16_t reverse_coupler_index, current_coupler_index;
 
@@ -502,7 +556,8 @@ int ec_master_bus_scan(ec_master_t *master /**< EtherCAT master */)
 
     // init slaves
     for (i = 0; i < master->slave_count; i++) {
-        if (!(slave = (ec_slave_t *) kmalloc(sizeof(ec_slave_t), GFP_KERNEL))) {
+        if (!(slave =
+              (ec_slave_t *) kmalloc(sizeof(ec_slave_t), GFP_KERNEL))) {
             EC_ERR("Failed to allocate slave %i!\n", i);
             goto out_free;
         }
@@ -553,7 +608,7 @@ int ec_master_bus_scan(ec_master_t *master /**< EtherCAT master */)
         if (!slave->type) {
             EC_WARN("Unknown slave device (vendor 0x%08X, code 0x%08X) at"
                     " position %i.\n", slave->sii_vendor_id,
-                    slave->sii_product_code, i);
+                    slave->sii_product_code, slave->ring_position);
         }
         else if (slave->type->special == EC_TYPE_BUS_COUPLER) {
             if (slave->sii_alias)
@@ -566,27 +621,12 @@ int ec_master_bus_scan(ec_master_t *master /**< EtherCAT master */)
         slave->coupler_index = current_coupler_index;
         slave->coupler_subindex = coupler_subindex;
         coupler_subindex++;
-
-        // does the slave support EoE?
-        if (slave->sii_mailbox_protocols & EC_MBOX_EOE) {
-            if (!(eoe = (ec_eoe_t *) kmalloc(sizeof(ec_eoe_t), GFP_KERNEL))) {
-                EC_ERR("Failed to allocate EoE-Object.\n");
-                goto out_free;
-            }
-
-            ec_eoe_init(eoe, slave);
-            list_add_tail(&eoe->list, &master->eoe_slaves);
-        }
     }
 
     return 0;
 
  out_free:
-    list_for_each_entry_safe(slave, next, &master->slaves, list) {
-        list_del(&slave->list);
-        kobject_del(&slave->kobj);
-        kobject_put(&slave->kobj);
-    }
+    ec_master_clear_slaves(master);
     return -1;
 }
 
@@ -619,10 +659,6 @@ void ec_master_output_stats(ec_master_t *master /**< EtherCAT master */)
             EC_WARN("%i command(s) UNMATCHED!\n", master->stats.unmatched);
             master->stats.unmatched = 0;
         }
-        if (master->stats.eoe_errors) {
-            EC_WARN("%i EOE ERROR(S)!\n", master->stats.eoe_errors);
-            master->stats.eoe_errors = 0;
-        }
         master->stats.t_last = t_now;
     }
 }
@@ -645,18 +681,8 @@ void ec_master_freerun_start(ec_master_t *master /**< EtherCAT master */)
     EC_INFO("Starting Free-Run mode.\n");
 
     master->mode = EC_MASTER_MODE_FREERUN;
-
-    if (master->watch_command.state == EC_CMD_INIT) {
-        if (ec_command_brd(&master->watch_command, 0x130, 2)) {
-            EC_ERR("Failed to allocate watchdog command!\n");
-            return;
-        }
-    }
-
-    ecrt_master_prepare_async_io(master);
-
-    master->freerun_timer.expires = jiffies + 10;
-    add_timer(&master->freerun_timer);
+    ec_fsm_reset(&master->fsm);
+    queue_delayed_work(master->workqueue, &master->freerun_work, 1);
 }
 
 /*****************************************************************************/
@@ -669,9 +695,15 @@ void ec_master_freerun_stop(ec_master_t *master /**< EtherCAT master */)
 {
     if (master->mode != EC_MASTER_MODE_FREERUN) return;
 
+    ec_master_eoe_stop(master);
+
     EC_INFO("Stopping Free-Run mode.\n");
 
-    del_timer_sync(&master->freerun_timer);
+    if (!cancel_delayed_work(&master->freerun_work)) {
+        flush_workqueue(master->workqueue);
+    }
+
+    ec_master_clear_slaves(master);
     master->mode = EC_MASTER_MODE_IDLE;
 }
 
@@ -681,22 +713,24 @@ void ec_master_freerun_stop(ec_master_t *master /**< EtherCAT master */)
    Free-Run mode function.
 */
 
-void ec_master_freerun(unsigned long data /**< private timer data = master */)
+void ec_master_freerun(void *data /**< master pointer */)
 {
     ec_master_t *master = (ec_master_t *) data;
 
+    // aquire master lock
+    spin_lock_bh(&master->internal_lock);
+
     ecrt_master_async_receive(master);
 
-    // watchdog command
-    ec_master_process_watch_command(master);
-    ec_master_queue_command(master, &master->watch_command);
-
-    master->slave_count = master->watch_command.working_counter;
+    // execute master state machine
+    ec_fsm_execute(&master->fsm);
 
     ecrt_master_async_send(master);
 
-    master->freerun_timer.expires += HZ;
-    add_timer(&master->freerun_timer);
+    // release master lock
+    spin_unlock_bh(&master->internal_lock);
+
+    queue_delayed_work(master->workqueue, &master->freerun_work, 1);
 }
 
 /*****************************************************************************/
@@ -791,63 +825,139 @@ ssize_t ec_show_master_attribute(struct kobject *kobj, /**< kobject */
 /*****************************************************************************/
 
 /**
-   Processes the watchdog command.
+   Starts Ethernet-over-EtherCAT processing for all EoE-capable slaves.
 */
 
-void ec_master_process_watch_command(ec_master_t *master
-                                     /**< EtherCAT master */
-                                     )
+void ec_master_eoe_start(ec_master_t *master /**< EtherCAT master */)
 {
-    unsigned int first;
+    ec_eoe_t *eoe;
+    ec_slave_t *slave;
+    unsigned int coupled, found;
 
-    if (unlikely(master->watch_command.state == EC_CMD_INIT)) return;
+    if (master->eoe_running) return;
 
-    first = 1;
+    // decouple all EoE handlers
+    list_for_each_entry(eoe, &master->eoe_handlers, list)
+        eoe->slave = NULL;
+    coupled = 0;
 
-    if (master->watch_command.working_counter != master->slaves_responding ||
-        master->watch_command.data[0] != master->slave_states)
-    {
-        master->slaves_responding = master->watch_command.working_counter;
-        master->slave_states = master->watch_command.data[0];
+    // couple a free EoE handler to every EoE-capable slave
+    list_for_each_entry(slave, &master->slaves, list) {
+        if (!(slave->sii_mailbox_protocols & EC_MBOX_EOE)) continue;
 
-        EC_INFO("%i slave%s responding (", master->slaves_responding,
-                master->slaves_responding == 1 ? "" : "s");
-
-        if (master->slave_states & EC_SLAVE_STATE_INIT) {
-            printk("INIT");
-            first = 0;
+        found = 0;
+        list_for_each_entry(eoe, &master->eoe_handlers, list) {
+            if (eoe->slave) continue;
+            eoe->slave = slave;
+            found = 1;
+            coupled++;
+            EC_INFO("Coupling device %s to slave %i.\n",
+                    eoe->dev->name, slave->ring_position);
+            if (eoe->opened) {
+                slave->requested_state = EC_SLAVE_STATE_OP;
+            }
+            else {
+                slave->requested_state = EC_SLAVE_STATE_INIT;
+            }
+            slave->state_error = 0;
+            break;
         }
-        if (master->slave_states & EC_SLAVE_STATE_PREOP) {
-            if (!first) printk(", ");
-            printk("PREOP");
-            first = 0;
+
+        if (!found) {
+            EC_WARN("No EoE handler for slave %i!\n", slave->ring_position);
+            slave->requested_state = EC_SLAVE_STATE_INIT;
+            slave->state_error = 0;
         }
-        if (master->slave_states & EC_SLAVE_STATE_SAVEOP) {
-            if (!first) printk(", ");
-            printk("SAVEOP");
-            first = 0;
-        }
-        if (master->slave_states & EC_SLAVE_STATE_OP) {
-            if (!first) printk(", ");
-            printk("OP");
-        }
-        printk(")\n");
     }
+
+    if (!coupled) {
+        EC_INFO("No EoE handlers coupled.\n");
+        return;
+    }
+
+    EC_INFO("Starting EoE processing.\n");
+    master->eoe_running = 1;
+
+    // start EoE processing
+    master->eoe_timer.expires = jiffies + 10;
+    add_timer(&master->eoe_timer);
+    return;
 }
 
 /*****************************************************************************/
 
 /**
-   Does the Ethernet-over-EtherCAT processing.
+   Stops the Ethernet-over-EtherCAT processing.
 */
 
-void ec_master_run_eoe(ec_master_t *master /**< EtherCAT master */)
+void ec_master_eoe_stop(ec_master_t *master /**< EtherCAT master */)
 {
     ec_eoe_t *eoe;
 
-    list_for_each_entry(eoe, &master->eoe_slaves, list) {
+    if (!master->eoe_running) return;
+
+    EC_INFO("Stopping EoE processing.\n");
+
+    del_timer_sync(&master->eoe_timer);
+
+    // decouple all EoE handlers
+    list_for_each_entry(eoe, &master->eoe_handlers, list) {
+        if (eoe->slave) {
+            eoe->slave->requested_state = EC_SLAVE_STATE_INIT;
+            eoe->slave->state_error = 0;
+            eoe->slave = NULL;
+        }
+    }
+
+    master->eoe_running = 0;
+}
+
+/*****************************************************************************/
+/**
+   Does the Ethernet-over-EtherCAT processing.
+*/
+
+void ec_master_eoe_run(unsigned long data /**< master pointer */)
+{
+    ec_master_t *master = (ec_master_t *) data;
+    ec_eoe_t *eoe;
+    unsigned int active = 0;
+
+    list_for_each_entry(eoe, &master->eoe_handlers, list) {
+        if (ec_eoe_active(eoe)) active++;
+    }
+    if (!active) goto queue_timer;
+
+    // aquire master lock...
+    if (master->mode == EC_MASTER_MODE_RUNNING) {
+        // request_cb must return 0, if the lock has been aquired!
+        if (master->request_cb(master->cb_data))
+            goto queue_timer;
+    }
+    else if (master->mode == EC_MASTER_MODE_FREERUN) {
+        spin_lock(&master->internal_lock);
+    }
+    else
+        goto queue_timer;
+
+    // actual EoE stuff
+    ecrt_master_async_receive(master);
+    list_for_each_entry(eoe, &master->eoe_handlers, list) {
         ec_eoe_run(eoe);
     }
+    ecrt_master_async_send(master);
+
+    // release lock...
+    if (master->mode == EC_MASTER_MODE_RUNNING) {
+        master->release_cb(master->cb_data);
+    }
+    else if (master->mode == EC_MASTER_MODE_FREERUN) {
+        spin_unlock(&master->internal_lock);
+    }
+
+ queue_timer:
+    master->eoe_timer.expires += HZ / EC_EOE_FREQUENCY;
+    add_timer(&master->eoe_timer);
 }
 
 /******************************************************************************
@@ -919,13 +1029,6 @@ int ecrt_master_activate(ec_master_t *master /**< EtherCAT master */)
     ec_eeprom_sync_t *eeprom_sync, mbox_sync;
 
     command = &master->simple_command;
-
-    if (master->watch_command.state == EC_CMD_INIT) {
-        if (ec_command_brd(&master->watch_command, 0x130, 2)) {
-            EC_ERR("Failed to allocate watchdog command!\n");
-            return -1;
-        }
-    }
 
     // allocate all domains
     domain_offset = 0;
@@ -1080,9 +1183,6 @@ int ecrt_master_activate(ec_master_t *master /**< EtherCAT master */)
             return -1;
     }
 
-    master->slaves_responding = 0;
-    master->slave_states = EC_SLAVE_STATE_INIT;
-
     return 0;
 }
 
@@ -1223,26 +1323,32 @@ void ecrt_master_async_send(ec_master_t *master /**< EtherCAT master */)
 void ecrt_master_async_receive(ec_master_t *master /**< EtherCAT master */)
 {
     ec_command_t *command, *next;
+    cycles_t t_received, t_timeout;
 
     ec_device_call_isr(master->device);
+
+    t_received = get_cycles();
+    t_timeout = (cycles_t) master->timeout * (cpu_khz / 1000);
 
     // dequeue all received commands
     list_for_each_entry_safe(command, next, &master->command_queue, queue)
         if (command->state == EC_CMD_RECEIVED) list_del_init(&command->queue);
 
-    // dequeue all remaining commands
+    // dequeue all commands that timed out
     list_for_each_entry_safe(command, next, &master->command_queue, queue) {
         switch (command->state) {
             case EC_CMD_SENT:
             case EC_CMD_QUEUED:
-                command->state = EC_CMD_TIMEOUT;
-                master->stats.timeouts++;
-                ec_master_output_stats(master);
+                if (t_received - command->t_sent > t_timeout) {
+                    list_del_init(&command->queue);
+                    command->state = EC_CMD_TIMEOUT;
+                    master->stats.timeouts++;
+                    ec_master_output_stats(master);
+                }
                 break;
             default:
                 break;
         }
-        list_del_init(&command->queue);
     }
 }
 
@@ -1288,12 +1394,8 @@ void ecrt_master_run(ec_master_t *master /**< EtherCAT master */)
     // output statistics
     ec_master_output_stats(master);
 
-    // watchdog command
-    ec_master_process_watch_command(master);
-    ec_master_queue_command(master, &master->watch_command);
-
-    // Ethernet-over-EtherCAT
-    ec_master_run_eoe(master);
+    // execute master state machine
+    ec_fsm_execute(&master->fsm);
 }
 
 /*****************************************************************************/
@@ -1407,6 +1509,45 @@ ec_slave_t *ecrt_master_get_slave(const ec_master_t *master, /**< Master */
 /*****************************************************************************/
 
 /**
+   Sets the locking callbacks.
+   The request_cb function must return zero, to allow another instance
+   (the EoE process for example) to access the master. Non-zero means,
+   that access is forbidden at this time.
+   \ingroup RealtimeInterface
+*/
+
+void ecrt_master_callbacks(ec_master_t *master, /**< EtherCAT master */
+                           int (*request_cb)(void *), /**< request lock CB */
+                           void (*release_cb)(void *), /**< release lock CB */
+                           void *cb_data /**< data parameter */
+                           )
+{
+    master->request_cb = request_cb;
+    master->release_cb = release_cb;
+    master->cb_data = cb_data;
+}
+
+/*****************************************************************************/
+
+/**
+   Starts Ethernet-over-EtherCAT processing for all EoE-capable slaves.
+   \ingroup RealtimeInterface
+*/
+
+int ecrt_master_start_eoe(ec_master_t *master /**< EtherCAT master */)
+{
+    if (!master->request_cb || !master->release_cb) {
+        EC_ERR("EoE requires master callbacks to be set!\n");
+        return -1;
+    }
+
+    ec_master_eoe_start(master);
+    return 0;
+}
+
+/*****************************************************************************/
+
+/**
    Sets the debug level of the master.
    The following levels are valid:
    - 1: only output positions marks and basic data
@@ -1448,9 +1589,9 @@ void ecrt_master_print(const ec_master_t *master, /**< EtherCAT master */
         list_for_each_entry(slave, &master->slaves, list)
             ec_slave_print(slave, verbosity);
     }
-    if (!list_empty(&master->eoe_slaves)) {
+    if (!list_empty(&master->eoe_handlers)) {
         EC_INFO("Ethernet-over-EtherCAT (EoE) objects:\n");
-        list_for_each_entry(eoe, &master->eoe_slaves, list) {
+        list_for_each_entry(eoe, &master->eoe_handlers, list) {
             ec_eoe_print(eoe);
         }
     }
@@ -1470,6 +1611,8 @@ EXPORT_SYMBOL(ecrt_master_sync_io);
 EXPORT_SYMBOL(ecrt_master_async_send);
 EXPORT_SYMBOL(ecrt_master_async_receive);
 EXPORT_SYMBOL(ecrt_master_run);
+EXPORT_SYMBOL(ecrt_master_callbacks);
+EXPORT_SYMBOL(ecrt_master_start_eoe);
 EXPORT_SYMBOL(ecrt_master_debug);
 EXPORT_SYMBOL(ecrt_master_print);
 EXPORT_SYMBOL(ecrt_master_get_slave);
