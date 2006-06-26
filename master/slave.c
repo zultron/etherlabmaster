@@ -69,6 +69,7 @@ EC_SYSFS_READ_ATTR(product_desc);
 EC_SYSFS_READ_ATTR(sii_name);
 EC_SYSFS_READ_ATTR(type);
 EC_SYSFS_READ_WRITE_ATTR(state);
+EC_SYSFS_READ_WRITE_ATTR(eeprom);
 
 static struct attribute *def_attrs[] = {
     &attr_ring_position,
@@ -79,6 +80,7 @@ static struct attribute *def_attrs[] = {
     &attr_sii_name,
     &attr_type,
     &attr_state,
+    &attr_eeprom,
     NULL,
 };
 
@@ -145,6 +147,8 @@ int ec_slave_init(ec_slave_t *slave, /**< EtherCAT slave */
     slave->type = NULL;
     slave->registered = 0;
     slave->fmmu_count = 0;
+    slave->eeprom_data = NULL;
+    slave->eeprom_size = 0;
     slave->eeprom_group = NULL;
     slave->eeprom_image = NULL;
     slave->eeprom_order = NULL;
@@ -153,13 +157,14 @@ int ec_slave_init(ec_slave_t *slave, /**< EtherCAT slave */
     slave->current_state = EC_SLAVE_STATE_UNKNOWN;
     slave->state_error = 0;
     slave->online = 1;
-
-    ec_command_init(&slave->mbox_command);
+    slave->new_eeprom_data = NULL;
+    slave->new_eeprom_size = 0;
 
     INIT_LIST_HEAD(&slave->eeprom_strings);
     INIT_LIST_HEAD(&slave->eeprom_syncs);
     INIT_LIST_HEAD(&slave->eeprom_pdos);
     INIT_LIST_HEAD(&slave->sdo_dictionary);
+    INIT_LIST_HEAD(&slave->varsize_fields);
 
     for (i = 0; i < 4; i++) {
         slave->dl_link[i] = 0;
@@ -186,6 +191,7 @@ void ec_slave_clear(struct kobject *kobj /**< kobject of the slave */)
     ec_eeprom_pdo_entry_t *entry, *next_ent;
     ec_sdo_t *sdo, *next_sdo;
     ec_sdo_entry_t *en, *next_en;
+    ec_varsize_t *var, *next_var;
 
     slave = container_of(kobj, ec_slave_t, kobj);
 
@@ -234,7 +240,14 @@ void ec_slave_clear(struct kobject *kobj /**< kobject of the slave */)
         kfree(sdo);
     }
 
-    ec_command_clear(&slave->mbox_command);
+    // free information about variable sized data fields
+    list_for_each_entry_safe(var, next_var, &slave->varsize_fields, list) {
+        list_del(&var->list);
+        kfree(var);
+    }
+
+    if (slave->eeprom_data) kfree(slave->eeprom_data);
+    if (slave->new_eeprom_data) kfree(slave->new_eeprom_data);
 }
 
 /*****************************************************************************/
@@ -1121,6 +1134,8 @@ void ec_slave_print(const ec_slave_t *slave, /**< EtherCAT slave */
 
     EC_INFO("  EEPROM data:\n");
 
+    EC_INFO("    EEPROM content size: %i Bytes\n", slave->eeprom_size);
+
     if (slave->sii_alias)
         EC_INFO("    Configured station alias: 0x%04X (%i)\n",
                 slave->sii_alias, slave->sii_alias);
@@ -1239,6 +1254,83 @@ int ec_slave_check_crc(ec_slave_t *slave /**< EtherCAT slave */)
 /*****************************************************************************/
 
 /**
+   Schedules an EEPROM write operation.
+   \return 0 in case of success, else < 0
+*/
+
+ssize_t ec_slave_write_eeprom(ec_slave_t *slave, /**< EtherCAT slave */
+                              const uint8_t *data, /**< new EEPROM data */
+                              size_t size /**< size of data in bytes */
+                              )
+{
+    uint16_t word_size, cat_type, cat_size;
+    const uint16_t *data_words, *next_header;
+    uint16_t *new_data;
+
+    if (!slave->master->eeprom_write_enable) {
+        EC_ERR("Writing EEPROMs not allowed! Enable via"
+               " eeprom_write_enable SysFS entry.\n");
+        return -1;
+    }
+
+    if (slave->master->mode != EC_MASTER_MODE_FREERUN) {
+        EC_ERR("Writing EEPROMs only allowed in freerun mode!\n");
+        return -1;
+    }
+
+    if (slave->new_eeprom_data) {
+        EC_ERR("Slave %i already has a pending EEPROM write operation!\n",
+               slave->ring_position);
+        return -1;
+    }
+
+    // coarse check of the data
+
+    if (size % 2) {
+        EC_ERR("EEPROM size is odd! Dropping.\n");
+        return -1;
+    }
+
+    data_words = (const uint16_t *) data;
+    word_size = size / 2;
+
+    if (word_size < 0x0041) {
+        EC_ERR("EEPROM data too short! Dropping.\n");
+        return -1;
+    }
+
+    next_header = data_words + 0x0040;
+    cat_type = EC_READ_U16(next_header);
+    while (cat_type != 0xFFFF) {
+        cat_type = EC_READ_U16(next_header);
+        cat_size = EC_READ_U16(next_header + 1);
+        if ((next_header + cat_size + 2) - data_words >= word_size) {
+            EC_ERR("EEPROM data seems to be corrupted! Dropping.\n");
+            return -1;
+        }
+        next_header += cat_size + 2;
+        cat_type = EC_READ_U16(next_header);
+    }
+
+    // data ok!
+
+    if (!(new_data = (uint16_t *) kmalloc(word_size * 2, GFP_KERNEL))) {
+        EC_ERR("Unable to allocate memory for new EEPROM data!\n");
+        return -1;
+    }
+    memcpy(new_data, data, size);
+
+    slave->new_eeprom_size = word_size;
+    slave->new_eeprom_data = new_data;
+
+    EC_INFO("EEPROM writing scheduled for slave %i, %i words.\n",
+            slave->ring_position, word_size);
+    return 0;
+}
+
+/*****************************************************************************/
+
+/**
    Formats attribute data for SysFS read access.
    \return number of bytes to read
 */
@@ -1295,6 +1387,19 @@ ssize_t ec_show_slave_attribute(struct kobject *kobj, /**< slave's kobject */
                 return sprintf(buffer, "UNKNOWN\n");
         }
     }
+    else if (attr == &attr_eeprom) {
+        if (slave->eeprom_data) {
+            if (slave->eeprom_size > PAGE_SIZE) {
+                EC_ERR("EEPROM contents of slave %i exceed 1 page (%i/%i).\n",
+                       slave->ring_position, slave->eeprom_size,
+                       (int) PAGE_SIZE);
+            }
+            else {
+                memcpy(buffer, slave->eeprom_data, slave->eeprom_size);
+                return slave->eeprom_size;
+            }
+        }
+    }
 
     return 0;
 }
@@ -1338,8 +1443,49 @@ ssize_t ec_store_slave_attribute(struct kobject *kobj, /**< slave's kobject */
 
         EC_ERR("Failed to set slave state!\n");
     }
+    else if (attr == &attr_eeprom) {
+        if (!ec_slave_write_eeprom(slave, buffer, size))
+            return size;
+    }
 
     return -EINVAL;
+}
+
+/*****************************************************************************/
+
+/**
+   \return size of sync manager contents
+*/
+
+size_t ec_slave_calc_sync_size(const ec_slave_t *slave, /**< EtherCAT slave */
+                               const ec_sync_t *sync /**< sync manager */
+                               )
+{
+    unsigned int i, found;
+    const ec_field_t *field;
+    const ec_varsize_t *var;
+    size_t size;
+
+    // if size is specified, return size
+    if (sync->size) return sync->size;
+
+    // sync manager has variable size (size == 0).
+
+    size = 0;
+    for (i = 0; (field = sync->fields[i]); i++) {
+        found = 0;
+        list_for_each_entry(var, &slave->varsize_fields, list) {
+            if (var->field != field) continue;
+            size += var->size;
+            found = 1;
+        }
+
+        if (!found) {
+            EC_WARN("Variable data field \"%s\" of slave %i has no size"
+                    " information!\n", field->name, slave->ring_position);
+        }
+    }
+    return size;
 }
 
 /******************************************************************************
@@ -1361,9 +1507,75 @@ int ecrt_slave_write_alias(ec_slave_t *slave, /**< EtherCAT slave */
 
 /*****************************************************************************/
 
+/**
+   \return 0 in case of success, else < 0
+   \ingroup RealtimeInterface
+*/
+
+int ecrt_slave_field_size(ec_slave_t *slave, /**< EtherCAT slave */
+                          const char *field_name, /**< data field name */
+                          unsigned int field_index, /**< data field index */
+                          size_t size /**< new data field size */
+                          )
+{
+    unsigned int i, j, field_counter;
+    const ec_sync_t *sync;
+    const ec_field_t *field;
+    ec_varsize_t *var;
+
+    if (!slave->type) {
+        EC_ERR("Slave %i has no type information!\n", slave->ring_position);
+        return -1;
+    }
+
+    field_counter = 0;
+    for (i = 0; (sync = slave->type->sync_managers[i]); i++) {
+        for (j = 0; (field = sync->fields[j]); j++) {
+            if (!strcmp(field->name, field_name)) {
+                if (field_counter++ == field_index) {
+                    // is the size of this field variable?
+                    if (field->size) {
+                        EC_ERR("Field \"%s\"[%i] of slave %i has no variable"
+                               " size!\n", field->name, field_index,
+                               slave->ring_position);
+                        return -1;
+                    }
+                    // does a size specification already exist?
+                    list_for_each_entry(var, &slave->varsize_fields, list) {
+                        if (var->field == field) {
+                            EC_WARN("Resizing field \"%s\"[%i] of slave %i.\n",
+                                    field->name, field_index,
+                                    slave->ring_position);
+                            var->size = size;
+                            return 0;
+                        }
+                    }
+                    // create a new size specification...
+                    if (!(var = kmalloc(sizeof(ec_varsize_t), GFP_KERNEL))) {
+                        EC_ERR("Failed to allocate memory for varsize_t!\n");
+                        return -1;
+                    }
+                    var->field = field;
+                    var->size = size;
+                    list_add_tail(&var->list, &slave->varsize_fields);
+                    return 0;
+                }
+            }
+        }
+    }
+
+    EC_ERR("Slave %i (\"%s %s\") has no field \"%s\"[%i]!\n",
+           slave->ring_position, slave->type->vendor_name,
+           slave->type->product_name, field_name, field_index);
+    return -1;
+}
+
+/*****************************************************************************/
+
 /**< \cond */
 
 EXPORT_SYMBOL(ecrt_slave_write_alias);
+EXPORT_SYMBOL(ecrt_slave_field_size);
 
 /**< \endcond */
 

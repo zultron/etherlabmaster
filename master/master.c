@@ -58,6 +58,8 @@
 void ec_master_freerun(void *);
 void ec_master_eoe_run(unsigned long);
 ssize_t ec_show_master_attribute(struct kobject *, struct attribute *, char *);
+ssize_t ec_store_master_attribute(struct kobject *, struct attribute *,
+                                  const char *, size_t);
 
 /*****************************************************************************/
 
@@ -65,16 +67,18 @@ ssize_t ec_show_master_attribute(struct kobject *, struct attribute *, char *);
 
 EC_SYSFS_READ_ATTR(slave_count);
 EC_SYSFS_READ_ATTR(mode);
+EC_SYSFS_READ_WRITE_ATTR(eeprom_write_enable);
 
 static struct attribute *ec_def_attrs[] = {
     &attr_slave_count,
     &attr_mode,
+    &attr_eeprom_write_enable,
     NULL,
 };
 
 static struct sysfs_ops ec_sysfs_ops = {
     .show = &ec_show_master_attribute,
-    .store = NULL
+    .store = ec_store_master_attribute
 };
 
 static struct kobj_type ktype_ec_master = {
@@ -243,6 +247,8 @@ void ec_master_reset(ec_master_t *master /**< EtherCAT master */)
     master->request_cb = NULL;
     master->release_cb = NULL;
     master->cb_data = NULL;
+
+    master->eeprom_write_enable = 0;
 
     ec_fsm_reset(&master->fsm);
 }
@@ -492,7 +498,7 @@ int ec_master_simple_io(ec_master_t *master, /**< EtherCAT master */
 {
     unsigned int response_tries_left;
 
-    response_tries_left = 10;
+    response_tries_left = 10000;
 
     while (1)
     {
@@ -698,13 +704,13 @@ void ec_master_freerun_stop(ec_master_t *master /**< EtherCAT master */)
     ec_master_eoe_stop(master);
 
     EC_INFO("Stopping Free-Run mode.\n");
+    master->mode = EC_MASTER_MODE_IDLE;
 
     if (!cancel_delayed_work(&master->freerun_work)) {
         flush_workqueue(master->workqueue);
     }
 
     ec_master_clear_slaves(master);
-    master->mode = EC_MASTER_MODE_IDLE;
 }
 
 /*****************************************************************************/
@@ -730,7 +736,8 @@ void ec_master_freerun(void *data /**< master pointer */)
     // release master lock
     spin_unlock_bh(&master->internal_lock);
 
-    queue_delayed_work(master->workqueue, &master->freerun_work, 1);
+    if (master->mode == EC_MASTER_MODE_FREERUN)
+        queue_delayed_work(master->workqueue, &master->freerun_work, 1);
 }
 
 /*****************************************************************************/
@@ -741,11 +748,16 @@ void ec_master_freerun(void *data /**< master pointer */)
 */
 
 void ec_sync_config(const ec_sync_t *sync, /**< sync manager */
+                    const ec_slave_t *slave, /**< EtherCAT slave */
                     uint8_t *data /**> configuration memory */
                     )
 {
+    size_t sync_size;
+
+    sync_size = ec_slave_calc_sync_size(slave, sync);
+
     EC_WRITE_U16(data,     sync->physical_start_address);
-    EC_WRITE_U16(data + 2, sync->size);
+    EC_WRITE_U16(data + 2, sync_size);
     EC_WRITE_U8 (data + 4, sync->control_byte);
     EC_WRITE_U8 (data + 5, 0x00); // status byte (read only)
     EC_WRITE_U16(data + 6, 0x0001); // enable
@@ -777,11 +789,16 @@ void ec_eeprom_sync_config(const ec_eeprom_sync_t *sync, /**< sync manager */
 */
 
 void ec_fmmu_config(const ec_fmmu_t *fmmu, /**< FMMU */
+                    const ec_slave_t *slave, /**< EtherCAT slave */
                     uint8_t *data /**> configuration memory */
                     )
 {
+    size_t sync_size;
+
+    sync_size = ec_slave_calc_sync_size(slave, fmmu->sync);
+
     EC_WRITE_U32(data,      fmmu->logical_start_address);
-    EC_WRITE_U16(data + 4,  fmmu->sync->size);
+    EC_WRITE_U16(data + 4,  sync_size); // size of fmmu
     EC_WRITE_U8 (data + 6,  0x00); // logical start bit
     EC_WRITE_U8 (data + 7,  0x07); // logical end bit
     EC_WRITE_U16(data + 8,  fmmu->sync->physical_start_address);
@@ -820,6 +837,44 @@ ssize_t ec_show_master_attribute(struct kobject *kobj, /**< kobject */
     }
 
     return 0;
+}
+
+/*****************************************************************************/
+
+/**
+   Formats attribute data for SysFS write access.
+   \return number of bytes processed, or negative error code
+*/
+
+ssize_t ec_store_master_attribute(struct kobject *kobj, /**< slave's kobject */
+                                  struct attribute *attr, /**< attribute */
+                                  const char *buffer, /**< memory with data */
+                                  size_t size /**< size of data to store */
+                                  )
+{
+    ec_master_t *master = container_of(kobj, ec_master_t, kobj);
+
+    if (attr == &attr_eeprom_write_enable) {
+        if (!strcmp(buffer, "1\n")) {
+            master->eeprom_write_enable = 1;
+            EC_INFO("Slave EEPROM writing enabled.\n");
+            return size;
+        }
+        else if (!strcmp(buffer, "0\n")) {
+            master->eeprom_write_enable = 0;
+            EC_INFO("Slave EEPROM writing disabled.\n");
+            return size;
+        }
+
+        EC_ERR("Invalid value for eeprom_write_enable!\n");
+
+        if (master->eeprom_write_enable) {
+            master->eeprom_write_enable = 0;
+            EC_INFO("Slave EEPROM writing disabled.\n");
+        }
+    }
+
+    return -EINVAL;
 }
 
 /*****************************************************************************/
@@ -1088,7 +1143,7 @@ int ecrt_master_activate(ec_master_t *master /**< EtherCAT master */)
                 if (ec_command_npwr(command, slave->station_address,
                                     0x0800 + j * EC_SYNC_SIZE, EC_SYNC_SIZE))
                     return -1;
-                ec_sync_config(sync, command->data);
+                ec_sync_config(sync, slave, command->data);
                 if (unlikely(ec_master_simple_io(master, command))) {
                     EC_ERR("Setting sync manager %i failed on slave %i!\n",
                            j, slave->ring_position);
@@ -1166,7 +1221,7 @@ int ecrt_master_activate(ec_master_t *master /**< EtherCAT master */)
             if (ec_command_npwr(command, slave->station_address,
                                 0x0600 + j * EC_FMMU_SIZE, EC_FMMU_SIZE))
                 return -1;
-            ec_fmmu_config(fmmu, command->data);
+            ec_fmmu_config(fmmu, slave, command->data);
             if (unlikely(ec_master_simple_io(master, command))) {
                 EC_ERR("Setting FMMU %i failed on slave %i!\n",
                        j, slave->ring_position);

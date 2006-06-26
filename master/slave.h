@@ -214,6 +214,20 @@ ec_sdo_entry_t;
 /*****************************************************************************/
 
 /**
+   Variable-sized field information.
+*/
+
+typedef struct
+{
+    struct list_head list; /**< list item */
+    const ec_field_t *field; /**< data field */
+    size_t size; /**< field size */
+}
+ec_varsize_t;
+
+/*****************************************************************************/
+
+/**
    EtherCAT slave.
 */
 
@@ -261,23 +275,28 @@ struct ec_slave
     ec_fmmu_t fmmus[EC_MAX_FMMUS]; /**< FMMU configurations */
     uint8_t fmmu_count; /**< number of FMMUs used */
 
+    uint8_t *eeprom_data; /**< Complete EEPROM image */
+    uint16_t eeprom_size; /**< size of the EEPROM contents in byte */
     struct list_head eeprom_strings; /**< EEPROM STRING categories */
     struct list_head eeprom_syncs; /**< EEPROM SYNC MANAGER categories */
     struct list_head eeprom_pdos; /**< EEPROM [RT]XPDO categories */
-
     char *eeprom_group; /**< slave group acc. to EEPROM */
     char *eeprom_image; /**< slave image name acc. to EEPROM */
     char *eeprom_order; /**< slave order number acc. to EEPROM */
     char *eeprom_name; /**< slave name acc. to EEPROM */
 
-    struct list_head sdo_dictionary; /**< SDO directory list */
+    uint16_t *new_eeprom_data; /**< new EEPROM data to write */
+    size_t new_eeprom_size; /**< size of new EEPROM data in words */
 
-    ec_command_t mbox_command; /**< mailbox command */
+    struct list_head sdo_dictionary; /**< SDO directory list */
 
     ec_slave_state_t requested_state; /**< requested slave state */
     ec_slave_state_t current_state; /**< current slave state */
     unsigned int state_error; /**< a state error has happened */
     unsigned int online; /**< non-zero, if the slave responds. */
+
+    struct list_head varsize_fields; /**< size information for variable-sized
+                                        data fields. */
 };
 
 /*****************************************************************************/
@@ -306,6 +325,7 @@ int ec_slave_fetch_pdo(ec_slave_t *, const uint8_t *, size_t, ec_pdo_type_t);
 int ec_slave_locate_string(ec_slave_t *, unsigned int, char **);
 
 // misc.
+size_t ec_slave_calc_sync_size(const ec_slave_t *, const ec_sync_t *);
 void ec_slave_print(const ec_slave_t *, unsigned int);
 int ec_slave_check_crc(ec_slave_t *);
 

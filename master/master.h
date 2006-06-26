@@ -122,6 +122,8 @@ struct ec_master
     int (*request_cb)(void *); /**< lock request callback */
     void (*release_cb)(void *); /**< lock release callback */
     void *cb_data; /**< data parameter of locking callbacks */
+
+    uint8_t eeprom_write_enable; /**< allow write operations to EEPROMs */
 };
 
 /*****************************************************************************/
@@ -149,9 +151,9 @@ int ec_master_bus_scan(ec_master_t *);
 
 // misc.
 void ec_master_clear_slaves(ec_master_t *);
-void ec_sync_config(const ec_sync_t *, uint8_t *);
+void ec_sync_config(const ec_sync_t *, const ec_slave_t *, uint8_t *);
 void ec_eeprom_sync_config(const ec_eeprom_sync_t *, uint8_t *);
-void ec_fmmu_config(const ec_fmmu_t *, uint8_t *);
+void ec_fmmu_config(const ec_fmmu_t *, const ec_slave_t *, uint8_t *);
 void ec_master_output_stats(ec_master_t *);
 
 /*****************************************************************************/

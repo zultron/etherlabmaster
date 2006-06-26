@@ -145,6 +145,8 @@ int ecrt_domain_state(ec_domain_t *domain);
  *  Slave Methods
  *****************************************************************************/
 
+/* there SDO functions are deprecated! */
+
 int ecrt_slave_sdo_read_exp8(ec_slave_t *slave, uint16_t sdo_index,
                               uint8_t sdo_subindex, uint8_t *value);
 int ecrt_slave_sdo_read_exp16(ec_slave_t *slave, uint16_t sdo_index,
@@ -160,7 +162,10 @@ int ecrt_slave_sdo_write_exp32(ec_slave_t *slave, uint16_t sdo_index,
 int ecrt_slave_sdo_read(ec_slave_t *slave, uint16_t sdo_index,
                         uint8_t sdo_subindex, uint8_t *data, size_t *size);
 
-int ecrt_slave_write_alias(ec_slave_t *slave, uint16_t alias);
+int ecrt_slave_write_alias(ec_slave_t *slave, uint16_t alias); // deprecated!
+
+int ecrt_slave_field_size(ec_slave_t *slave, const char *field_name,
+                          unsigned int field_index, size_t size);
 
 /******************************************************************************
  *  Bitwise read/write macros

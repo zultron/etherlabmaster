@@ -35,26 +35,24 @@
 #
 #------------------------------------------------------------------------------
 
-ifneq ($(KERNELRELEASE),)
-
 #------------------------------------------------------------------------------
 #  kbuild section
+
+ifneq ($(KERNELRELEASE),)
 
 obj-m := ec_master.o
 
 ec_master-objs := module.o master.o device.o slave.o command.o types.o \
 		domain.o mailbox.o canopen.o ethernet.o debug.o fsm.o
 
-REV := $(shell svnversion $(src) 2>/dev/null)
+REV := $(shell svnversion $(src) 2>/dev/null || echo "unknown")
 
 EXTRA_CFLAGS := -DSVNREV=$(REV) -DUSER=$(USER)
 
 #------------------------------------------------------------------------------
+#  default section
 
 else
-
-#------------------------------------------------------------------------------
-#  default section
 
 ifneq ($(wildcard ../ethercat.conf),)
 include ../ethercat.conf
@@ -62,13 +60,21 @@ else
 KERNEL := $(shell uname -r)
 endif
 
-KERNELDIR := /lib/modules/$(KERNEL)/build
+KERNEL_DIR := /lib/modules/$(KERNEL)/build
+CURRENT_DIR := $(shell pwd)
+INSTALL_MOD_DIR := ethercat/master
 
 modules:
-	$(MAKE) -C $(KERNELDIR) M=`pwd`
+	$(MAKE) -C $(KERNEL_DIR) M=$(CURRENT_DIR) modules
+
+install: modules_install
+
+modules_install:
+	$(MAKE) -C $(KERNEL_DIR) M=$(CURRENT_DIR) \
+		INSTALL_MOD_DIR=$(INSTALL_MOD_DIR) modules_install
 
 clean:
-	$(MAKE) -C $(KERNELDIR) M=`pwd` clean
+	$(MAKE) -C $(KERNEL_DIR) M=$(CURRENT_DIR) clean
 
 #------------------------------------------------------------------------------
 

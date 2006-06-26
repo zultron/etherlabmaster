@@ -1,6 +1,6 @@
 #------------------------------------------------------------------------------
 #
-#  kbuild Makefile
+#  Makefile
 #
 #  IgH EtherCAT master device modules
 #
@@ -35,25 +35,23 @@
 #
 #------------------------------------------------------------------------------
 
-ifneq ($(KERNELRELEASE),)
-
 #------------------------------------------------------------------------------
 #  kbuild section
+
+ifneq ($(KERNELRELEASE),)
 
 obj-m := ec_8139too.o
 
 ec_8139too-objs := 8139too.o
 
-REV := $(shell svnversion $(src) 2>/dev/null)
+REV := $(shell svnversion $(src) 2>/dev/null || echo "unknown")
 
 EXTRA_CFLAGS = -DEC_REV=$(REV) -DEC_USER=$(USER)
 
 #------------------------------------------------------------------------------
+#  default section
 
 else
-
-#------------------------------------------------------------------------------
-#  default section
 
 ifneq ($(wildcard ../ethercat.conf),)
 include ../ethercat.conf
@@ -61,13 +59,21 @@ else
 KERNEL := $(shell uname -r)
 endif
 
-KERNELDIR := /lib/modules/$(KERNEL)/build
+KERNEL_DIR := /lib/modules/$(KERNEL)/build
+CURRENT_DIR := $(shell pwd)
+INSTALL_MOD_DIR := ethercat/devices
 
 modules:
-	$(MAKE) -C $(KERNELDIR) M=`pwd`
+	$(MAKE) -C $(KERNEL_DIR) M=$(CURRENT_DIR) modules
+
+install: modules_install
+
+modules_install:
+	$(MAKE) -C $(KERNEL_DIR) M=$(CURRENT_DIR) \
+		INSTALL_MOD_DIR=$(INSTALL_MOD_DIR) modules_install
 
 clean:
-	$(MAKE) -C $(KERNELDIR) M=`pwd` clean
+	$(MAKE) -C $(KERNEL_DIR) M=$(CURRENT_DIR) clean
 
 #------------------------------------------------------------------------------
 

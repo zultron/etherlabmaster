@@ -67,9 +67,39 @@ const ec_slave_type_t Beckhoff_EK1110 = {
 
 /*****************************************************************************/
 
+const ec_field_t bk1120_out = {"Outputs", 0}; // variable size
+const ec_field_t bk1120_in = {"Inputs", 0}; // variable size
+
+const ec_sync_t bk1120_sm0 = {0x1C00, 264, 0x26, {NULL}};
+const ec_sync_t bk1120_sm1 = {0x1E00, 264, 0x22, {NULL}};
+
+const ec_sync_t bk1120_sm2 = { // outputs
+    0x1000, 0, 0x24, // variable size
+    {&bk1120_out, NULL}
+};
+
+const ec_sync_t bk1120_sm3 = { // inputs
+    0x1600, 0, 0x00, // variable size
+    {&bk1120_in, NULL}
+};
+
 const ec_slave_type_t Beckhoff_BK1120 = {
     "Beckhoff", "BK1120", "KBUS Coupler", EC_TYPE_NORMAL,
-    {NULL} // no sync managers
+    {&bk1120_sm0, &bk1120_sm1, &bk1120_sm2, &bk1120_sm3, NULL}
+};
+
+/*****************************************************************************/
+
+const ec_field_t el1004_in = {"InputValue", 1};
+
+const ec_sync_t el1004_sm0 = { // inputs
+    0x1000, 1, 0x00,
+    {&el1004_in, NULL}
+};
+
+const ec_slave_type_t Beckhoff_EL1004 = {
+    "Beckhoff", "EL1004", "4x Digital Input, 3ms", EC_TYPE_NORMAL,
+    {&el1004_sm0, NULL}
 };
 
 /*****************************************************************************/
@@ -82,7 +112,7 @@ const ec_sync_t el1014_sm0 = { // inputs
 };
 
 const ec_slave_type_t Beckhoff_EL1014 = {
-    "Beckhoff", "EL1014", "4x Digital Input", EC_TYPE_NORMAL,
+    "Beckhoff", "EL1014", "4x Digital Input, 10us", EC_TYPE_NORMAL,
     {&el1014_sm0, NULL}
 };
 
@@ -186,8 +216,7 @@ const ec_sync_t el5101_sm3 = {
     {&el5101_st, &el5101_ip, &el5101_la, NULL}
 };
 
-const ec_slave_type_t Beckhoff_EL5101 =
-{
+const ec_slave_type_t Beckhoff_EL5101 = {
     "Beckhoff", "EL5101", "Incremental Encoder Interface", EC_TYPE_NORMAL,
     {&mailbox_sm0, &mailbox_sm1, &el5101_sm2, &el5101_sm3, NULL}
 };
@@ -230,10 +259,11 @@ const ec_slave_type_t TR_Electronic_LinEnc2 = {
 */
 
 ec_slave_ident_t slave_idents[] = {
+    {0x00000002, 0x03EC3052, &Beckhoff_EL1004},
     {0x00000002, 0x03F63052, &Beckhoff_EL1014},
     {0x00000002, 0x044C2C52, &Beckhoff_EK1100},
     {0x00000002, 0x04562C52, &Beckhoff_EK1110},
-    //{0x00000002, 0x04602C22, &Beckhoff_BK1120},
+    {0x00000002, 0x04602C22, &Beckhoff_BK1120},
     {0x00000002, 0x07D43052, &Beckhoff_EL2004},
     {0x00000002, 0x07F03052, &Beckhoff_EL2032},
     {0x00000002, 0x0C1E3052, &Beckhoff_EL3102},
