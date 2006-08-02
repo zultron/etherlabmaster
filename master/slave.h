@@ -45,7 +45,7 @@
 #include <linux/kobject.h>
 
 #include "globals.h"
-#include "command.h"
+#include "datagram.h"
 #include "types.h"
 
 /*****************************************************************************/
@@ -292,7 +292,7 @@ struct ec_slave
 
     ec_slave_state_t requested_state; /**< requested slave state */
     ec_slave_state_t current_state; /**< current slave state */
-    unsigned int state_error; /**< a state error has happened */
+    unsigned int error_flag; /**< stop processing after an error */
     unsigned int online; /**< non-zero, if the slave responds. */
 
     struct list_head varsize_fields; /**< size information for variable-sized
@@ -326,6 +326,9 @@ int ec_slave_locate_string(ec_slave_t *, unsigned int, char **);
 
 // misc.
 size_t ec_slave_calc_sync_size(const ec_slave_t *, const ec_sync_t *);
+uint16_t ec_slave_calc_eeprom_sync_size(const ec_slave_t *,
+                                        const ec_eeprom_sync_t *);
+
 void ec_slave_print(const ec_slave_t *, unsigned int);
 int ec_slave_check_crc(ec_slave_t *);
 

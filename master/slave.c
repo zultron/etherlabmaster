@@ -43,7 +43,7 @@
 
 #include "globals.h"
 #include "slave.h"
-#include "command.h"
+#include "datagram.h"
 #include "master.h"
 
 /*****************************************************************************/
@@ -62,22 +62,22 @@ ssize_t ec_store_slave_attribute(struct kobject *, struct attribute *,
 /** \cond */
 
 EC_SYSFS_READ_ATTR(ring_position);
-EC_SYSFS_READ_ATTR(coupler_address);
-EC_SYSFS_READ_ATTR(vendor_name);
-EC_SYSFS_READ_ATTR(product_name);
-EC_SYSFS_READ_ATTR(product_desc);
-EC_SYSFS_READ_ATTR(sii_name);
-EC_SYSFS_READ_ATTR(type);
+EC_SYSFS_READ_ATTR(advanced_position);
+EC_SYSFS_READ_ATTR(vendor_name); // deprecated
+EC_SYSFS_READ_ATTR(product_name); // deprecated
+EC_SYSFS_READ_ATTR(product_desc); // deprecated
+EC_SYSFS_READ_ATTR(name);
+EC_SYSFS_READ_ATTR(type); // deprecated
 EC_SYSFS_READ_WRITE_ATTR(state);
 EC_SYSFS_READ_WRITE_ATTR(eeprom);
 
 static struct attribute *def_attrs[] = {
     &attr_ring_position,
-    &attr_coupler_address,
+    &attr_advanced_position,
     &attr_vendor_name,
     &attr_product_name,
     &attr_product_desc,
-    &attr_sii_name,
+    &attr_name,
     &attr_type,
     &attr_state,
     &attr_eeprom,
@@ -155,7 +155,7 @@ int ec_slave_init(ec_slave_t *slave, /**< EtherCAT slave */
     slave->eeprom_name = NULL;
     slave->requested_state = EC_SLAVE_STATE_UNKNOWN;
     slave->current_state = EC_SLAVE_STATE_UNKNOWN;
-    slave->state_error = 0;
+    slave->error_flag = 0;
     slave->online = 1;
     slave->new_eeprom_data = NULL;
     slave->new_eeprom_size = 0;
@@ -259,38 +259,40 @@ void ec_slave_clear(struct kobject *kobj /**< kobject of the slave */)
 
 int ec_slave_fetch(ec_slave_t *slave /**< EtherCAT slave */)
 {
-    ec_command_t *command;
+    ec_datagram_t *datagram;
     unsigned int i;
     uint16_t dl_status;
 
-    command = &slave->master->simple_command;
+    datagram = &slave->master->simple_datagram;
 
     // read base data
-    if (ec_command_nprd(command, slave->station_address, 0x0000, 6)) return -1;
-    if (unlikely(ec_master_simple_io(slave->master, command))) {
+    if (ec_datagram_nprd(datagram, slave->station_address, 0x0000, 6))
+        return -1;
+    if (unlikely(ec_master_simple_io(slave->master, datagram))) {
         EC_ERR("Reading base data from slave %i failed!\n",
                slave->ring_position);
         return -1;
     }
 
-    slave->base_type =       EC_READ_U8 (command->data);
-    slave->base_revision =   EC_READ_U8 (command->data + 1);
-    slave->base_build =      EC_READ_U16(command->data + 2);
-    slave->base_fmmu_count = EC_READ_U8 (command->data + 4);
-    slave->base_sync_count = EC_READ_U8 (command->data + 5);
+    slave->base_type =       EC_READ_U8 (datagram->data);
+    slave->base_revision =   EC_READ_U8 (datagram->data + 1);
+    slave->base_build =      EC_READ_U16(datagram->data + 2);
+    slave->base_fmmu_count = EC_READ_U8 (datagram->data + 4);
+    slave->base_sync_count = EC_READ_U8 (datagram->data + 5);
 
     if (slave->base_fmmu_count > EC_MAX_FMMUS)
         slave->base_fmmu_count = EC_MAX_FMMUS;
 
     // read data link status
-    if (ec_command_nprd(command, slave->station_address, 0x0110, 2)) return -1;
-    if (unlikely(ec_master_simple_io(slave->master, command))) {
+    if (ec_datagram_nprd(datagram, slave->station_address, 0x0110, 2))
+        return -1;
+    if (unlikely(ec_master_simple_io(slave->master, datagram))) {
         EC_ERR("Reading DL status from slave %i failed!\n",
                slave->ring_position);
         return -1;
     }
 
-    dl_status = EC_READ_U16(command->data);
+    dl_status = EC_READ_U16(datagram->data);
     for (i = 0; i < 4; i++) {
         slave->dl_link[i] = dl_status & (1 << (4 + i)) ? 1 : 0;
         slave->dl_loop[i] = dl_status & (1 << (8 + i * 2)) ? 1 : 0;
@@ -342,17 +344,18 @@ int ec_slave_sii_read16(ec_slave_t *slave,
                         /**< target memory */
                         )
 {
-    ec_command_t *command;
+    ec_datagram_t *datagram;
     cycles_t start, end, timeout;
 
-    command = &slave->master->simple_command;
+    datagram = &slave->master->simple_datagram;
 
     // initiate read operation
-    if (ec_command_npwr(command, slave->station_address, 0x502, 6)) return -1;
-    EC_WRITE_U8 (command->data,     0x00); // read-only access
-    EC_WRITE_U8 (command->data + 1, 0x01); // request read operation
-    EC_WRITE_U32(command->data + 2, offset);
-    if (unlikely(ec_master_simple_io(slave->master, command))) {
+    if (ec_datagram_npwr(datagram, slave->station_address, 0x502, 6))
+        return -1;
+    EC_WRITE_U8 (datagram->data,     0x00); // read-only access
+    EC_WRITE_U8 (datagram->data + 1, 0x01); // request read operation
+    EC_WRITE_U32(datagram->data + 2, offset);
+    if (unlikely(ec_master_simple_io(slave->master, datagram))) {
         EC_ERR("SII-read failed on slave %i!\n", slave->ring_position);
         return -1;
     }
@@ -364,9 +367,9 @@ int ec_slave_sii_read16(ec_slave_t *slave,
     {
         udelay(10);
 
-        if (ec_command_nprd(command, slave->station_address, 0x502, 10))
+        if (ec_datagram_nprd(datagram, slave->station_address, 0x502, 10))
             return -1;
-        if (unlikely(ec_master_simple_io(slave->master, command))) {
+        if (unlikely(ec_master_simple_io(slave->master, datagram))) {
             EC_ERR("Getting SII-read status failed on slave %i!\n",
                    slave->ring_position);
             return -1;
@@ -375,8 +378,8 @@ int ec_slave_sii_read16(ec_slave_t *slave,
         end = get_cycles();
 
         // check for "busy bit"
-        if (likely((EC_READ_U8(command->data + 1) & 0x81) == 0)) {
-            *target = EC_READ_U16(command->data + 6);
+        if (likely((EC_READ_U8(datagram->data + 1) & 0x81) == 0)) {
+            *target = EC_READ_U16(datagram->data + 6);
             return 0;
         }
 
@@ -402,17 +405,18 @@ int ec_slave_sii_read32(ec_slave_t *slave,
                         /**< target memory */
                         )
 {
-    ec_command_t *command;
+    ec_datagram_t *datagram;
     cycles_t start, end, timeout;
 
-    command = &slave->master->simple_command;
+    datagram = &slave->master->simple_datagram;
 
     // initiate read operation
-    if (ec_command_npwr(command, slave->station_address, 0x502, 6)) return -1;
-    EC_WRITE_U8 (command->data,     0x00); // read-only access
-    EC_WRITE_U8 (command->data + 1, 0x01); // request read operation
-    EC_WRITE_U32(command->data + 2, offset);
-    if (unlikely(ec_master_simple_io(slave->master, command))) {
+    if (ec_datagram_npwr(datagram, slave->station_address, 0x502, 6))
+        return -1;
+    EC_WRITE_U8 (datagram->data,     0x00); // read-only access
+    EC_WRITE_U8 (datagram->data + 1, 0x01); // request read operation
+    EC_WRITE_U32(datagram->data + 2, offset);
+    if (unlikely(ec_master_simple_io(slave->master, datagram))) {
         EC_ERR("SII-read failed on slave %i!\n", slave->ring_position);
         return -1;
     }
@@ -424,9 +428,9 @@ int ec_slave_sii_read32(ec_slave_t *slave,
     {
         udelay(10);
 
-        if (ec_command_nprd(command, slave->station_address, 0x502, 10))
+        if (ec_datagram_nprd(datagram, slave->station_address, 0x502, 10))
             return -1;
-        if (unlikely(ec_master_simple_io(slave->master, command))) {
+        if (unlikely(ec_master_simple_io(slave->master, datagram))) {
             EC_ERR("Getting SII-read status failed on slave %i!\n",
                    slave->ring_position);
             return -1;
@@ -435,8 +439,8 @@ int ec_slave_sii_read32(ec_slave_t *slave,
         end = get_cycles();
 
         // check "busy bit"
-        if (likely((EC_READ_U8(command->data + 1) & 0x81) == 0)) {
-            *target = EC_READ_U32(command->data + 6);
+        if (likely((EC_READ_U8(datagram->data + 1) & 0x81) == 0)) {
+            *target = EC_READ_U32(datagram->data + 6);
             return 0;
         }
 
@@ -462,21 +466,22 @@ int ec_slave_sii_write16(ec_slave_t *slave,
                          /**< new value */
                          )
 {
-    ec_command_t *command;
+    ec_datagram_t *datagram;
     cycles_t start, end, timeout;
 
-    command = &slave->master->simple_command;
+    datagram = &slave->master->simple_datagram;
 
     EC_INFO("SII-write (slave %i, offset 0x%04X, value 0x%04X)\n",
             slave->ring_position, offset, value);
 
     // initiate write operation
-    if (ec_command_npwr(command, slave->station_address, 0x502, 8)) return -1;
-    EC_WRITE_U8 (command->data,     0x01); // enable write access
-    EC_WRITE_U8 (command->data + 1, 0x02); // request write operation
-    EC_WRITE_U32(command->data + 2, offset);
-    EC_WRITE_U16(command->data + 6, value);
-    if (unlikely(ec_master_simple_io(slave->master, command))) {
+    if (ec_datagram_npwr(datagram, slave->station_address, 0x502, 8))
+        return -1;
+    EC_WRITE_U8 (datagram->data,     0x01); // enable write access
+    EC_WRITE_U8 (datagram->data + 1, 0x02); // request write operation
+    EC_WRITE_U32(datagram->data + 2, offset);
+    EC_WRITE_U16(datagram->data + 6, value);
+    if (unlikely(ec_master_simple_io(slave->master, datagram))) {
         EC_ERR("SII-write failed on slave %i!\n", slave->ring_position);
         return -1;
     }
@@ -488,9 +493,9 @@ int ec_slave_sii_write16(ec_slave_t *slave,
     {
         udelay(10);
 
-        if (ec_command_nprd(command, slave->station_address, 0x502, 2))
+        if (ec_datagram_nprd(datagram, slave->station_address, 0x502, 2))
             return -1;
-        if (unlikely(ec_master_simple_io(slave->master, command))) {
+        if (unlikely(ec_master_simple_io(slave->master, datagram))) {
             EC_ERR("Getting SII-write status failed on slave %i!\n",
                    slave->ring_position);
             return -1;
@@ -499,8 +504,8 @@ int ec_slave_sii_write16(ec_slave_t *slave,
         end = get_cycles();
 
         // check "busy bit"
-        if (likely((EC_READ_U8(command->data + 1) & 0x82) == 0)) {
-            if (EC_READ_U8(command->data + 1) & 0x40) {
+        if (likely((EC_READ_U8(datagram->data + 1) & 0x82) == 0)) {
+            if (EC_READ_U8(datagram->data + 1) & 0x40) {
                 EC_ERR("SII-write failed!\n");
                 return -1;
             }
@@ -534,7 +539,7 @@ int ec_slave_fetch_categories(ec_slave_t *slave /**< EtherCAT slave */)
 
     word_offset = 0x0040;
 
-    if (!(cat_data = (uint8_t *) kmalloc(0x10000, GFP_KERNEL))) {
+    if (!(cat_data = (uint8_t *) kmalloc(0x10000, GFP_ATOMIC))) {
         EC_ERR("Failed to allocate 64k bytes for category data.\n");
         return -1;
     }
@@ -632,7 +637,7 @@ int ec_slave_fetch_strings(ec_slave_t *slave, /**< EtherCAT slave */
         size = data[offset];
         // allocate memory for string structure and data at a single blow
         if (!(string = (ec_eeprom_string_t *)
-              kmalloc(sizeof(ec_eeprom_string_t) + size + 1, GFP_KERNEL))) {
+              kmalloc(sizeof(ec_eeprom_string_t) + size + 1, GFP_ATOMIC))) {
             EC_ERR("Failed to allocate string memory.\n");
             return -1;
         }
@@ -696,7 +701,7 @@ int ec_slave_fetch_sync(ec_slave_t *slave, /**< EtherCAT slave */
 
     for (i = 0; i < sync_count; i++, data += 8) {
         if (!(sync = (ec_eeprom_sync_t *)
-              kmalloc(sizeof(ec_eeprom_sync_t), GFP_KERNEL))) {
+              kmalloc(sizeof(ec_eeprom_sync_t), GFP_ATOMIC))) {
             EC_ERR("Failed to allocate Sync-Manager memory.\n");
             return -1;
         }
@@ -732,7 +737,7 @@ int ec_slave_fetch_pdo(ec_slave_t *slave, /**< EtherCAT slave */
 
     while (word_count >= 4) {
         if (!(pdo = (ec_eeprom_pdo_t *)
-              kmalloc(sizeof(ec_eeprom_pdo_t), GFP_KERNEL))) {
+              kmalloc(sizeof(ec_eeprom_pdo_t), GFP_ATOMIC))) {
             EC_ERR("Failed to allocate PDO memory.\n");
             return -1;
         }
@@ -753,7 +758,7 @@ int ec_slave_fetch_pdo(ec_slave_t *slave, /**< EtherCAT slave */
 
         for (i = 0; i < entry_count; i++) {
             if (!(entry = (ec_eeprom_pdo_entry_t *)
-                  kmalloc(sizeof(ec_eeprom_pdo_entry_t), GFP_KERNEL))) {
+                  kmalloc(sizeof(ec_eeprom_pdo_entry_t), GFP_ATOMIC))) {
                 EC_ERR("Failed to allocate PDO entry memory.\n");
                 return -1;
             }
@@ -803,7 +808,7 @@ int ec_slave_locate_string(ec_slave_t *slave, /**< EtherCAT slave */
     list_for_each_entry(string, &slave->eeprom_strings, list) {
         if (--index) continue;
 
-        if (!(*ptr = (char *) kmalloc(string->size + 1, GFP_KERNEL))) {
+        if (!(*ptr = (char *) kmalloc(string->size + 1, GFP_ATOMIC))) {
             EC_ERR("Unable to allocate string memory.\n");
             return -1;
         }
@@ -815,7 +820,7 @@ int ec_slave_locate_string(ec_slave_t *slave, /**< EtherCAT slave */
 
     err_string = "(string not found)";
 
-    if (!(*ptr = (char *) kmalloc(strlen(err_string) + 1, GFP_KERNEL))) {
+    if (!(*ptr = (char *) kmalloc(strlen(err_string) + 1, GFP_ATOMIC))) {
         EC_ERR("Unable to allocate string memory.\n");
         return -1;
     }
@@ -834,29 +839,28 @@ void ec_slave_state_ack(ec_slave_t *slave, /**< EtherCAT slave */
                         uint8_t state /**< previous state */
                         )
 {
-    ec_command_t *command;
+    ec_datagram_t *datagram;
     cycles_t start, end, timeout;
 
-    command = &slave->master->simple_command;
+    datagram = &slave->master->simple_datagram;
 
-    if (ec_command_npwr(command, slave->station_address, 0x0120, 2)) return;
-    EC_WRITE_U16(command->data, state | EC_ACK);
-    if (unlikely(ec_master_simple_io(slave->master, command))) {
+    if (ec_datagram_npwr(datagram, slave->station_address, 0x0120, 2)) return;
+    EC_WRITE_U16(datagram->data, state | EC_ACK);
+    if (unlikely(ec_master_simple_io(slave->master, datagram))) {
         EC_WARN("Acknowledge sending failed on slave %i!\n",
                 slave->ring_position);
         return;
     }
 
     start = get_cycles();
-    timeout = (cycles_t) 10 * cpu_khz; // 10ms
+    timeout = (cycles_t) 100 * cpu_khz; // 100ms
 
-    while (1)
-    {
+    while (1) {
         udelay(100); // wait a little bit...
 
-        if (ec_command_nprd(command, slave->station_address, 0x0130, 2))
+        if (ec_datagram_nprd(datagram, slave->station_address, 0x0130, 2))
             return;
-        if (unlikely(ec_master_simple_io(slave->master, command))) {
+        if (unlikely(ec_master_simple_io(slave->master, datagram))) {
             slave->current_state = EC_SLAVE_STATE_UNKNOWN;
             EC_WARN("Acknowledge checking failed on slave %i!\n",
                     slave->ring_position);
@@ -865,14 +869,14 @@ void ec_slave_state_ack(ec_slave_t *slave, /**< EtherCAT slave */
 
         end = get_cycles();
 
-        if (likely(EC_READ_U8(command->data) == state)) {
+        if (EC_READ_U8(datagram->data) == state) {
             slave->current_state = state;
             EC_INFO("Acknowleged state 0x%02X on slave %i.\n", state,
                     slave->ring_position);
             return;
         }
 
-        if (unlikely((end - start) >= timeout)) {
+        if (end - start >= timeout) {
             slave->current_state = EC_SLAVE_STATE_UNKNOWN;
             EC_WARN("Failed to acknowledge state 0x%02X on slave %i"
                     " - Timeout!\n", state, slave->ring_position);
@@ -891,20 +895,20 @@ void ec_slave_state_ack(ec_slave_t *slave, /**< EtherCAT slave */
 
 void ec_slave_read_al_status_code(ec_slave_t *slave /**< EtherCAT slave */)
 {
-    ec_command_t *command;
+    ec_datagram_t *datagram;
     uint16_t code;
     const ec_code_msg_t *al_msg;
 
-    command = &slave->master->simple_command;
+    datagram = &slave->master->simple_datagram;
 
-    if (ec_command_nprd(command, slave->station_address, 0x0134, 2)) return;
-    if (unlikely(ec_master_simple_io(slave->master, command))) {
+    if (ec_datagram_nprd(datagram, slave->station_address, 0x0134, 2)) return;
+    if (unlikely(ec_master_simple_io(slave->master, datagram))) {
         EC_WARN("Failed to read AL status code on slave %i!\n",
                 slave->ring_position);
         return;
     }
 
-    if (!(code = EC_READ_U16(command->data))) return;
+    if (!(code = EC_READ_U16(datagram->data))) return;
 
     for (al_msg = al_status_messages; al_msg->code; al_msg++) {
         if (al_msg->code == code) {
@@ -928,16 +932,17 @@ int ec_slave_state_change(ec_slave_t *slave, /**< EtherCAT slave */
                           uint8_t state /**< new state */
                           )
 {
-    ec_command_t *command;
+    ec_datagram_t *datagram;
     cycles_t start, end, timeout;
 
-    command = &slave->master->simple_command;
+    datagram = &slave->master->simple_datagram;
 
     slave->requested_state = state;
 
-    if (ec_command_npwr(command, slave->station_address, 0x0120, 2)) return -1;
-    EC_WRITE_U16(command->data, state);
-    if (unlikely(ec_master_simple_io(slave->master, command))) {
+    if (ec_datagram_npwr(datagram, slave->station_address, 0x0120, 2))
+        return -1;
+    EC_WRITE_U16(datagram->data, state);
+    if (unlikely(ec_master_simple_io(slave->master, datagram))) {
         EC_ERR("Failed to set state 0x%02X on slave %i!\n",
                state, slave->ring_position);
         return -1;
@@ -950,9 +955,9 @@ int ec_slave_state_change(ec_slave_t *slave, /**< EtherCAT slave */
     {
         udelay(100); // wait a little bit
 
-        if (ec_command_nprd(command, slave->station_address, 0x0130, 2))
+        if (ec_datagram_nprd(datagram, slave->station_address, 0x0130, 2))
             return -1;
-        if (unlikely(ec_master_simple_io(slave->master, command))) {
+        if (unlikely(ec_master_simple_io(slave->master, datagram))) {
             slave->current_state = EC_SLAVE_STATE_UNKNOWN;
             EC_ERR("Failed to check state 0x%02X on slave %i!\n",
                    state, slave->ring_position);
@@ -961,18 +966,19 @@ int ec_slave_state_change(ec_slave_t *slave, /**< EtherCAT slave */
 
         end = get_cycles();
 
-        if (unlikely(EC_READ_U8(command->data) & 0x10)) { // state change error
+        if (unlikely(EC_READ_U8(datagram->data) & 0x10)) {
+            // state change error
             EC_ERR("Failed to set state 0x%02X - Slave %i refused state change"
                    " (code 0x%02X)!\n", state, slave->ring_position,
-                   EC_READ_U8(command->data));
-            slave->current_state = EC_READ_U8(command->data);
+                   EC_READ_U8(datagram->data));
+            slave->current_state = EC_READ_U8(datagram->data);
             state = slave->current_state & 0x0F;
             ec_slave_read_al_status_code(slave);
             ec_slave_state_ack(slave, state);
             return -1;
         }
 
-        if (likely(EC_READ_U8(command->data) == (state & 0x0F))) {
+        if (likely(EC_READ_U8(datagram->data) == (state & 0x0F))) {
             slave->current_state = state;
             return 0; // state change successful
         }
@@ -1205,44 +1211,46 @@ void ec_slave_print(const ec_slave_t *slave, /**< EtherCAT slave */
 
 int ec_slave_check_crc(ec_slave_t *slave /**< EtherCAT slave */)
 {
-    ec_command_t *command;
+    ec_datagram_t *datagram;
 
-    command = &slave->master->simple_command;
+    datagram = &slave->master->simple_datagram;
 
-    if (ec_command_nprd(command, slave->station_address, 0x0300, 4)) return -1;
-    if (unlikely(ec_master_simple_io(slave->master, command))) {
+    if (ec_datagram_nprd(datagram, slave->station_address, 0x0300, 4))
+        return -1;
+    if (unlikely(ec_master_simple_io(slave->master, datagram))) {
         EC_WARN("Reading CRC fault counters failed on slave %i!\n",
                 slave->ring_position);
         return -1;
     }
 
-    if (!EC_READ_U32(command->data)) return 0; // no CRC faults
+    if (!EC_READ_U32(datagram->data)) return 0; // no CRC faults
 
-    if (EC_READ_U8(command->data))
+    if (EC_READ_U8(datagram->data))
         EC_WARN("%3i RX-error%s on slave %i, channel A.\n",
-                EC_READ_U8(command->data),
-                EC_READ_U8(command->data) == 1 ? "" : "s",
+                EC_READ_U8(datagram->data),
+                EC_READ_U8(datagram->data) == 1 ? "" : "s",
                 slave->ring_position);
-    if (EC_READ_U8(command->data + 1))
+    if (EC_READ_U8(datagram->data + 1))
         EC_WARN("%3i invalid frame%s on slave %i, channel A.\n",
-                EC_READ_U8(command->data + 1),
-                EC_READ_U8(command->data + 1) == 1 ? "" : "s",
+                EC_READ_U8(datagram->data + 1),
+                EC_READ_U8(datagram->data + 1) == 1 ? "" : "s",
                 slave->ring_position);
-    if (EC_READ_U8(command->data + 2))
+    if (EC_READ_U8(datagram->data + 2))
         EC_WARN("%3i RX-error%s on slave %i, channel B.\n",
-                EC_READ_U8(command->data + 2),
-                EC_READ_U8(command->data + 2) == 1 ? "" : "s",
+                EC_READ_U8(datagram->data + 2),
+                EC_READ_U8(datagram->data + 2) == 1 ? "" : "s",
                 slave->ring_position);
-    if (EC_READ_U8(command->data + 3))
+    if (EC_READ_U8(datagram->data + 3))
         EC_WARN("%3i invalid frame%s on slave %i, channel B.\n",
-                EC_READ_U8(command->data + 3),
-                EC_READ_U8(command->data + 3) == 1 ? "" : "s",
+                EC_READ_U8(datagram->data + 3),
+                EC_READ_U8(datagram->data + 3) == 1 ? "" : "s",
                 slave->ring_position);
 
     // reset CRC counters
-    if (ec_command_npwr(command, slave->station_address, 0x0300, 4)) return -1;
-    EC_WRITE_U32(command->data, 0x00000000);
-    if (unlikely(ec_master_simple_io(slave->master, command))) {
+    if (ec_datagram_npwr(datagram, slave->station_address, 0x0300, 4))
+        return -1;
+    EC_WRITE_U32(datagram->data, 0x00000000);
+    if (unlikely(ec_master_simple_io(slave->master, datagram))) {
         EC_WARN("Resetting CRC fault counters failed on slave %i!\n",
                 slave->ring_position);
         return -1;
@@ -1273,8 +1281,8 @@ ssize_t ec_slave_write_eeprom(ec_slave_t *slave, /**< EtherCAT slave */
         return -1;
     }
 
-    if (slave->master->mode != EC_MASTER_MODE_FREERUN) {
-        EC_ERR("Writing EEPROMs only allowed in freerun mode!\n");
+    if (slave->master->mode != EC_MASTER_MODE_IDLE) {
+        EC_ERR("Writing EEPROMs only allowed in idle mode!\n");
         return -1;
     }
 
@@ -1345,7 +1353,7 @@ ssize_t ec_show_slave_attribute(struct kobject *kobj, /**< slave's kobject */
     if (attr == &attr_ring_position) {
         return sprintf(buffer, "%i\n", slave->ring_position);
     }
-    else if (attr == &attr_coupler_address) {
+    else if (attr == &attr_advanced_position) {
         return sprintf(buffer, "%i:%i\n", slave->coupler_index,
                        slave->coupler_subindex);
     }
@@ -1361,7 +1369,7 @@ ssize_t ec_show_slave_attribute(struct kobject *kobj, /**< slave's kobject */
         if (slave->type)
             return sprintf(buffer, "%s\n", slave->type->description);
     }
-    else if (attr == &attr_sii_name) {
+    else if (attr == &attr_name) {
         if (slave->eeprom_name)
             return sprintf(buffer, "%s\n", slave->eeprom_name);
     }
@@ -1369,6 +1377,8 @@ ssize_t ec_show_slave_attribute(struct kobject *kobj, /**< slave's kobject */
         if (slave->type) {
             if (slave->type->special == EC_TYPE_BUS_COUPLER)
                 return sprintf(buffer, "coupler\n");
+	    else if (slave->type->special == EC_TYPE_INFRA)
+                return sprintf(buffer, "infrastructure\n");
             else
                 return sprintf(buffer, "normal\n");
         }
@@ -1420,28 +1430,23 @@ ssize_t ec_store_slave_attribute(struct kobject *kobj, /**< slave's kobject */
     ec_slave_t *slave = container_of(kobj, ec_slave_t, kobj);
 
     if (attr == &attr_state) {
-        if (!strcmp(buffer, "INIT\n")) {
+        if (!strcmp(buffer, "INIT\n"))
             slave->requested_state = EC_SLAVE_STATE_INIT;
-            slave->state_error = 0;
-            return size;
-        }
-        else if (!strcmp(buffer, "PREOP\n")) {
+        else if (!strcmp(buffer, "PREOP\n"))
             slave->requested_state = EC_SLAVE_STATE_PREOP;
-            slave->state_error = 0;
-            return size;
-        }
-        else if (!strcmp(buffer, "SAVEOP\n")) {
+        else if (!strcmp(buffer, "SAVEOP\n"))
             slave->requested_state = EC_SLAVE_STATE_SAVEOP;
-            slave->state_error = 0;
-            return size;
-        }
-        else if (!strcmp(buffer, "OP\n")) {
+        else if (!strcmp(buffer, "OP\n"))
             slave->requested_state = EC_SLAVE_STATE_OP;
-            slave->state_error = 0;
-            return size;
+        else {
+            EC_ERR("Invalid slave state \"%s\"!\n", buffer);
+            return -EINVAL;
         }
 
-        EC_ERR("Failed to set slave state!\n");
+        EC_INFO("Accepted new state %s for slave %i.\n",
+                buffer, slave->ring_position);
+        slave->error_flag = 0;
+        return size;
     }
     else if (attr == &attr_eeprom) {
         if (!ec_slave_write_eeprom(slave, buffer, size))
@@ -1486,6 +1491,40 @@ size_t ec_slave_calc_sync_size(const ec_slave_t *slave, /**< EtherCAT slave */
         }
     }
     return size;
+}
+
+/*****************************************************************************/
+
+/**
+   Calculates the size of a sync manager by evaluating PDO sizes.
+   \return sync manager size
+*/
+
+uint16_t ec_slave_calc_eeprom_sync_size(const ec_slave_t *slave,
+                                        /**< EtherCAT slave */
+                                        const ec_eeprom_sync_t *sync
+                                        /**< sync manager */
+                                        )
+{
+    ec_eeprom_pdo_t *pdo;
+    ec_eeprom_pdo_entry_t *pdo_entry;
+    unsigned int bit_size;
+
+    if (sync->length) return sync->length;
+
+    bit_size = 0;
+    list_for_each_entry(pdo, &slave->eeprom_pdos, list) {
+        if (pdo->sync_manager != sync->index) continue;
+
+        list_for_each_entry(pdo_entry, &pdo->entries, list) {
+            bit_size += pdo_entry->bit_length;
+        }
+    }
+
+    if (bit_size % 8) // round up to full bytes
+        return bit_size / 8 + 1;
+    else
+        return bit_size / 8;
 }
 
 /******************************************************************************

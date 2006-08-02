@@ -38,6 +38,7 @@
 
 /*****************************************************************************/
 
+#include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 
 #include "../include/ecrt.h"
@@ -87,7 +88,7 @@ int ec_eoe_init(ec_eoe_t *eoe /**< EoE handler */)
     int result, i;
 
     eoe->slave = NULL;
-    ec_command_init(&eoe->command);
+    ec_datagram_init(&eoe->datagram);
     eoe->state = ec_eoe_state_rx_start;
     eoe->opened = 0;
     eoe->rx_skb = NULL;
@@ -154,7 +155,7 @@ int ec_eoe_init(ec_eoe_t *eoe /**< EoE handler */)
 
 void ec_eoe_clear(ec_eoe_t *eoe /**< EoE handler */)
 {
-    if (eoe->dev) {
+    if (eoe->dev) { // TODO: dev never NULL?
         unregister_netdev(eoe->dev);
         free_netdev(eoe->dev);
     }
@@ -169,7 +170,7 @@ void ec_eoe_clear(ec_eoe_t *eoe /**< EoE handler */)
 
     if (eoe->rx_skb) dev_kfree_skb(eoe->rx_skb);
 
-    ec_command_clear(&eoe->command);
+    ec_datagram_clear(&eoe->datagram);
 }
 
 /*****************************************************************************/
@@ -224,6 +225,7 @@ int ec_eoe_send(ec_eoe_t *eoe /**< EoE handler */)
         complete_offset = eoe->tx_offset / 32;
     }
     else {
+        // complete size in 32 bit blocks, rounded up.
         complete_offset = remaining_size / 32 + 1;
     }
 
@@ -246,7 +248,7 @@ int ec_eoe_send(ec_eoe_t *eoe /**< EoE handler */)
     printk("\n");
 #endif
 
-    if (!(data = ec_slave_mbox_prepare_send(eoe->slave, &eoe->command,
+    if (!(data = ec_slave_mbox_prepare_send(eoe->slave, &eoe->datagram,
                                             0x02, current_size + 4)))
         return -1;
 
@@ -257,7 +259,7 @@ int ec_eoe_send(ec_eoe_t *eoe /**< EoE handler */)
                             (eoe->tx_frame_number & 0x0F) << 12));
 
     memcpy(data + 4, eoe->tx_frame->skb->data + eoe->tx_offset, current_size);
-    ec_master_queue_command(eoe->slave->master, &eoe->command);
+    ec_master_queue_datagram(eoe->slave->master, &eoe->datagram);
 
     eoe->tx_offset += current_size;
     eoe->tx_fragment_number++;
@@ -312,8 +314,8 @@ void ec_eoe_print(const ec_eoe_t *eoe /**< EoE handler */)
 
 /**
    State: RX_START.
-   Starts a new receiving sequence by queueing a command that checks the
-   slave's mailbox for a new EoE command.
+   Starts a new receiving sequence by queueing a datagram that checks the
+   slave's mailbox for a new EoE datagram.
 */
 
 void ec_eoe_state_rx_start(ec_eoe_t *eoe /**< EoE handler */)
@@ -321,8 +323,8 @@ void ec_eoe_state_rx_start(ec_eoe_t *eoe /**< EoE handler */)
     if (!eoe->slave->online || !eoe->slave->master->device->link_state)
         return;
 
-    ec_slave_mbox_prepare_check(eoe->slave, &eoe->command);
-    ec_master_queue_command(eoe->slave->master, &eoe->command);
+    ec_slave_mbox_prepare_check(eoe->slave, &eoe->datagram);
+    ec_master_queue_datagram(eoe->slave->master, &eoe->datagram);
     eoe->state = ec_eoe_state_rx_check;
 }
 
@@ -330,25 +332,25 @@ void ec_eoe_state_rx_start(ec_eoe_t *eoe /**< EoE handler */)
 
 /**
    State: RX_CHECK.
-   Processes the checking command sent in RX_START and issues a receive
-   command, if new data is available.
+   Processes the checking datagram sent in RX_START and issues a receive
+   datagram, if new data is available.
 */
 
 void ec_eoe_state_rx_check(ec_eoe_t *eoe /**< EoE handler */)
 {
-    if (eoe->command.state != EC_CMD_RECEIVED) {
+    if (eoe->datagram.state != EC_CMD_RECEIVED) {
         eoe->stats.rx_errors++;
         eoe->state = ec_eoe_state_tx_start;
         return;
     }
 
-    if (!ec_slave_mbox_check(&eoe->command)) {
+    if (!ec_slave_mbox_check(&eoe->datagram)) {
         eoe->state = ec_eoe_state_tx_start;
         return;
     }
 
-    ec_slave_mbox_prepare_fetch(eoe->slave, &eoe->command);
-    ec_master_queue_command(eoe->slave->master, &eoe->command);
+    ec_slave_mbox_prepare_fetch(eoe->slave, &eoe->datagram);
+    ec_master_queue_datagram(eoe->slave->master, &eoe->datagram);
     eoe->state = ec_eoe_state_rx_fetch;
 }
 
@@ -357,7 +359,7 @@ void ec_eoe_state_rx_check(ec_eoe_t *eoe /**< EoE handler */)
 /**
    State: RX_FETCH.
    Checks if the requested data of RX_CHECK was received and processes the
-   EoE command.
+   EoE datagram.
 */
 
 void ec_eoe_state_rx_fetch(ec_eoe_t *eoe /**< EoE handler */)
@@ -367,13 +369,13 @@ void ec_eoe_state_rx_fetch(ec_eoe_t *eoe /**< EoE handler */)
     uint8_t frame_number, fragment_offset, fragment_number;
     off_t offset;
 
-    if (eoe->command.state != EC_CMD_RECEIVED) {
+    if (eoe->datagram.state != EC_CMD_RECEIVED) {
         eoe->stats.rx_errors++;
         eoe->state = ec_eoe_state_tx_start;
         return;
     }
 
-    if (!(data = ec_slave_mbox_fetch(eoe->slave, &eoe->command,
+    if (!(data = ec_slave_mbox_fetch(eoe->slave, &eoe->datagram,
                                      0x02, &rec_size))) {
         eoe->stats.rx_errors++;
         eoe->state = ec_eoe_state_tx_start;
@@ -382,114 +384,116 @@ void ec_eoe_state_rx_fetch(ec_eoe_t *eoe /**< EoE handler */)
 
     frame_type = EC_READ_U16(data) & 0x000F;
 
-    if (frame_type == 0x00) { // EoE Fragment Request
-        last_fragment = (EC_READ_U16(data) >> 8) & 0x0001;
-        time_appended = (EC_READ_U16(data) >> 9) & 0x0001;
-        fragment_number = EC_READ_U16(data + 2) & 0x003F;
-        fragment_offset = (EC_READ_U16(data + 2) >> 6) & 0x003F;
-        frame_number = (EC_READ_U16(data + 2) >> 12) & 0x000F;
-
-#if EOE_DEBUG_LEVEL > 0
-        EC_DBG("EoE RX fragment %i, offset %i, frame %i%s%s,"
-               " %i octets\n", fragment_number, fragment_offset,
-               frame_number,
-               last_fragment ? ", last fragment" : "",
-               time_appended ? ", + timestamp" : "",
-               time_appended ? rec_size - 8 : rec_size - 4);
-#endif
-
-#if EOE_DEBUG_LEVEL > 1
-        EC_DBG("");
-        for (i = 0; i < rec_size - 4; i++) {
-            printk("%02X ", data[i + 4]);
-            if ((i + 1) % 16 == 0) {
-                printk("\n");
-                EC_DBG("");
-            }
-        }
-        printk("\n");
-#endif
-
-        data_size = time_appended ? rec_size - 8 : rec_size - 4;
-
-        if (!fragment_number) {
-            if (eoe->rx_skb) {
-                EC_WARN("EoE RX freeing old socket buffer...\n");
-                dev_kfree_skb(eoe->rx_skb);
-            }
-
-            // new socket buffer
-            if (!(eoe->rx_skb = dev_alloc_skb(fragment_offset * 32))) {
-                if (printk_ratelimit())
-                    EC_WARN("EoE RX low on mem. frame dropped.\n");
-                eoe->stats.rx_dropped++;
-                eoe->state = ec_eoe_state_tx_start;
-                return;
-            }
-
-            eoe->rx_skb_offset = 0;
-            eoe->rx_skb_size = fragment_offset * 32;
-            eoe->rx_expected_fragment = 0;
-        }
-        else {
-            if (!eoe->rx_skb) {
-                eoe->stats.rx_dropped++;
-                eoe->state = ec_eoe_state_tx_start;
-                return;
-            }
-
-            offset = fragment_offset * 32;
-            if (offset != eoe->rx_skb_offset ||
-                offset + data_size > eoe->rx_skb_size ||
-                fragment_number != eoe->rx_expected_fragment) {
-                eoe->stats.rx_errors++;
-                eoe->state = ec_eoe_state_tx_start;
-                dev_kfree_skb(eoe->rx_skb);
-                eoe->rx_skb = NULL;
-                return;
-            }
-        }
-
-        // copy fragment into socket buffer
-        memcpy(skb_put(eoe->rx_skb, data_size), data + 4, data_size);
-        eoe->rx_skb_offset += data_size;
-
-        if (last_fragment) {
-            // update statistics
-            eoe->stats.rx_packets++;
-            eoe->stats.rx_bytes += eoe->rx_skb->len;
-
-#if EOE_DEBUG_LEVEL > 0
-            EC_DBG("EoE RX frame completed with %u octets.\n",
-                   eoe->rx_skb->len);
-#endif
-
-            // pass socket buffer to network stack
-            eoe->rx_skb->dev = eoe->dev;
-            eoe->rx_skb->protocol = eth_type_trans(eoe->rx_skb, eoe->dev);
-            eoe->rx_skb->ip_summed = CHECKSUM_UNNECESSARY;
-            if (netif_rx(eoe->rx_skb)) {
-                EC_WARN("EoE RX netif_rx failed.\n");
-            }
-            eoe->rx_skb = NULL;
-
-            eoe->state = ec_eoe_state_tx_start;
-        }
-        else {
-            eoe->rx_expected_fragment++;
-#if EOE_DEBUG_LEVEL > 0
-            EC_DBG("EoE RX expecting fragment %i\n",
-                   eoe->rx_expected_fragment);
-#endif
-            eoe->state = ec_eoe_state_rx_start;
-        }
-    }
-    else {
+    if (frame_type != 0x00) {
 #if EOE_DEBUG_LEVEL > 0
         EC_DBG("other frame received.\n");
 #endif
         eoe->stats.rx_dropped++;
         eoe->state = ec_eoe_state_tx_start;
+        return;
+    }
+
+    // EoE Fragment Request received
+
+    last_fragment = (EC_READ_U16(data) >> 8) & 0x0001;
+    time_appended = (EC_READ_U16(data) >> 9) & 0x0001;
+    fragment_number = EC_READ_U16(data + 2) & 0x003F;
+    fragment_offset = (EC_READ_U16(data + 2) >> 6) & 0x003F;
+    frame_number = (EC_READ_U16(data + 2) >> 12) & 0x000F;
+
+#if EOE_DEBUG_LEVEL > 0
+    EC_DBG("EoE RX fragment %i, offset %i, frame %i%s%s,"
+           " %i octets\n", fragment_number, fragment_offset,
+           frame_number,
+           last_fragment ? ", last fragment" : "",
+           time_appended ? ", + timestamp" : "",
+           time_appended ? rec_size - 8 : rec_size - 4);
+#endif
+
+#if EOE_DEBUG_LEVEL > 1
+    EC_DBG("");
+    for (i = 0; i < rec_size - 4; i++) {
+        printk("%02X ", data[i + 4]);
+        if ((i + 1) % 16 == 0) {
+            printk("\n");
+            EC_DBG("");
+        }
+    }
+    printk("\n");
+#endif
+
+    data_size = time_appended ? rec_size - 8 : rec_size - 4;
+
+    if (!fragment_number) {
+        if (eoe->rx_skb) {
+            EC_WARN("EoE RX freeing old socket buffer...\n");
+            dev_kfree_skb(eoe->rx_skb);
+        }
+
+        // new socket buffer
+        if (!(eoe->rx_skb = dev_alloc_skb(fragment_offset * 32))) {
+            if (printk_ratelimit())
+                EC_WARN("EoE RX low on mem. frame dropped.\n");
+            eoe->stats.rx_dropped++;
+            eoe->state = ec_eoe_state_tx_start;
+            return;
+        }
+
+        eoe->rx_skb_offset = 0;
+        eoe->rx_skb_size = fragment_offset * 32;
+        eoe->rx_expected_fragment = 0;
+    }
+    else {
+        if (!eoe->rx_skb) {
+            eoe->stats.rx_dropped++;
+            eoe->state = ec_eoe_state_tx_start;
+            return;
+        }
+
+        offset = fragment_offset * 32;
+        if (offset != eoe->rx_skb_offset ||
+            offset + data_size > eoe->rx_skb_size ||
+            fragment_number != eoe->rx_expected_fragment) {
+            dev_kfree_skb(eoe->rx_skb);
+            eoe->rx_skb = NULL;
+            eoe->stats.rx_errors++;
+            eoe->state = ec_eoe_state_tx_start;
+            return;
+        }
+    }
+
+    // copy fragment into socket buffer
+    memcpy(skb_put(eoe->rx_skb, data_size), data + 4, data_size);
+    eoe->rx_skb_offset += data_size;
+
+    if (last_fragment) {
+        // update statistics
+        eoe->stats.rx_packets++;
+        eoe->stats.rx_bytes += eoe->rx_skb->len;
+
+#if EOE_DEBUG_LEVEL > 0
+        EC_DBG("EoE RX frame completed with %u octets.\n",
+               eoe->rx_skb->len);
+#endif
+
+        // pass socket buffer to network stack
+        eoe->rx_skb->dev = eoe->dev;
+        eoe->rx_skb->protocol = eth_type_trans(eoe->rx_skb, eoe->dev);
+        eoe->rx_skb->ip_summed = CHECKSUM_UNNECESSARY;
+        if (netif_rx(eoe->rx_skb)) {
+            EC_WARN("EoE RX netif_rx failed.\n");
+        }
+        eoe->rx_skb = NULL;
+
+        eoe->state = ec_eoe_state_tx_start;
+    }
+    else {
+        eoe->rx_expected_fragment++;
+#if EOE_DEBUG_LEVEL > 0
+        EC_DBG("EoE RX expecting fragment %i\n",
+               eoe->rx_expected_fragment);
+#endif
+        eoe->state = ec_eoe_state_rx_start;
     }
 }
 
@@ -560,19 +564,19 @@ void ec_eoe_state_tx_start(ec_eoe_t *eoe /**< EoE handler */)
 
 /**
    State: TX SENT.
-   Checks is the previous transmit command succeded and sends the next
+   Checks is the previous transmit datagram succeded and sends the next
    fragment, if necessary.
 */
 
 void ec_eoe_state_tx_sent(ec_eoe_t *eoe /**< EoE handler */)
 {
-    if (eoe->command.state != EC_CMD_RECEIVED) {
+    if (eoe->datagram.state != EC_CMD_RECEIVED) {
         eoe->stats.tx_errors++;
         eoe->state = ec_eoe_state_rx_start;
         return;
     }
 
-    if (eoe->command.working_counter != 1) {
+    if (eoe->datagram.working_counter != 1) {
         eoe->stats.tx_errors++;
         eoe->state = ec_eoe_state_rx_start;
         return;
@@ -618,7 +622,7 @@ int ec_eoedev_open(struct net_device *dev /**< EoE net_device */)
         EC_WARN("device %s is not coupled to any EoE slave!\n", dev->name);
     else {
         eoe->slave->requested_state = EC_SLAVE_STATE_OP;
-        eoe->slave->state_error = 0;
+        eoe->slave->error_flag = 0;
     }
     return 0;
 }
@@ -641,7 +645,7 @@ int ec_eoedev_stop(struct net_device *dev /**< EoE net_device */)
         EC_WARN("device %s is not coupled to any EoE slave!\n", dev->name);
     else {
         eoe->slave->requested_state = EC_SLAVE_STATE_INIT;
-        eoe->slave->state_error = 0;
+        eoe->slave->error_flag = 0;
     }
     return 0;
 }
