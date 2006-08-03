@@ -67,7 +67,7 @@ void __exit ec_cleanup_module(void);
 /*****************************************************************************/
 
 static int ec_master_count = 1; /**< parameter value, number of masters */
-static int ec_eoe_devices = 0; /**< parameter value, number of EoE interf. */
+static int ec_eoeif_count = 0; /**< parameter value, number of EoE interf. */
 static struct list_head ec_masters; /**< list of masters */
 
 /*****************************************************************************/
@@ -75,14 +75,14 @@ static struct list_head ec_masters; /**< list of masters */
 /** \cond */
 
 module_param(ec_master_count, int, S_IRUGO);
-module_param(ec_eoe_devices, int, S_IRUGO);
+module_param(ec_eoeif_count, int, S_IRUGO);
 
 MODULE_AUTHOR("Florian Pose <fp@igh-essen.com>");
 MODULE_DESCRIPTION("EtherCAT master driver module");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(COMPILE_INFO);
 MODULE_PARM_DESC(ec_master_count, "number of EtherCAT masters to initialize");
-MODULE_PARM_DESC(ec_eoe_devices, "number of EoE devices per master");
+MODULE_PARM_DESC(ec_eoeif_count, "number of EoE interfaces per master");
 
 /** \endcond */
 
@@ -117,7 +117,7 @@ int __init ec_init_module(void)
             goto out_free;
         }
 
-        if (ec_master_init(master, i, ec_eoe_devices))
+        if (ec_master_init(master, i, ec_eoeif_count))
             goto out_free;
 
         if (kobject_add(&master->kobj)) {
@@ -237,33 +237,38 @@ void ec_print_data_diff(const uint8_t *d1, /**< first data */
    Prints slave states in clear text.
 */
 
-void ec_print_states(const uint8_t states /**< slave states */)
+size_t ec_state_string(uint8_t states, /**< slave states */
+                       char *buffer /**< target buffer (min. 25 bytes) */
+                       )
 {
+    off_t off = 0;
     unsigned int first = 1;
 
     if (!states) {
-        printk("(unknown)");
-        return;
+        off += sprintf(buffer + off, "(unknown)");
+        return off;
     }
 
     if (states & EC_SLAVE_STATE_INIT) {
-        printk("INIT");
+        off += sprintf(buffer + off, "INIT");
         first = 0;
     }
     if (states & EC_SLAVE_STATE_PREOP) {
-        if (!first) printk(", ");
-        printk("PREOP");
+        if (!first) off += sprintf(buffer + off, ", ");
+        off += sprintf(buffer + off, "PREOP");
         first = 0;
     }
     if (states & EC_SLAVE_STATE_SAVEOP) {
-        if (!first) printk(", ");
-        printk("SAVEOP");
+        if (!first) off += sprintf(buffer + off, ", ");
+        off += sprintf(buffer + off, "SAVEOP");
         first = 0;
     }
     if (states & EC_SLAVE_STATE_OP) {
-        if (!first) printk(", ");
-        printk("OP");
+        if (!first) off += sprintf(buffer + off, ", ");
+        off += sprintf(buffer + off, "OP");
     }
+
+    return off;
 }
 
 /******************************************************************************
@@ -350,7 +355,7 @@ void ecdev_unregister(unsigned int master_index, /**< master index */
    Starts the master associated with the device.
    This function has to be called by the network device driver to tell the
    master that the device is ready to send and receive data. The master
-   will enter the free-run mode then.
+   will enter the idle mode then.
    \ingroup DeviceInterface
 */
 
@@ -364,7 +369,7 @@ int ecdev_start(unsigned int master_index /**< master index */)
         return -1;
     }
 
-    ec_master_freerun_start(master);
+    ec_master_idle_start(master);
     return 0;
 }
 
@@ -382,7 +387,7 @@ void ecdev_stop(unsigned int master_index /**< master index */)
     ec_master_t *master;
     if (!(master = ec_find_master(master_index))) return;
 
-    ec_master_freerun_stop(master);
+    ec_master_idle_stop(master);
 
     if (ec_device_close(master->device))
         EC_WARN("Failed to close device!\n");
@@ -424,9 +429,9 @@ ec_master_t *ecrt_request_master(unsigned int master_index
         goto out_release;
     }
 
-    ec_master_freerun_stop(master);
+    ec_master_idle_stop(master);
     ec_master_reset(master);
-    master->mode = EC_MASTER_MODE_RUNNING;
+    master->mode = EC_MASTER_MODE_OPERATION;
 
     if (!master->device->link_state) EC_WARN("Link is DOWN.\n");
 
@@ -441,7 +446,7 @@ ec_master_t *ecrt_request_master(unsigned int master_index
  out_module_put:
     module_put(master->device->module);
     ec_master_reset(master);
-    ec_master_freerun_start(master);
+    ec_master_idle_start(master);
  out_release:
     master->reserved = 0;
  out_return:
@@ -466,9 +471,7 @@ void ecrt_release_master(ec_master_t *master /**< EtherCAT master */)
     }
 
     ec_master_reset(master);
-
-    master->mode = EC_MASTER_MODE_IDLE;
-    ec_master_freerun_start(master);
+    ec_master_idle_start(master);
 
     module_put(master->device->module);
     master->reserved = 0;

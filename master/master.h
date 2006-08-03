@@ -57,9 +57,9 @@
 
 typedef enum
 {
+    EC_MASTER_MODE_ORPHANED,
     EC_MASTER_MODE_IDLE,
-    EC_MASTER_MODE_FREERUN,
-    EC_MASTER_MODE_RUNNING
+    EC_MASTER_MODE_OPERATION
 }
 ec_master_mode_t;
 
@@ -104,21 +104,18 @@ struct ec_master
 
     struct list_head domains; /**< list of domains */
 
-    ec_datagram_t simple_datagram; /**< datagram structure for initialization */
-    unsigned int timeout; /**< timeout in synchronous IO */
-
     int debug_level; /**< master debug level */
     ec_stats_t stats; /**< cyclic statistics */
 
     struct workqueue_struct *workqueue; /**< master workqueue */
-    struct work_struct freerun_work; /**< free run work object */
+    struct work_struct idle_work; /**< free run work object */
     ec_fsm_t fsm; /**< master state machine */
     ec_master_mode_t mode; /**< master mode */
 
     struct timer_list eoe_timer; /**< EoE timer object */
     unsigned int eoe_running; /**< non-zero, if EoE processing is active. */
     struct list_head eoe_handlers; /**< Ethernet-over-EtherCAT handlers */
-    spinlock_t internal_lock; /**< spinlock used in freerun mode */
+    spinlock_t internal_lock; /**< spinlock used in idle mode */
     int (*request_cb)(void *); /**< lock request callback */
     void (*release_cb)(void *); /**< lock release callback */
     void *cb_data; /**< data parameter of locking callbacks */
@@ -134,8 +131,8 @@ void ec_master_clear(struct kobject *);
 void ec_master_reset(ec_master_t *);
 
 // free run
-void ec_master_freerun_start(ec_master_t *);
-void ec_master_freerun_stop(ec_master_t *);
+void ec_master_idle_start(ec_master_t *);
+void ec_master_idle_stop(ec_master_t *);
 
 // EoE
 void ec_master_eoe_start(ec_master_t *);
@@ -144,17 +141,18 @@ void ec_master_eoe_stop(ec_master_t *);
 // IO
 void ec_master_receive(ec_master_t *, const uint8_t *, size_t);
 void ec_master_queue_datagram(ec_master_t *, ec_datagram_t *);
-int ec_master_simple_io(ec_master_t *, ec_datagram_t *);
 
 // slave management
 int ec_master_bus_scan(ec_master_t *);
 
 // misc.
-void ec_master_clear_slaves(ec_master_t *);
-void ec_sync_config(const ec_sync_t *, const ec_slave_t *, uint8_t *);
-void ec_eeprom_sync_config(const ec_eeprom_sync_t *, uint8_t *);
-void ec_fmmu_config(const ec_fmmu_t *, const ec_slave_t *, uint8_t *);
 void ec_master_output_stats(ec_master_t *);
+void ec_master_clear_slaves(ec_master_t *);
+
+// other methods
+void ec_sync_config(const ec_sii_sync_t *, const ec_slave_t *, uint8_t *);
+void ec_fmmu_config(const ec_fmmu_t *, const ec_slave_t *, uint8_t *);
+void ec_master_calc_addressing(ec_master_t *);
 
 /*****************************************************************************/
 
