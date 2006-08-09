@@ -54,7 +54,7 @@
 #define EC_MASTER_VERSION_SUB   1
 
 /** master extra version (just a string) */
-#define EC_MASTER_VERSION_EXTRA "trunk"
+#define EC_MASTER_VERSION_EXTRA "stable"
 
 /** maximum number of FMMUs per slave */
 #define EC_MAX_FMMUS 16
