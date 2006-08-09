@@ -101,6 +101,12 @@ int ec_eoe_init(ec_eoe_t *eoe /**< EoE handler */)
     eoe->tx_frame_number = 0xFF;
     memset(&eoe->stats, 0, sizeof(struct net_device_stats));
 
+    eoe->rx_counter = 0;
+    eoe->tx_counter = 0;
+    eoe->rx_rate = 0;
+    eoe->tx_rate = 0;
+    eoe->t_last = 0;
+
     if (!(eoe->dev =
           alloc_netdev(sizeof(ec_eoe_t *), "eoe%d", ether_setup))) {
         EC_ERR("Unable to allocate net_device for EoE handler!\n");
@@ -237,7 +243,7 @@ int ec_eoe_send(ec_eoe_t *eoe /**< EoE handler */)
 #if EOE_DEBUG_LEVEL > 1
     EC_DBG("");
     for (i = 0; i < current_size; i++) {
-        printk("%02X ", frame->skb->data[eoe->tx_offset + i]);
+        printk("%02X ", eoe->tx_frame->skb->data[eoe->tx_offset + i]);
         if ((i + 1) % 16 == 0) {
             printk("\n");
             EC_DBG("");
@@ -272,10 +278,22 @@ int ec_eoe_send(ec_eoe_t *eoe /**< EoE handler */)
 
 void ec_eoe_run(ec_eoe_t *eoe /**< EoE handler */)
 {
+    cycles_t t_now;
+
     if (!eoe->opened) return;
 
     // call state function
     eoe->state(eoe);
+
+    // update statistics
+    t_now = get_cycles();
+    if ((u32) (t_now - eoe->t_last) > cpu_khz * 1000) {
+        eoe->rx_rate = eoe->rx_counter * 8;
+        eoe->tx_rate = eoe->tx_counter * 8;
+        eoe->rx_counter = 0;
+        eoe->tx_counter = 0;
+        eoe->t_last = t_now;
+    }
 }
 
 /*****************************************************************************/
@@ -285,7 +303,7 @@ void ec_eoe_run(ec_eoe_t *eoe /**< EoE handler */)
    \return 1 if the device is "up", 0 if it is "down"
 */
 
-unsigned int ec_eoe_active(const ec_eoe_t *eoe /**< EoE handler */)
+int ec_eoe_active(const ec_eoe_t *eoe /**< EoE handler */)
 {
     return eoe->slave && eoe->opened;
 }
@@ -350,6 +368,9 @@ void ec_eoe_state_rx_fetch(ec_eoe_t *eoe /**< EoE handler */)
     uint8_t *data, frame_type, last_fragment, time_appended;
     uint8_t frame_number, fragment_offset, fragment_number;
     off_t offset;
+#if EOE_DEBUG_LEVEL > 1
+    unsigned int i;
+#endif
 
     if (eoe->datagram.state != EC_DATAGRAM_RECEIVED) {
         eoe->stats.rx_errors++;
@@ -452,6 +473,7 @@ void ec_eoe_state_rx_fetch(ec_eoe_t *eoe /**< EoE handler */)
         // update statistics
         eoe->stats.rx_packets++;
         eoe->stats.rx_bytes += eoe->rx_skb->len;
+        eoe->rx_counter += eoe->rx_skb->len;
 
 #if EOE_DEBUG_LEVEL > 0
         EC_DBG("EoE RX frame completed with %u octets.\n",
@@ -490,7 +512,7 @@ void ec_eoe_state_rx_fetch(ec_eoe_t *eoe /**< EoE handler */)
 void ec_eoe_state_tx_start(ec_eoe_t *eoe /**< EoE handler */)
 {
 #if EOE_DEBUG_LEVEL > 0
-    unsigned int wakeup;
+    unsigned int wakeup = 0;
 #endif
 
     if (!eoe->slave->online || !eoe->slave->master->device->link_state)
@@ -568,6 +590,7 @@ void ec_eoe_state_tx_sent(ec_eoe_t *eoe /**< EoE handler */)
     if (eoe->tx_offset >= eoe->tx_frame->skb->len) {
         eoe->stats.tx_packets++;
         eoe->stats.tx_bytes += eoe->tx_frame->skb->len;
+        eoe->tx_counter += eoe->tx_frame->skb->len;
         dev_kfree_skb(eoe->tx_frame->skb);
         kfree(eoe->tx_frame);
         eoe->tx_frame = NULL;

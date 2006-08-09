@@ -74,7 +74,10 @@ typedef struct
     unsigned int timeouts; /**< datagram timeouts */
     unsigned int delayed; /**< delayed datagrams */
     unsigned int corrupted; /**< corrupted frames */
-    unsigned int unmatched; /**< unmatched datagrams */
+    unsigned int skipped; /**< skipped datagrams (the ones that were
+                             requeued when not yet received) */
+    unsigned int unmatched; /**< unmatched datagrams (received, but not
+                               queued any longer) */
     cycles_t t_last; /**< time of last output */
 }
 ec_stats_t;
@@ -94,10 +97,13 @@ struct ec_master
 
     struct kobject kobj; /**< kobject */
 
+    ec_device_t *device; /**< EtherCAT device */
+
+    ec_fsm_t fsm; /**< master state machine */
+    ec_master_mode_t mode; /**< master mode */
+
     struct list_head slaves; /**< list of slaves on the bus */
     unsigned int slave_count; /**< number of slaves on the bus */
-
-    ec_device_t *device; /**< EtherCAT device */
 
     struct list_head datagram_queue; /**< datagram queue */
     uint8_t datagram_index; /**< current datagram index */
@@ -109,12 +115,17 @@ struct ec_master
 
     struct workqueue_struct *workqueue; /**< master workqueue */
     struct work_struct idle_work; /**< free run work object */
-    ec_fsm_t fsm; /**< master state machine */
-    ec_master_mode_t mode; /**< master mode */
+    uint32_t idle_cycle_times[HZ]; /**< Idle cycle times ring */
+    unsigned int idle_cycle_time_pos; /**< time ring buffer position */
 
     struct timer_list eoe_timer; /**< EoE timer object */
+    uint32_t eoe_cycle_times[HZ]; /**< EoE cycle times ring */
+    unsigned int eoe_cycle_time_pos; /**< time ring buffer position */
     unsigned int eoe_running; /**< non-zero, if EoE processing is active. */
+    unsigned int eoe_checked; /**< non-zero, if EoE processing is not
+                                 necessary. */
     struct list_head eoe_handlers; /**< Ethernet-over-EtherCAT handlers */
+
     spinlock_t internal_lock; /**< spinlock used in idle mode */
     int (*request_cb)(void *); /**< lock request callback */
     void (*release_cb)(void *); /**< lock release callback */
@@ -139,7 +150,7 @@ void ec_master_eoe_start(ec_master_t *);
 void ec_master_eoe_stop(ec_master_t *);
 
 // IO
-void ec_master_receive(ec_master_t *, const uint8_t *, size_t);
+void ec_master_receive_datagrams(ec_master_t *, const uint8_t *, size_t);
 void ec_master_queue_datagram(ec_master_t *, ec_datagram_t *);
 
 // slave management
@@ -148,6 +159,7 @@ int ec_master_bus_scan(ec_master_t *);
 // misc.
 void ec_master_output_stats(ec_master_t *);
 void ec_master_clear_slaves(ec_master_t *);
+void ec_master_measure_bus_time(ec_master_t *);
 
 // other methods
 void ec_sync_config(const ec_sii_sync_t *, const ec_slave_t *, uint8_t *);

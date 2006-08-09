@@ -155,6 +155,7 @@ int ec_slave_init(ec_slave_t *slave, /**< EtherCAT slave */
     INIT_LIST_HEAD(&slave->sii_syncs);
     INIT_LIST_HEAD(&slave->sii_pdos);
     INIT_LIST_HEAD(&slave->sdo_dictionary);
+    INIT_LIST_HEAD(&slave->sdo_confs);
     INIT_LIST_HEAD(&slave->varsize_fields);
 
     for (i = 0; i < 4; i++) {
@@ -182,6 +183,7 @@ void ec_slave_clear(struct kobject *kobj /**< kobject of the slave */)
     ec_sii_pdo_entry_t *entry, *next_ent;
     ec_sdo_t *sdo, *next_sdo;
     ec_sdo_entry_t *en, *next_en;
+    ec_sdo_data_t *sdodata, *next_sdodata;
     ec_varsize_t *var, *next_var;
 
     slave = container_of(kobj, ec_slave_t, kobj);
@@ -229,6 +231,13 @@ void ec_slave_clear(struct kobject *kobj /**< kobject of the slave */)
             kfree(en);
         }
         kfree(sdo);
+    }
+
+    // free all SDO configurations
+    list_for_each_entry_safe(sdodata, next_sdodata, &slave->sdo_confs, list) {
+        list_del(&sdodata->list);
+        kfree(sdodata->data);
+        kfree(sdodata);
     }
 
     // free information about variable sized data fields
@@ -512,18 +521,17 @@ size_t ec_slave_info(const ec_slave_t *slave, /**< EtherCAT slave */
     if (slave->sii_name)
         off += sprintf(buffer + off, "%s", slave->sii_name);
 
-    off += sprintf(buffer + off, "\n\nVendor ID: 0x%08X\n",
+    off += sprintf(buffer + off, "\nVendor ID: 0x%08X\n",
                    slave->sii_vendor_id);
     off += sprintf(buffer + off, "Product code: 0x%08X\n\n",
                    slave->sii_product_code);
 
-    off += sprintf(buffer + off, "Ring position: %i\n", slave->ring_position);
-    off += sprintf(buffer + off, "Advanced position: %i:%i\n\n",
-                   slave->coupler_index, slave->coupler_subindex);
-
     off += sprintf(buffer + off, "State: ");
     off += ec_state_string(slave->current_state, buffer + off);
-    off += sprintf(buffer + off, "\n\n");
+    off += sprintf(buffer + off, "\nRing position: %i\n",
+                   slave->ring_position);
+    off += sprintf(buffer + off, "Advanced position: %i:%i\n\n",
+                   slave->coupler_index, slave->coupler_subindex);
 
     off += sprintf(buffer + off, "Data link status:\n");
     for (i = 0; i < 4; i++) {
@@ -602,7 +610,7 @@ size_t ec_slave_info(const ec_slave_t *slave, /**< EtherCAT slave */
     if (slave->sii_image)
         off += sprintf(buffer + off, "  Image: %s\n", slave->sii_image);
     if (slave->sii_order)
-        off += sprintf(buffer + off, "  Order#: %s\n", slave->sii_order);
+        off += sprintf(buffer + off, "  Order number: %s\n", slave->sii_order);
 
     if (!list_empty(&slave->sii_syncs))
         off += sprintf(buffer + off, "\nSync-Managers:\n");
@@ -620,13 +628,13 @@ size_t ec_slave_info(const ec_slave_t *slave, /**< EtherCAT slave */
 
     list_for_each_entry(pdo, &slave->sii_pdos, list) {
         off += sprintf(buffer + off,
-                       "  %s \"%s\" (0x%04X), -> Sync-Manager %i\n",
+                       "  %s \"%s\" (0x%04X), Sync-Manager %i\n",
                        pdo->type == EC_RX_PDO ? "RXPDO" : "TXPDO",
                        pdo->name ? pdo->name : "???",
                        pdo->index, pdo->sync_index);
 
         list_for_each_entry(pdo_entry, &pdo->entries, list) {
-            off += sprintf(buffer + off, "    \"%s\" 0x%04X:%X, %i Bit\n",
+            off += sprintf(buffer + off, "    \"%s\" 0x%04X:%X, %i bit\n",
                            pdo_entry->name ? pdo_entry->name : "???",
                            pdo_entry->index, pdo_entry->subindex,
                            pdo_entry->bit_length);
@@ -840,6 +848,7 @@ ssize_t ec_store_slave_attribute(struct kobject *kobj, /**< slave's kobject */
     ec_slave_t *slave = container_of(kobj, ec_slave_t, kobj);
 
     if (attr == &attr_state) {
+        char state[25];
         if (!strcmp(buffer, "INIT\n"))
             slave->requested_state = EC_SLAVE_STATE_INIT;
         else if (!strcmp(buffer, "PREOP\n"))
@@ -853,8 +862,9 @@ ssize_t ec_store_slave_attribute(struct kobject *kobj, /**< slave's kobject */
             return -EINVAL;
         }
 
+        ec_state_string(slave->requested_state, state);
         EC_INFO("Accepted new state %s for slave %i.\n",
-                buffer, slave->ring_position);
+                state, slave->ring_position);
         slave->error_flag = 0;
         return size;
     }
@@ -913,9 +923,104 @@ int ec_slave_is_coupler(const ec_slave_t *slave)
         && slave->sii_product_code == 0x044C2C52;
 }
 
+/*****************************************************************************/
+
+/**
+   \return 0 in case of success, else < 0
+*/
+
+int ec_slave_conf_sdo(ec_slave_t *slave, /**< EtherCAT slave */
+                      uint16_t sdo_index, /**< SDO index */
+                      uint8_t sdo_subindex, /**< SDO subindex */
+                      const uint8_t *data, /**< SDO data */
+                      size_t size /**< SDO size in bytes */
+                      )
+{
+    ec_sdo_data_t *sdodata;
+
+    if (!(slave->sii_mailbox_protocols & EC_MBOX_COE)) {
+        EC_ERR("Slave %i does not support CoE!\n", slave->ring_position);
+        return -1;
+    }
+
+    if (!(sdodata = (ec_sdo_data_t *)
+          kmalloc(sizeof(ec_sdo_data_t), GFP_KERNEL))) {
+        EC_ERR("Failed to allocate memory for SDO configuration object!\n");
+        return -1;
+    }
+
+    if (!(sdodata->data = (uint8_t *) kmalloc(size, GFP_KERNEL))) {
+        EC_ERR("Failed to allocate memory for SDO configuration data!\n");
+        kfree(sdodata);
+        return -1;
+    }
+
+    sdodata->index = sdo_index;
+    sdodata->subindex = sdo_subindex;
+    memcpy(sdodata->data, data, size);
+    sdodata->size = size;
+
+    list_add_tail(&sdodata->list, &slave->sdo_confs);
+    return 0;
+}
+
 /******************************************************************************
  *  Realtime interface
  *****************************************************************************/
+
+/**
+   \return 0 in case of success, else < 0
+   \ingroup RealtimeInterface
+*/
+
+int ecrt_slave_conf_sdo8(ec_slave_t *slave, /**< EtherCAT slave */
+                         uint16_t sdo_index, /**< SDO index */
+                         uint8_t sdo_subindex, /**< SDO subindex */
+                         uint8_t value /**< new SDO value */
+                         )
+{
+    uint8_t data[1];
+    EC_WRITE_U8(data, value);
+    return ec_slave_conf_sdo(slave, sdo_index, sdo_subindex, data, 1);
+}
+
+/*****************************************************************************/
+
+/**
+   \return 0 in case of success, else < 0
+   \ingroup RealtimeInterface
+*/
+
+int ecrt_slave_conf_sdo16(ec_slave_t *slave, /**< EtherCAT slave */
+                          uint16_t sdo_index, /**< SDO index */
+                          uint8_t sdo_subindex, /**< SDO subindex */
+                          uint16_t value /**< new SDO value */
+                          )
+{
+    uint8_t data[2];
+    EC_WRITE_U16(data, value);
+    return ec_slave_conf_sdo(slave, sdo_index, sdo_subindex, data, 2);
+}
+
+/*****************************************************************************/
+
+/**
+   \return 0 in case of success, else < 0
+   \ingroup RealtimeInterface
+*/
+
+int ecrt_slave_conf_sdo32(ec_slave_t *slave, /**< EtherCAT slave */
+                          uint16_t sdo_index, /**< SDO index */
+                          uint8_t sdo_subindex, /**< SDO subindex */
+                          uint32_t value /**< new SDO value */
+                          )
+{
+    uint8_t data[4];
+    EC_WRITE_U32(data, value);
+    return ec_slave_conf_sdo(slave, sdo_index, sdo_subindex, data, 4);
+}
+
+/*****************************************************************************/
 
 /**
    \return 0 in case of success, else < 0
@@ -989,6 +1094,9 @@ int ecrt_slave_pdo_size(ec_slave_t *slave, /**< EtherCAT slave */
 
 /**< \cond */
 
+EXPORT_SYMBOL(ecrt_slave_conf_sdo8);
+EXPORT_SYMBOL(ecrt_slave_conf_sdo16);
+EXPORT_SYMBOL(ecrt_slave_conf_sdo32);
 EXPORT_SYMBOL(ecrt_slave_pdo_size);
 
 /**< \endcond */

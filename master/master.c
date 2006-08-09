@@ -65,14 +65,12 @@ ssize_t ec_store_master_attribute(struct kobject *, struct attribute *,
 
 /** \cond */
 
-EC_SYSFS_READ_ATTR(slave_count);
-EC_SYSFS_READ_ATTR(mode);
+EC_SYSFS_READ_ATTR(info);
 EC_SYSFS_READ_WRITE_ATTR(eeprom_write_enable);
 EC_SYSFS_READ_WRITE_ATTR(debug_level);
 
 static struct attribute *ec_def_attrs[] = {
-    &attr_slave_count,
-    &attr_mode,
+    &attr_info,
     &attr_eeprom_write_enable,
     &attr_debug_level,
     NULL,
@@ -121,6 +119,13 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     master->eoe_timer.data = (unsigned long) master;
     master->internal_lock = SPIN_LOCK_UNLOCKED;
     master->eoe_running = 0;
+    master->eoe_checked = 0;
+    for (i = 0; i < HZ; i++) {
+        master->idle_cycle_times[i] = 0;
+        master->eoe_cycle_times[i] = 0;
+    }
+    master->idle_cycle_time_pos = 0;
+    master->eoe_cycle_time_pos = 0;
 
     // create workqueue
     if (!(master->workqueue = create_singlethread_workqueue("EtherCAT"))) {
@@ -239,6 +244,7 @@ void ec_master_reset(ec_master_t *master /**< EtherCAT master */)
     master->stats.timeouts = 0;
     master->stats.delayed = 0;
     master->stats.corrupted = 0;
+    master->stats.skipped = 0;
     master->stats.unmatched = 0;
     master->stats.t_last = 0;
 
@@ -286,9 +292,9 @@ void ec_master_queue_datagram(ec_master_t *master, /**< EtherCAT master */
     // check, if the datagram is already queued
     list_for_each_entry(queued_datagram, &master->datagram_queue, queue) {
         if (queued_datagram == datagram) {
+            master->stats.skipped++;
+            ec_master_output_stats(master);
             datagram->state = EC_DATAGRAM_QUEUED;
-            if (unlikely(master->debug_level))
-                EC_WARN("datagram already queued.\n");
             return;
         }
     }
@@ -405,10 +411,10 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
    \return 0 in case of success, else < 0
 */
 
-void ec_master_receive(ec_master_t *master, /**< EtherCAT master */
-                       const uint8_t *frame_data, /**< received data */
-                       size_t size /**< size of the received data */
-                       )
+void ec_master_receive_datagrams(ec_master_t *master, /**< EtherCAT master */
+                                 const uint8_t *frame_data, /**< frame data */
+                                 size_t size /**< size of the received data */
+                                 )
 {
     size_t frame_size, data_size;
     uint8_t datagram_type, datagram_index;
@@ -537,6 +543,10 @@ void ec_master_output_stats(ec_master_t *master /**< EtherCAT master */)
             EC_WARN("%i frame(s) CORRUPTED!\n", master->stats.corrupted);
             master->stats.corrupted = 0;
         }
+        if (master->stats.skipped) {
+            EC_WARN("%i datagram(s) SKIPPED!\n", master->stats.skipped);
+            master->stats.skipped = 0;
+        }
         if (master->stats.unmatched) {
             EC_WARN("%i datagram(s) UNMATCHED!\n", master->stats.unmatched);
             master->stats.unmatched = 0;
@@ -600,19 +610,27 @@ void ec_master_idle_stop(ec_master_t *master /**< EtherCAT master */)
 void ec_master_idle_run(void *data /**< master pointer */)
 {
     ec_master_t *master = (ec_master_t *) data;
+    cycles_t start, end;
 
     // aquire master lock
     spin_lock_bh(&master->internal_lock);
 
+    start = get_cycles();
     ecrt_master_receive(master);
 
     // execute master state machine
     ec_fsm_execute(&master->fsm);
 
     ecrt_master_send(master);
+    end = get_cycles();
 
     // release master lock
     spin_unlock_bh(&master->internal_lock);
+
+    master->idle_cycle_times[master->idle_cycle_time_pos]
+        = (u32) (end - start) * 1000 / cpu_khz;
+    master->idle_cycle_time_pos++;
+    master->idle_cycle_time_pos %= HZ;
 
     if (master->mode == EC_MASTER_MODE_IDLE)
         queue_delayed_work(master->workqueue, &master->idle_work, 1);
@@ -680,6 +698,78 @@ void ec_fmmu_config(const ec_fmmu_t *fmmu, /**< FMMU */
 /*****************************************************************************/
 
 /**
+   Formats master information for SysFS read access.
+   \return number of bytes written
+*/
+
+ssize_t ec_master_info(ec_master_t *master, /**< EtherCAT master */
+                       char *buffer /**< memory to store data */
+                       )
+{
+    off_t off = 0;
+    ec_eoe_t *eoe;
+    uint32_t cur, sum, min, max, pos, i;
+
+    off += sprintf(buffer + off, "\nMode: ");
+    switch (master->mode) {
+        case EC_MASTER_MODE_ORPHANED:
+            off += sprintf(buffer + off, "ORPHANED");
+            break;
+        case EC_MASTER_MODE_IDLE:
+            off += sprintf(buffer + off, "IDLE");
+            break;
+        case EC_MASTER_MODE_OPERATION:
+            off += sprintf(buffer + off, "OPERATION");
+            break;
+    }
+
+    off += sprintf(buffer + off, "\nSlaves: %i\n",
+                   master->slave_count);
+
+    off += sprintf(buffer + off, "\nTiming (min/avg/max) [us]:\n");
+
+    sum = 0;
+    min = 0xFFFFFFFF;
+    max = 0;
+    pos = master->idle_cycle_time_pos;
+    for (i = 0; i < HZ; i++) {
+        cur = master->idle_cycle_times[(i + pos) % HZ];
+        sum += cur;
+        if (cur < min) min = cur;
+        if (cur > max) max = cur;
+    }
+    off += sprintf(buffer + off, "  Idle cycle: %u / %u.%u / %u\n",
+                   min, sum / HZ, (sum * 100 / HZ) % 100, max);
+
+    sum = 0;
+    min = 0xFFFFFFFF;
+    max = 0;
+    pos = master->eoe_cycle_time_pos;
+    for (i = 0; i < HZ; i++) {
+        cur = master->eoe_cycle_times[(i + pos) % HZ];
+        sum += cur;
+        if (cur < min) min = cur;
+        if (cur > max) max = cur;
+    }
+    off += sprintf(buffer + off, "  EoE cycle: %u / %u.%u / %u\n",
+                   min, sum / HZ, (sum * 100 / HZ) % 100, max);
+
+    if (!list_empty(&master->eoe_handlers))
+        off += sprintf(buffer + off, "\nEoE statistics (RX/TX) [bps]:\n");
+    list_for_each_entry(eoe, &master->eoe_handlers, list) {
+        off += sprintf(buffer + off, "  %s: %u / %u (%u KB/s)\n",
+                       eoe->dev->name, eoe->rx_rate, eoe->tx_rate,
+                       ((eoe->rx_rate + eoe->tx_rate) / 8 + 512) / 1024);
+    }
+
+    off += sprintf(buffer + off, "\n");
+
+    return off;
+}
+
+/*****************************************************************************/
+
+/**
    Formats attribute data for SysFS read access.
    \return number of bytes to read
 */
@@ -691,18 +781,8 @@ ssize_t ec_show_master_attribute(struct kobject *kobj, /**< kobject */
 {
     ec_master_t *master = container_of(kobj, ec_master_t, kobj);
 
-    if (attr == &attr_slave_count) {
-        return sprintf(buffer, "%i\n", master->slave_count);
-    }
-    else if (attr == &attr_mode) {
-        switch (master->mode) {
-            case EC_MASTER_MODE_ORPHANED:
-                return sprintf(buffer, "ORPHANED\n");
-            case EC_MASTER_MODE_IDLE:
-                return sprintf(buffer, "IDLE\n");
-            case EC_MASTER_MODE_OPERATION:
-                return sprintf(buffer, "OPERATION\n");
-        }
+    if (attr == &attr_info) {
+        return ec_master_info(master, buffer);
     }
     else if (attr == &attr_debug_level) {
         return sprintf(buffer, "%i\n", master->debug_level);
@@ -773,7 +853,7 @@ ssize_t ec_store_master_attribute(struct kobject *kobj, /**< slave's kobject */
 /*****************************************************************************/
 
 /**
-   Starts/Stops Ethernet-over-EtherCAT processing on demand.
+   Starts Ethernet-over-EtherCAT processing on demand.
 */
 
 void ec_master_eoe_start(ec_master_t *master /**< EtherCAT master */)
@@ -782,12 +862,17 @@ void ec_master_eoe_start(ec_master_t *master /**< EtherCAT master */)
     ec_slave_t *slave;
     unsigned int coupled, found;
 
-    if (master->eoe_running) return;
+    if (master->eoe_running || master->eoe_checked) return;
+
+    master->eoe_checked = 1;
 
     // if the locking callbacks are not set in operation mode,
     // the EoE timer my not be started.
     if (master->mode == EC_MASTER_MODE_OPERATION
-        && (!master->request_cb || !master->release_cb)) return;
+        && (!master->request_cb || !master->release_cb)) {
+        EC_INFO("No EoE processing because of missing locking callbacks.\n");
+        return;
+    }
 
     // decouple all EoE handlers
     list_for_each_entry(eoe, &master->eoe_handlers, list)
@@ -843,6 +928,8 @@ void ec_master_eoe_stop(ec_master_t *master /**< EtherCAT master */)
 {
     ec_eoe_t *eoe;
 
+    master->eoe_checked = 0;
+
     if (!master->eoe_running) return;
 
     EC_INFO("Stopping EoE processing.\n");
@@ -871,6 +958,7 @@ void ec_master_eoe_run(unsigned long data /**< master pointer */)
     ec_master_t *master = (ec_master_t *) data;
     ec_eoe_t *eoe;
     unsigned int active = 0;
+    cycles_t start, end;
 
     list_for_each_entry(eoe, &master->eoe_handlers, list) {
         if (ec_eoe_active(eoe)) active++;
@@ -890,11 +978,15 @@ void ec_master_eoe_run(unsigned long data /**< master pointer */)
         goto queue_timer;
 
     // actual EoE stuff
+    start = get_cycles();
     ecrt_master_receive(master);
+
     list_for_each_entry(eoe, &master->eoe_handlers, list) {
         ec_eoe_run(eoe);
     }
+
     ecrt_master_send(master);
+    end = get_cycles();
 
     // release lock...
     if (master->mode == EC_MASTER_MODE_OPERATION) {
@@ -903,6 +995,11 @@ void ec_master_eoe_run(unsigned long data /**< master pointer */)
     else if (master->mode == EC_MASTER_MODE_IDLE) {
         spin_unlock(&master->internal_lock);
     }
+
+    master->eoe_cycle_times[master->eoe_cycle_time_pos]
+        = (u32) (end - start) * 1000 / cpu_khz;
+    master->eoe_cycle_time_pos++;
+    master->eoe_cycle_time_pos %= HZ;
 
  queue_timer:
     master->eoe_timer.expires += HZ / EC_EOE_FREQUENCY;
@@ -939,6 +1036,69 @@ void ec_master_calc_addressing(ec_master_t *master /**< EtherCAT master */)
         slave->coupler_subindex = coupler_subindex;
         coupler_subindex++;
     }
+}
+
+/*****************************************************************************/
+
+/**
+   Measures the time, a frame is on the bus.
+*/
+
+void ec_master_measure_bus_time(ec_master_t *master)
+{
+    ec_datagram_t datagram;
+    cycles_t t_start, t_end, t_timeout;
+    uint32_t times[100], sum, min, max, i;
+
+    ec_datagram_init(&datagram);
+
+    if (ec_datagram_brd(&datagram, 0x130, 2)) {
+        EC_ERR("Failed to allocate datagram for bus time measuring.\n");
+        ec_datagram_clear(&datagram);
+        return;
+    }
+
+    t_timeout = (cycles_t) EC_IO_TIMEOUT * (cpu_khz / 1000);
+
+    sum = 0;
+    min = 0xFFFFFFFF;
+    max = 0;
+
+    for (i = 0; i < 100; i++) {
+        ec_master_queue_datagram(master, &datagram);
+        ecrt_master_send(master);
+        t_start = get_cycles();
+
+        while (1) { // active waiting
+            ec_device_call_isr(master->device);
+            t_end = get_cycles(); // take current time
+
+            if (datagram.state == EC_DATAGRAM_RECEIVED) {
+                break;
+            }
+            else if (datagram.state == EC_DATAGRAM_ERROR) {
+                EC_WARN("Failed to measure bus time.\n");
+                goto error;
+            }
+            else if (t_end - t_start >= t_timeout) {
+                EC_WARN("Timeout while measuring bus time.\n");
+                goto error;
+            }
+        }
+
+        times[i] = (unsigned int) (t_end - t_start) * 1000 / cpu_khz;
+        sum += times[i];
+        if (times[i] > max) max = times[i];
+        if (times[i] < min) min = times[i];
+    }
+
+    EC_INFO("Bus time is (min/avg/max) %u/%u.%u/%u us.\n",
+            min, sum / 100, sum % 100, max);
+
+  error:
+    // Dequeue and free datagram
+    list_del(&datagram.queue);
+    ec_datagram_clear(&datagram);
 }
 
 /******************************************************************************
@@ -1163,7 +1323,7 @@ void ecrt_master_receive(ec_master_t *master /**< EtherCAT master */)
     ec_device_call_isr(master->device);
 
     t_received = get_cycles();
-    t_timeout = (cycles_t) EC_IO_TIMEOUT * (cpu_khz / 1000);
+    t_timeout = EC_IO_TIMEOUT * cpu_khz / 1000;
 
     // dequeue all received datagrams
     list_for_each_entry_safe(datagram, next, &master->datagram_queue, queue)
