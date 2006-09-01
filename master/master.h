@@ -72,13 +72,12 @@ ec_master_mode_t;
 typedef struct
 {
     unsigned int timeouts; /**< datagram timeouts */
-    unsigned int delayed; /**< delayed datagrams */
     unsigned int corrupted; /**< corrupted frames */
     unsigned int skipped; /**< skipped datagrams (the ones that were
                              requeued when not yet received) */
     unsigned int unmatched; /**< unmatched datagrams (received, but not
                                queued any longer) */
-    cycles_t t_last; /**< time of last output */
+    unsigned long output_jiffies; /**< time of last output */
 }
 ec_stats_t;
 

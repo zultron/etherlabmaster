@@ -106,7 +106,7 @@ int ec_domain_init(ec_domain_t *domain, /**< EtherCAT domain */
     domain->data_size = 0;
     domain->base_address = 0;
     domain->response_count = 0xFFFFFFFF;
-    domain->t_last = 0;
+    domain->notify_jiffies = 0;
     domain->working_counter_changes = 0;
 
     INIT_LIST_HEAD(&domain->data_regs);
@@ -193,7 +193,7 @@ int ec_domain_reg_pdo_entry(ec_domain_t *domain, /**< EtherCAT domain */
     list_for_each_entry(other_pdo, &slave->sii_pdos, list) {
         if (other_pdo->sync_index != sync->index) continue;
 
-        list_for_each_entry(other_entry, &pdo->entries, list) {
+        list_for_each_entry(other_entry, &other_pdo->entries, list) {
             if (other_entry == entry) {
                 byte_offset = bit_offset / 8;
                 break;
@@ -513,7 +513,6 @@ void ecrt_domain_process(ec_domain_t *domain /**< EtherCAT domain */)
 {
     unsigned int working_counter_sum;
     ec_datagram_t *datagram;
-    cycles_t t_now = get_cycles();
 
     working_counter_sum = 0;
     list_for_each_entry(datagram, &domain->datagrams, list) {
@@ -528,8 +527,8 @@ void ecrt_domain_process(ec_domain_t *domain /**< EtherCAT domain */)
     }
 
     if (domain->working_counter_changes &&
-        (u32) (t_now - domain->t_last) / cpu_khz > 1000) {
-        domain->t_last = t_now;
+        jiffies - domain->notify_jiffies > HZ) {
+        domain->notify_jiffies = jiffies;
         if (domain->working_counter_changes == 1) {
             EC_INFO("Domain %i working counter change: %i\n", domain->index,
                     domain->response_count);

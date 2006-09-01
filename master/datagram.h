@@ -74,10 +74,10 @@ typedef enum
 {
     EC_DATAGRAM_INIT, /**< new datagram */
     EC_DATAGRAM_QUEUED, /**< datagram queued by master */
-    EC_DATAGRAM_SENT, /**< datagram has been sent */
-    EC_DATAGRAM_RECEIVED, /**< datagram has been received */
-    EC_DATAGRAM_TIMED_OUT, /**< datagram timed out */
-    EC_DATAGRAM_ERROR /**< error while sending/receiving */
+    EC_DATAGRAM_SENT, /**< datagram has been sent and still in the queue */
+    EC_DATAGRAM_RECEIVED, /**< datagram has been received and dequeued */
+    EC_DATAGRAM_TIMED_OUT, /**< datagram timed out and was dequeued */
+    EC_DATAGRAM_ERROR /**< error while sending/receiving, datagram dequeued */
 }
 ec_datagram_state_t;
 
@@ -118,7 +118,7 @@ typedef struct
     uint8_t index; /**< datagram index (set by master) */
     uint16_t working_counter; /**< working counter */
     ec_datagram_state_t state; /**< datagram state */
-    cycles_t t_sent; /**< time, the datagrams was sent */
+    cycles_t cycles_sent; /**< time, the datagram was sent */
 }
 ec_datagram_t;
 
