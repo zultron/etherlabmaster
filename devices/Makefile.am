@@ -1,10 +1,10 @@
-#----------------------------------------------------------------
+#------------------------------------------------------------------------------
 #
-#  Makefile
+#  Makefile.am
 #
-#  Minimal EtherCAT module.
+#  IgH EtherCAT master module
 #
-#  $Id$
+#  $Id: Makefile 545 2006-09-19 13:28:40Z fp $
 #
 #  Copyright (C) 2006  Florian Pose, Ingenieurgemeinschaft IgH
 #
@@ -33,40 +33,24 @@
 #  standard) as the (only) precondition to have the right to use EtherCAT
 #  Technology, IP and trade marks.
 #
-#----------------------------------------------------------------
+#------------------------------------------------------------------------------
 
-ifneq ($(KERNELRELEASE),)
+EXTRA_DIST = \
+	Kbuild \
+	ecdev.h \
+	8139too.c \
+	original_8139too.c
 
-#----------------------------------------------------------------
-#  kbuild section
-#----------------------------------------------------------------
+ABSSRCDIR = `cd $(srcdir) && pwd -P`
 
-obj-m := ec_mini.o
+all:
+	$(MAKE) -C "$(LINUX_DIR)" M="$(ABSSRCDIR)" modules
 
-ec_mini-objs := mini.o
+clean-local:
+	$(MAKE) -C "$(LINUX_DIR)" M="$(ABSSRCDIR)" clean
 
-#----------------------------------------------------------------
+install-data-local:
+	$(MAKE) -C "$(LINUX_DIR)" M="$(ABSSRCDIR)" \
+		INSTALL_MOD_DIR="ethercat" modules_install
 
-else
-
-#----------------------------------------------------------------
-#  default section
-#----------------------------------------------------------------
-
-ifneq ($(wildcard kernel.conf),)
-include kernel.conf
-else
-KERNEL_DIR := /lib/modules/$(shell uname -r)/build
-endif
-
-CURRENT_DIR := $(shell pwd)
-
-modules:
-	$(MAKE) -C $(KERNEL_DIR) M=$(CURRENT_DIR)
-
-clean:
-	$(MAKE) -C $(KERNEL_DIR) M=$(CURRENT_DIR) clean
-
-#----------------------------------------------------------------
-
-endif
+#------------------------------------------------------------------------------
