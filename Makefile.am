@@ -66,7 +66,8 @@ MSR_FILES = \
 	examples/msr/msrserv.pl \
 	examples/msr/msr_unload
 
-EXTRA_DIST = $(noinst_SCRIPTS) $(MINI_FILES) $(RTAI_FILES) $(MSR_FILES)
+EXTRA_DIST = $(noinst_SCRIPTS) documentation/ethercat_doc.pdf \
+	$(MINI_FILES) $(RTAI_FILES) $(MSR_FILES)
 
 mydist:
 	$(MAKE) dist distdir=$(PACKAGE)-$(VERSION)-r`svnversion $(srcdir)`
@@ -95,6 +96,6 @@ doc:
 	doxygen Doxyfile
 
 cleandoc:
-	@rm -rf documentation
+	@rm -rf doxygen-output
 
 #------------------------------------------------------------------------------
