@@ -44,6 +44,7 @@
 #include <linux/list.h>
 #include <linux/sysfs.h>
 #include <linux/timer.h>
+#include <asm/atomic.h>
 
 #include "device.h"
 #include "domain.h"
@@ -91,7 +92,7 @@ ec_stats_t;
 struct ec_master
 {
     struct list_head list; /**< list item for module's master list */
-    unsigned int reserved; /**< non-zero, if the master is reserved for RT */
+    atomic_t available; /**< zero, if the master is reserved for RT */
     unsigned int index; /**< master index */
 
     struct kobject kobj; /**< kobject */
@@ -158,7 +159,7 @@ int ec_master_bus_scan(ec_master_t *);
 // misc.
 void ec_master_output_stats(ec_master_t *);
 void ec_master_clear_slaves(ec_master_t *);
-void ec_master_measure_bus_time(ec_master_t *);
+int ec_master_measure_bus_time(ec_master_t *);
 
 // other methods
 void ec_sync_config(const ec_sii_sync_t *, const ec_slave_t *, uint8_t *);

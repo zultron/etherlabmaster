@@ -401,45 +401,52 @@ ec_master_t *ecrt_request_master(unsigned int master_index
 
     if (!(master = ec_find_master(master_index))) goto out_return;
 
-    if (master->reserved) {
+    if (!atomic_dec_and_test(&master->available)) {
+        atomic_inc(&master->available);
         EC_ERR("Master %i is already in use!\n", master_index);
         goto out_return;
     }
-    master->reserved = 1;
 
     if (!master->device) {
         EC_ERR("Master %i has no assigned device!\n", master_index);
         goto out_release;
     }
 
-    if (!try_module_get(master->device->module)) {
+    if (!try_module_get(master->device->module)) { // possible race?
         EC_ERR("Failed to reserve device module!\n");
         goto out_release;
     }
 
-    ec_master_measure_bus_time(master);
-    ec_master_idle_stop(master);
-    ec_master_reset(master);
-    master->mode = EC_MASTER_MODE_OPERATION;
-
-    if (!master->device->link_state) EC_WARN("Link is DOWN.\n");
-
-    if (ec_master_bus_scan(master)) {
-        EC_ERR("Bus scan failed!\n");
+    if (!master->device->link_state) {
+        EC_ERR("Link is DOWN.\n");
         goto out_module_put;
     }
 
-    EC_INFO("Master %i is ready.\n", master_index);
+    ec_master_reset(master); // also stops idle mode
+    master->mode = EC_MASTER_MODE_OPERATION;
+
+    if (ec_master_measure_bus_time(master)) {
+        EC_ERR("Bus time measuring failed!\n");
+        goto out_reset;
+    }
+
+    if (ec_master_bus_scan(master)) {
+        EC_ERR("Bus scan failed!\n");
+        goto out_reset;
+    }
+
+    EC_INFO("Successfully requested master %i.\n", master_index);
     return master;
 
- out_module_put:
-    module_put(master->device->module);
+ out_reset:
     ec_master_reset(master);
     ec_master_idle_start(master);
+ out_module_put:
+    module_put(master->device->module);
  out_release:
-    master->reserved = 0;
+    atomic_inc(&master->available);
  out_return:
-    EC_ERR("Failed requesting master %i.\n", master_index);
+    EC_ERR("Failed to request master %i.\n", master_index);
     return NULL;
 }
 
@@ -454,7 +461,7 @@ void ecrt_release_master(ec_master_t *master /**< EtherCAT master */)
 {
     EC_INFO("Releasing master %i...\n", master->index);
 
-    if (!master->reserved) {
+    if (atomic_read(&master->available)) {
         EC_ERR("Master %i was never requested!\n", master->index);
         return;
     }
@@ -463,9 +470,9 @@ void ecrt_release_master(ec_master_t *master /**< EtherCAT master */)
     ec_master_idle_start(master);
 
     module_put(master->device->module);
-    master->reserved = 0;
+    atomic_inc(&master->available);
 
-    EC_INFO("Released master %i.\n", master->index);
+    EC_INFO("Successfully released master %i.\n", master->index);
     return;
 }
 
