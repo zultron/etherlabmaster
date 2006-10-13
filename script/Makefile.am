@@ -2,7 +2,7 @@
 #
 #  Makefile.am
 #
-#  IgH EtherCAT master module
+#  IgH EtherCAT master
 #
 #  $Id$
 #
@@ -35,17 +35,19 @@
 #
 #------------------------------------------------------------------------------
 
-EXTRA_DIST = Kbuild mini.c
+initdir = $(sysconfdir)/init.d
+sysdir = $(sysconfdir)/sysconfig
 
-all:
-	$(MAKE) -C "$(LINUX_SOURCE_DIR)" M="@abs_srcdir@" modules
+bin_SCRIPTS = lsec
+init_SCRIPTS = ethercat
+sys_DATA = sysconfig
 
-clean-local:
-	$(MAKE) -C "$(LINUX_SOURCE_DIR)" M="@abs_srcdir@" clean
+EXTRA_DIST = lsec.pl ethercat.sh sysconfig
 
-install-data-local:
-	$(MAKE) -C "$(LINUX_SOURCE_DIR)" M="@abs_srcdir@" \
-		INSTALL_MOD_PATH="$(DESTDIR)" \
-		INSTALL_MOD_DIR="ethercat" modules_install
+lsec: lsec.pl
+	cp $(srcdir)/lsec.pl lsec
+
+ethercat: ethercat.sh
+	cp $(srcdir)/ethercat.sh ethercat
 
 #------------------------------------------------------------------------------

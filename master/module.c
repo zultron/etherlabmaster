@@ -67,7 +67,7 @@ module_param(ec_eoeif_count, int, S_IRUGO);
 MODULE_AUTHOR("Florian Pose <fp@igh-essen.com>");
 MODULE_DESCRIPTION("EtherCAT master driver module");
 MODULE_LICENSE("GPL");
-MODULE_VERSION(EC_COMPILE_INFO);
+MODULE_VERSION(EC_MASTER_VERSION);
 MODULE_PARM_DESC(ec_master_count, "number of EtherCAT masters to initialize");
 MODULE_PARM_DESC(ec_eoeif_count, "number of EoE interfaces per master");
 
@@ -86,7 +86,7 @@ int __init ec_init_module(void)
     unsigned int i;
     ec_master_t *master, *next;
 
-    EC_INFO("Master driver, %s\n", EC_COMPILE_INFO);
+    EC_INFO("Master driver %s\n", EC_MASTER_VERSION);
 
     if (ec_master_count < 1) {
         EC_ERR("Error - Invalid ec_master_count: %i\n", ec_master_count);
@@ -282,15 +282,20 @@ ec_device_t *ecdev_register(unsigned int master_index, /**< master index */
 
     if (!(master = ec_find_master(master_index))) return NULL;
 
+    if (down_interruptible(&master->device_sem)) {
+        EC_ERR("Interrupted while waiting for device!\n");
+        goto out_return;
+    }
+
     if (master->device) {
         EC_ERR("Master %i already has a device!\n", master_index);
-        goto out_return;
+        goto out_up;
     }
 
     if (!(master->device =
           (ec_device_t *) kmalloc(sizeof(ec_device_t), GFP_KERNEL))) {
         EC_ERR("Failed to allocate device!\n");
-        goto out_return;
+        goto out_up;
     }
 
     if (ec_device_init(master->device, master, net_dev, isr, module)) {
@@ -298,11 +303,14 @@ ec_device_t *ecdev_register(unsigned int master_index, /**< master index */
         goto out_free;
     }
 
+    up(&master->device_sem);
     return master->device;
 
  out_free:
     kfree(master->device);
     master->device = NULL;
+ out_up:
+    up(&master->device_sem);
  out_return:
     return NULL;
 }
@@ -326,7 +334,10 @@ void ecdev_unregister(unsigned int master_index, /**< master index */
 
     if (!(master = ec_find_master(master_index))) return;
 
+    down(&master->device_sem);
+
     if (!master->device || master->device != device) {
+        up(&master->device_sem);
         EC_WARN("Unable to unregister device!\n");
         return;
     }
@@ -334,6 +345,8 @@ void ecdev_unregister(unsigned int master_index, /**< master index */
     ec_device_clear(master->device);
     kfree(master->device);
     master->device = NULL;
+
+    up(&master->device_sem);
 }
 
 /*****************************************************************************/
@@ -356,7 +369,6 @@ int ecdev_start(unsigned int master_index /**< master index */)
         return -1;
     }
 
-    ec_master_measure_bus_time(master);
     ec_master_idle_start(master);
     return 0;
 }
@@ -407,15 +419,24 @@ ec_master_t *ecrt_request_master(unsigned int master_index
         goto out_return;
     }
 
+    if (down_interruptible(&master->device_sem)) {
+        EC_ERR("Interrupted while waiting for device!\n");
+        goto out_release;
+    }
+
     if (!master->device) {
+        up(&master->device_sem);
         EC_ERR("Master %i has no assigned device!\n", master_index);
         goto out_release;
     }
 
-    if (!try_module_get(master->device->module)) { // possible race?
-        EC_ERR("Failed to reserve device module!\n");
+    if (!try_module_get(master->device->module)) {
+        up(&master->device_sem);
+        EC_ERR("Device module is unloading!\n");
         goto out_release;
     }
+
+    up(&master->device_sem);
 
     if (!master->device->link_state) {
         EC_ERR("Link is DOWN.\n");

@@ -45,6 +45,7 @@
 #include <linux/sysfs.h>
 #include <linux/timer.h>
 #include <asm/atomic.h>
+#include <asm/semaphore.h>
 
 #include "device.h"
 #include "domain.h"
@@ -98,6 +99,7 @@ struct ec_master
     struct kobject kobj; /**< kobject */
 
     ec_device_t *device; /**< EtherCAT device */
+    struct semaphore device_sem; /**< device semaphore */
 
     ec_fsm_t fsm; /**< master state machine */
     ec_master_mode_t mode; /**< master mode */

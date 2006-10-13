@@ -35,39 +35,11 @@
 #
 #------------------------------------------------------------------------------
 
-SUBDIRS = master/ devices/
+SUBDIRS = master devices script include
 
-initdir = $(sysconfdir)/init.d
-sysdir = $(sysconfdir)/sysconfig
+DIST_SUBDIRS = master devices script include examples
 
-include_HEADERS = include/ecdb.h include/ecrt.h
-noinst_SCRIPTS = script/lsec.pl script/ethercat.sh script/sysconfig
-
-MINI_FILES = \
-	examples/mini/Kbuild \
-	examples/mini/Makefile.am \
-	examples/mini/Makefile.in \
-	examples/mini/mini.c
-
-RTAI_FILES = \
-	examples/rtai/Kbuild \
-	examples/rtai/Makefile.am \
-	examples/rtai/Makefile.in \
-	examples/rtai/rtai_sample.c
-
-MSR_FILES = \
-	examples/msr/Kbuild \
-	examples/msr/libm.o_shipped \
-	examples/msr/Makefile.am \
-	examples/msr/Makefile.in \
-	examples/msr/msr_load \
-	examples/msr/msr_param.h \
-	examples/msr/msr_sample.c \
-	examples/msr/msrserv.pl \
-	examples/msr/msr_unload
-
-EXTRA_DIST = $(noinst_SCRIPTS) documentation/ethercat_doc.pdf \
-	$(MINI_FILES) $(RTAI_FILES) $(MSR_FILES)
+EXTRA_DIST = documentation/ethercat_doc.pdf
 
 mydist:
 	@SVNREV=`svnversion $(srcdir)` && \
@@ -79,19 +51,7 @@ dist-hook:
 	fi
 
 install-data-local:
-	$(mkinstalldirs) $(bindir)
-	$(mkinstalldirs) $(initdir)
-	$(mkinstalldirs) $(sysdir)
-	$(INSTALL_SCRIPT) $(srcdir)/script/lsec.pl $(bindir)/lsec
-	$(INSTALL_SCRIPT) $(srcdir)/script/ethercat.sh $(initdir)/ethercat
-	$(INSTALL_DATA) $(srcdir)/script/sysconfig $(sysdir)/ethercat
-	$(DEPMOD) $(LINUX_KERNEL_VERSION)
-
-uninstall-local:
-	rm -rf $(LINUX_MODULES_DIR)/ethercat
-	rm $(bindir)/lsec
-	rm $(initdir)/ethercat
-	rm $(sysdir)/ethercat
+	$(DEPMOD) -b "$(DESTDIR)" $(LINUX_KERNEL_VERSION)
 
 doc:
 	doxygen Doxyfile

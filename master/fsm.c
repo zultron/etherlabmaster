@@ -2064,7 +2064,7 @@ void ec_fsm_coe_down_start(ec_fsm_t *fsm /**< finite state machine */)
     EC_WRITE_U16(data + 3, sdodata->index);
     EC_WRITE_U8 (data + 5, sdodata->subindex);
     EC_WRITE_U32(data + 6, sdodata->size);
-    memcpy(data + 6, sdodata->data, sdodata->size);
+    memcpy(data + 10, sdodata->data, sdodata->size);
 
     ec_master_queue_datagram(fsm->master, datagram);
     fsm->coe_state = ec_fsm_coe_down_request;
@@ -2142,7 +2142,7 @@ void ec_fsm_coe_down_response(ec_fsm_t *fsm /**< finite state machine */)
 {
     ec_datagram_t *datagram = &fsm->datagram;
     ec_slave_t *slave = fsm->slave;
-    uint8_t *data;
+    uint8_t *data, mbox_prot;
     size_t rec_size;
     ec_sdo_data_t *sdodata = fsm->sdodata;
 
@@ -2153,9 +2153,16 @@ void ec_fsm_coe_down_response(ec_fsm_t *fsm /**< finite state machine */)
         return;
     }
 
-    if (!(data = ec_slave_mbox_fetch(slave, datagram, 0x03, &rec_size))) {
+    if (!(data = ec_slave_mbox_fetch(slave, datagram,
+				     &mbox_prot, &rec_size))) {
         fsm->coe_state = ec_fsm_error;
         return;
+    }
+
+    if (mbox_prot != 0x03) { // CoE
+        EC_WARN("Received mailbox protocol 0x%02X as response.\n", mbox_prot);
+        fsm->coe_state = ec_fsm_error;
+	return;
     }
 
     if (rec_size < 6) {

@@ -108,6 +108,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 
     master->index = index;
     master->device = NULL;
+    init_MUTEX(&master->device_sem);
     atomic_set(&master->available, 1);
     INIT_LIST_HEAD(&master->slaves);
     INIT_LIST_HEAD(&master->datagram_queue);
@@ -705,7 +706,7 @@ ssize_t ec_master_info(ec_master_t *master, /**< EtherCAT master */
     ec_eoe_t *eoe;
     uint32_t cur, sum, min, max, pos, i;
 
-    off += sprintf(buffer + off, "\nVersion: " EC_COMPILE_INFO);
+    off += sprintf(buffer + off, "\nVersion: " EC_MASTER_VERSION);
     off += sprintf(buffer + off, "\nMode: ");
     switch (master->mode) {
         case EC_MASTER_MODE_ORPHANED:
