@@ -57,6 +57,8 @@ static int ec_master_count = 1; /**< parameter value, number of masters */
 static int ec_eoeif_count = 0; /**< parameter value, number of EoE interf. */
 static struct list_head ec_masters; /**< list of masters */
 
+char *ec_master_version_str = EC_MASTER_VERSION;
+
 /*****************************************************************************/
 
 /** \cond */
@@ -107,12 +109,6 @@ int __init ec_init_module(void)
         if (ec_master_init(master, i, ec_eoeif_count))
             goto out_free;
 
-        if (kobject_add(&master->kobj)) {
-            EC_ERR("Failed to add kobj.\n");
-            kobject_put(&master->kobj); // free master
-            goto out_free;
-        }
-
         list_add_tail(&master->list, &ec_masters);
     }
 
@@ -144,8 +140,7 @@ void __exit ec_cleanup_module(void)
 
     list_for_each_entry_safe(master, next, &ec_masters, list) {
         list_del(&master->list);
-        kobject_del(&master->kobj);
-        kobject_put(&master->kobj); // free master
+        ec_master_destroy(master);
     }
 
     EC_INFO("Master driver cleaned up.\n");
@@ -225,7 +220,8 @@ void ec_print_data_diff(const uint8_t *d1, /**< first data */
 */
 
 size_t ec_state_string(uint8_t states, /**< slave states */
-                       char *buffer /**< target buffer (min. 25 bytes) */
+                       char *buffer /**< target buffer
+                                       (min. EC_STATE_STRING_SIZE bytes) */
                        )
 {
     off_t off = 0;
@@ -253,6 +249,10 @@ size_t ec_state_string(uint8_t states, /**< slave states */
     if (states & EC_SLAVE_STATE_OP) {
         if (!first) off += sprintf(buffer + off, ", ");
         off += sprintf(buffer + off, "OP");
+    }
+    if (states & EC_SLAVE_STATE_ACK_ERR) {
+        if (!first) off += sprintf(buffer + off, " + ");
+        off += sprintf(buffer + off, "ERROR");
     }
 
     return off;
@@ -369,7 +369,8 @@ int ecdev_start(unsigned int master_index /**< master index */)
         return -1;
     }
 
-    ec_master_idle_start(master);
+    ec_master_enter_idle_mode(master);
+
     return 0;
 }
 
@@ -387,7 +388,7 @@ void ecdev_stop(unsigned int master_index /**< master index */)
     ec_master_t *master;
     if (!(master = ec_find_master(master_index))) return;
 
-    ec_master_idle_stop(master);
+    ec_master_leave_idle_mode(master);
 
     if (ec_device_close(master->device))
         EC_WARN("Failed to close device!\n");
@@ -443,31 +444,19 @@ ec_master_t *ecrt_request_master(unsigned int master_index
         goto out_module_put;
     }
 
-    ec_master_reset(master); // also stops idle mode
-    master->mode = EC_MASTER_MODE_OPERATION;
-
-    if (ec_master_measure_bus_time(master)) {
-        EC_ERR("Bus time measuring failed!\n");
-        goto out_reset;
-    }
-
-    if (ec_master_bus_scan(master)) {
-        EC_ERR("Bus scan failed!\n");
-        goto out_reset;
+    if (ec_master_enter_operation_mode(master)) {
+        EC_ERR("Failed to enter OPERATION mode!\n");
+        goto out_module_put;
     }
 
     EC_INFO("Successfully requested master %i.\n", master_index);
     return master;
 
- out_reset:
-    ec_master_reset(master);
-    ec_master_idle_start(master);
  out_module_put:
     module_put(master->device->module);
  out_release:
     atomic_inc(&master->available);
  out_return:
-    EC_ERR("Failed to request master %i.\n", master_index);
     return NULL;
 }
 
@@ -480,20 +469,12 @@ ec_master_t *ecrt_request_master(unsigned int master_index
 
 void ecrt_release_master(ec_master_t *master /**< EtherCAT master */)
 {
-    EC_INFO("Releasing master %i...\n", master->index);
-
-    if (atomic_read(&master->available)) {
-        EC_ERR("Master %i was never requested!\n", master->index);
-        return;
-    }
-
-    ec_master_reset(master);
-    ec_master_idle_start(master);
+    ec_master_leave_operation_mode(master);
 
     module_put(master->device->module);
     atomic_inc(&master->available);
 
-    EC_INFO("Successfully released master %i.\n", master->index);
+    EC_INFO("Released master %i.\n", master->index);
     return;
 }
 

@@ -33,60 +33,39 @@
 
 /**
    \file
-   EtherCAT device structure.
+   Global definitions and macros.
 */
 
 /*****************************************************************************/
 
-#ifndef _EC_DEVICE_H_
-#define _EC_DEVICE_H_
+#ifndef _EC_GLOBALS_
+#define _EC_GLOBALS_
 
-#include <linux/interrupt.h>
+#include "config.h"
 
-#include "../include/ecrt.h"
-#include "../devices/ecdev.h"
-#include "globals.h"
-
-#ifdef EC_DBG_IF
-#include "debug.h"
-#endif
-
-/*****************************************************************************/
+/******************************************************************************
+ *  Overall macros
+ *****************************************************************************/
 
 /**
-   EtherCAT device.
-   An EtherCAT device is a network interface card, that is owned by an
-   EtherCAT master to send and receive EtherCAT frames with.
+   Helper macro for EC_STR(), literates a macro argument.
+   \param X argument to literate.
 */
 
-struct ec_device
-{
-    ec_master_t *master; /**< EtherCAT master */
-    struct net_device *dev; /**< pointer to the assigned net_device */
-    uint8_t open; /**< true, if the net_device has been opened */
-    struct sk_buff *tx_skb; /**< transmit socket buffer */
-    ec_isr_t isr; /**< pointer to the device's interrupt service routine */
-    cycles_t cycles_isr; /**< cycles of last ISR call */
-    unsigned long jiffies_isr; /**< jiffies of last ISR call */
-    struct module *module; /**< pointer to the device's owning module */
-    uint8_t link_state; /**< device link state */
-#ifdef EC_DBG_IF
-    ec_debug_t dbg; /**< debug device */
-#endif
-};
+#define EC_LIT(X) #X
 
-/*****************************************************************************/
+/**
+   Converts a macro argument to a string.
+   \param X argument to stringify.
+*/
 
-int ec_device_init(ec_device_t *, ec_master_t *, struct net_device *,
-                   ec_isr_t, struct module *);
-void ec_device_clear(ec_device_t *);
+#define EC_STR(X) EC_LIT(X)
 
-int ec_device_open(ec_device_t *);
-int ec_device_close(ec_device_t *);
+/**
+   Master version string
+*/
 
-void ec_device_call_isr(ec_device_t *);
-uint8_t *ec_device_tx_data(ec_device_t *);
-void ec_device_send(ec_device_t *, size_t);
+#define EC_MASTER_VERSION VERSION " " BRANCH " r" EC_STR(SVNREV)
 
 /*****************************************************************************/
 

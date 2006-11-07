@@ -1,7 +1,5 @@
 /******************************************************************************
  *
- *  Sample module for use with IgH MSR library.
- *
  *  $Id$
  *
  *  Copyright (C) 2006  Florian Pose, Ingenieurgemeinschaft IgH
@@ -44,11 +42,12 @@
 #include <msr_main.h>
 #include <msr_reg.h>
 #include <msr_time.h>
-#include "msr_param.h"
 
 // EtherCAT
 #include "../../include/ecrt.h"
 #include "../../include/ecdb.h"
+
+#define MSR_ABTASTFREQUENZ 1000
 
 #define HZREDUCTION (MSR_ABTASTFREQUENZ / HZ)
 #define TIMERTICKS (1000000000 / MSR_ABTASTFREQUENZ)
@@ -214,7 +213,6 @@ void __exit cleanup_mod(void)
 
     rt_task_delete(&task);
     stop_rt_timer();
-    ecrt_master_deactivate(master);
     ecrt_release_master(master);
     rt_sem_delete(&master_sem);
     msr_rtlib_cleanup();

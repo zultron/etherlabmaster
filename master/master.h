@@ -134,39 +134,43 @@ struct ec_master
     void *cb_data; /**< data parameter of locking callbacks */
 
     uint8_t eeprom_write_enable; /**< allow write operations to EEPROMs */
+
+    ec_sdo_request_t *sdo_request; /**< pointer to the current SDO request */
+    unsigned int sdo_seq_user; /**< sequence number for user space */
+    unsigned int sdo_seq_master; /**< sequence number for master */
+    struct semaphore sdo_sem; /**< SDO semaphore */
+    struct timer_list sdo_timer; /**< timer for polling sdo processing */
+    struct completion sdo_complete; /**< SDO request completion object */
 };
 
 /*****************************************************************************/
 
-// master creation and deletion
+// master creation/deletion
 int ec_master_init(ec_master_t *, unsigned int, unsigned int);
-void ec_master_clear(struct kobject *);
-void ec_master_reset(ec_master_t *);
+void ec_master_destroy(ec_master_t *);
 
-// free run
-void ec_master_idle_start(ec_master_t *);
-void ec_master_idle_stop(ec_master_t *);
+// mode transitions
+int ec_master_enter_idle_mode(ec_master_t *);
+void ec_master_leave_idle_mode(ec_master_t *);
+int ec_master_enter_operation_mode(ec_master_t *);
+void ec_master_leave_operation_mode(ec_master_t *);
 
 // EoE
 void ec_master_eoe_start(ec_master_t *);
 void ec_master_eoe_stop(ec_master_t *);
 
-// IO
+// datagram IO
 void ec_master_receive_datagrams(ec_master_t *, const uint8_t *, size_t);
 void ec_master_queue_datagram(ec_master_t *, ec_datagram_t *);
 
-// slave management
-int ec_master_bus_scan(ec_master_t *);
-
 // misc.
 void ec_master_output_stats(ec_master_t *);
-void ec_master_clear_slaves(ec_master_t *);
-int ec_master_measure_bus_time(ec_master_t *);
+void ec_master_destroy_slaves(ec_master_t *);
+void ec_master_calc_addressing(ec_master_t *);
 
-// other methods
+// helper functions
 void ec_sync_config(const ec_sii_sync_t *, const ec_slave_t *, uint8_t *);
 void ec_fmmu_config(const ec_fmmu_t *, const ec_slave_t *, uint8_t *);
-void ec_master_calc_addressing(ec_master_t *);
 
 /*****************************************************************************/
 

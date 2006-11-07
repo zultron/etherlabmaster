@@ -38,32 +38,16 @@
 
 /*****************************************************************************/
 
-#ifndef _EC_GLOBALS_
-#define _EC_GLOBALS_
+#ifndef _EC_MASTER_GLOBALS_
+#define _EC_MASTER_GLOBALS_
 
 #include <linux/types.h>
 
-#include "../config.h"
+#include "../globals.h"
 
 /******************************************************************************
  *  EtherCAT master
  *****************************************************************************/
-
-/** master main version */
-#define EC_MASTER_VERSION_MAIN  1
-
-/** master sub version (after the dot) */
-#define EC_MASTER_VERSION_SUB   1
-
-/** master extra version (just a string) */
-#define EC_MASTER_VERSION_EXTRA "stable"
-
-/** Compile version info. */
-
-#define EC_MASTER_VERSION EC_STR(EC_MASTER_VERSION_MAIN) \
-                          "." EC_STR(EC_MASTER_VERSION_SUB) \
-                          " " EC_MASTER_VERSION_EXTRA \
-                          " r" EC_STR(SVNREV)
 
 /** maximum number of FMMUs per slave */
 #define EC_MAX_FMMUS 16
@@ -76,6 +60,13 @@
 
 /** datagram timeout in microseconds */
 #define EC_IO_TIMEOUT 500
+
+/** Seconds to wait before fetching SDO dictionary
+    after slave entered PREOP state. */
+#define EC_WAIT_SDO_DICT 3
+
+/** minimum size of a buffer used with ec_state_string() */
+#define EC_STATE_STRING_SIZE 32
 
 /******************************************************************************
  *  EtherCAT protocol
@@ -143,20 +134,6 @@
     printk(KERN_DEBUG "EtherCAT DEBUG: " fmt, ##args)
 
 /**
-   Helper macro for EC_STR(), literates a macro argument.
-   \param X argument to literate.
-*/
-
-#define EC_LIT(X) #X
-
-/**
-   Converts a macro argument to a string.
-   \param X argument to stringify.
-*/
-
-#define EC_STR(X) EC_LIT(X)
-
-/**
    Convenience macro for defining read-only SysFS attributes.
    This results in creating a static variable called attr_\a NAME. The SysFS
    file will be world-readable.
@@ -179,6 +156,10 @@
     static struct attribute attr_##NAME = { \
         .name = EC_STR(NAME), .owner = THIS_MODULE, .mode = S_IRUGO | S_IWUSR \
     }
+
+/*****************************************************************************/
+
+extern char *ec_master_version_str;
 
 /*****************************************************************************/
 

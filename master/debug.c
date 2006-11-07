@@ -49,6 +49,7 @@
 // net_device functions
 int ec_dbgdev_open(struct net_device *);
 int ec_dbgdev_stop(struct net_device *);
+int ec_dbgdev_tx(struct sk_buff *, struct net_device *);
 struct net_device_stats *ec_dbgdev_stats(struct net_device *);
 
 /*****************************************************************************/
@@ -74,6 +75,7 @@ int ec_debug_init(ec_debug_t *dbg /**< debug object */)
     // initialize net_device
     dbg->dev->open = ec_dbgdev_open;
     dbg->dev->stop = ec_dbgdev_stop;
+    dbg->dev->hard_start_xmit = ec_dbgdev_tx;
     dbg->dev->get_stats = ec_dbgdev_stats;
 
     // initialize private data
@@ -156,7 +158,7 @@ int ec_dbgdev_open(struct net_device *dev /**< debug net_device */)
 {
     ec_debug_t *dbg = *((ec_debug_t **) netdev_priv(dev));
     dbg->opened = 1;
-    EC_INFO("debug interface %s opened.\n", dev->name);
+    EC_INFO("Debug interface %s opened.\n", dev->name);
     return 0;
 }
 
@@ -170,7 +172,24 @@ int ec_dbgdev_stop(struct net_device *dev /**< debug net_device */)
 {
     ec_debug_t *dbg = *((ec_debug_t **) netdev_priv(dev));
     dbg->opened = 0;
-    EC_INFO("debug interface %s stopped.\n", dev->name);
+    EC_INFO("Debug interface %s stopped.\n", dev->name);
+    return 0;
+}
+
+/*****************************************************************************/
+
+/**
+   Transmits data via the virtual network device.
+*/
+
+int ec_dbgdev_tx(struct sk_buff *skb, /**< transmit socket buffer */
+                 struct net_device *dev /**< EoE net_device */
+                 )
+{
+    ec_debug_t *dbg = *((ec_debug_t **) netdev_priv(dev));
+
+    dev_kfree_skb(skb);
+    dbg->stats.tx_dropped++;
     return 0;
 }
 

@@ -33,60 +33,62 @@
 
 /**
    \file
-   EtherCAT device structure.
+   EtherCAT state change FSM.
 */
 
 /*****************************************************************************/
 
-#ifndef _EC_DEVICE_H_
-#define _EC_DEVICE_H_
+#ifndef __EC_FSM_CHANGE__
+#define __EC_FSM_CHANGE__
 
-#include <linux/interrupt.h>
-
-#include "../include/ecrt.h"
-#include "../devices/ecdev.h"
 #include "globals.h"
-
-#ifdef EC_DBG_IF
-#include "debug.h"
-#endif
+#include "../include/ecrt.h"
+#include "datagram.h"
+#include "slave.h"
 
 /*****************************************************************************/
 
 /**
-   EtherCAT device.
-   An EtherCAT device is a network interface card, that is owned by an
-   EtherCAT master to send and receive EtherCAT frames with.
+   Mode of the change state machine.
 */
 
-struct ec_device
+typedef enum {
+    EC_FSM_CHANGE_MODE_FULL, /**< full state change */
+    EC_FSM_CHANGE_MODE_ACK_ONLY /**< only state acknowledgement */
+}
+ec_fsm_change_mode_t;
+
+/*****************************************************************************/
+
+typedef struct ec_fsm_change ec_fsm_change_t; /**< \see ec_fsm_change */
+
+/**
+   EtherCAT state change FSM.
+*/
+
+struct ec_fsm_change
 {
-    ec_master_t *master; /**< EtherCAT master */
-    struct net_device *dev; /**< pointer to the assigned net_device */
-    uint8_t open; /**< true, if the net_device has been opened */
-    struct sk_buff *tx_skb; /**< transmit socket buffer */
-    ec_isr_t isr; /**< pointer to the device's interrupt service routine */
-    cycles_t cycles_isr; /**< cycles of last ISR call */
-    unsigned long jiffies_isr; /**< jiffies of last ISR call */
-    struct module *module; /**< pointer to the device's owning module */
-    uint8_t link_state; /**< device link state */
-#ifdef EC_DBG_IF
-    ec_debug_t dbg; /**< debug device */
-#endif
+    ec_slave_t *slave; /**< slave the FSM runs on */
+    ec_datagram_t *datagram; /**< datagram used in the state machine */
+
+    void (*state)(ec_fsm_change_t *); /**< slave state change state function */
+    ec_fsm_change_mode_t mode; /**< full state change, or ack only. */
+    ec_slave_state_t requested_state; /**< input: state */
+    ec_slave_state_t old_state; /**< prior slave state */
+    unsigned long jiffies_start; /**< change timer */
+    uint8_t take_time; /**< take sending timestamp */
 };
 
 /*****************************************************************************/
 
-int ec_device_init(ec_device_t *, ec_master_t *, struct net_device *,
-                   ec_isr_t, struct module *);
-void ec_device_clear(ec_device_t *);
+void ec_fsm_change_init(ec_fsm_change_t *, ec_datagram_t *);
+void ec_fsm_change_clear(ec_fsm_change_t *);
 
-int ec_device_open(ec_device_t *);
-int ec_device_close(ec_device_t *);
+void ec_fsm_change_start(ec_fsm_change_t *, ec_slave_t *, ec_slave_state_t);
+void ec_fsm_change_ack(ec_fsm_change_t *, ec_slave_t *);
 
-void ec_device_call_isr(ec_device_t *);
-uint8_t *ec_device_tx_data(ec_device_t *);
-void ec_device_send(ec_device_t *, size_t);
+int ec_fsm_change_exec(ec_fsm_change_t *);
+int ec_fsm_change_success(ec_fsm_change_t *);
 
 /*****************************************************************************/
 

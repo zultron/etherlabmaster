@@ -52,6 +52,8 @@ extern const ec_code_msg_t al_status_messages[];
 
 /*****************************************************************************/
 
+void ec_slave_clear(struct kobject *);
+void ec_slave_sdos_clear(struct kobject *);
 ssize_t ec_show_slave_attribute(struct kobject *, struct attribute *, char *);
 ssize_t ec_store_slave_attribute(struct kobject *, struct attribute *,
                                  const char *, size_t);
@@ -82,6 +84,10 @@ static struct kobj_type ktype_ec_slave = {
     .default_attrs = def_attrs
 };
 
+static struct kobj_type ktype_ec_slave_sdos = {
+    .release = ec_slave_sdos_clear
+};
+
 /** \endcond */
 
 /*****************************************************************************/
@@ -102,25 +108,14 @@ int ec_slave_init(ec_slave_t *slave, /**< EtherCAT slave */
     slave->ring_position = ring_position;
     slave->station_address = station_address;
 
-    // init kobject and add it to the hierarchy
-    memset(&slave->kobj, 0x00, sizeof(struct kobject));
-    kobject_init(&slave->kobj);
-    slave->kobj.ktype = &ktype_ec_slave;
-    slave->kobj.parent = &master->kobj;
-    if (kobject_set_name(&slave->kobj, "slave%03i", slave->ring_position)) {
-        EC_ERR("Failed to set kobject name.\n");
-        kobject_put(&slave->kobj);
-        return -1;
-    }
-
     slave->master = master;
 
     slave->requested_state = EC_SLAVE_STATE_UNKNOWN;
     slave->current_state = EC_SLAVE_STATE_UNKNOWN;
+    slave->configured = 0;
     slave->error_flag = 0;
     slave->online = 1;
     slave->fmmu_count = 0;
-    slave->registered = 0;
 
     slave->coupler_index = 0;
     slave->coupler_subindex = 0xFFFF;
@@ -156,7 +151,9 @@ int ec_slave_init(ec_slave_t *slave, /**< EtherCAT slave */
     INIT_LIST_HEAD(&slave->sii_pdos);
     INIT_LIST_HEAD(&slave->sdo_dictionary);
     INIT_LIST_HEAD(&slave->sdo_confs);
-    INIT_LIST_HEAD(&slave->varsize_fields);
+
+    slave->sdo_dictionary_fetched = 0;
+    slave->jiffies_preop = 0;
 
     for (i = 0; i < 4; i++) {
         slave->dl_link[i] = 0;
@@ -165,13 +162,76 @@ int ec_slave_init(ec_slave_t *slave, /**< EtherCAT slave */
         slave->sii_physical_layer[i] = 0xFF;
     }
 
+    // init kobject and add it to the hierarchy
+    memset(&slave->kobj, 0x00, sizeof(struct kobject));
+    kobject_init(&slave->kobj);
+    slave->kobj.ktype = &ktype_ec_slave;
+    slave->kobj.parent = &master->kobj;
+    if (kobject_set_name(&slave->kobj, "slave%03i", slave->ring_position)) {
+        EC_ERR("Failed to set kobject name.\n");
+        goto out_slave_put;
+    }
+    if (kobject_add(&slave->kobj)) {
+        EC_ERR("Failed to add slave's kobject.\n");
+        goto out_slave_put;
+    }
+
+    // init SDO kobject and add it to the hierarchy
+    memset(&slave->sdo_kobj, 0x00, sizeof(struct kobject));
+    kobject_init(&slave->sdo_kobj);
+    slave->sdo_kobj.ktype = &ktype_ec_slave_sdos;
+    slave->sdo_kobj.parent = &slave->kobj;
+    if (kobject_set_name(&slave->sdo_kobj, "sdos")) {
+        EC_ERR("Failed to set kobject name.\n");
+        goto out_sdo_put;
+    }
+    if (kobject_add(&slave->sdo_kobj)) {
+        EC_ERR("Failed to add SDOs kobject.\n");
+        goto out_sdo_put;
+    }
+
     return 0;
+
+ out_sdo_put:
+    kobject_put(&slave->sdo_kobj);
+    kobject_del(&slave->kobj);
+ out_slave_put:
+    kobject_put(&slave->kobj);
+    return -1;
 }
 
 /*****************************************************************************/
 
 /**
    Slave destructor.
+   Clears and frees a slave object.
+*/
+
+void ec_slave_destroy(ec_slave_t *slave /**< EtherCAT slave */)
+{
+    ec_sdo_t *sdo, *next_sdo;
+
+    // free all SDOs
+    list_for_each_entry_safe(sdo, next_sdo, &slave->sdo_dictionary, list) {
+        list_del(&sdo->list);
+        ec_sdo_destroy(sdo);
+    }
+
+    // free SDO kobject
+    kobject_del(&slave->sdo_kobj);
+    kobject_put(&slave->sdo_kobj);
+
+    // destroy self
+    kobject_del(&slave->kobj);
+    kobject_put(&slave->kobj);
+}
+
+/*****************************************************************************/
+
+/**
+   Clear and free slave.
+   This method is called by the kobject,
+   once there are no more references to it.
 */
 
 void ec_slave_clear(struct kobject *kobj /**< kobject of the slave */)
@@ -181,10 +241,7 @@ void ec_slave_clear(struct kobject *kobj /**< kobject of the slave */)
     ec_sii_sync_t *sync, *next_sync;
     ec_sii_pdo_t *pdo, *next_pdo;
     ec_sii_pdo_entry_t *entry, *next_ent;
-    ec_sdo_t *sdo, *next_sdo;
-    ec_sdo_entry_t *en, *next_en;
     ec_sdo_data_t *sdodata, *next_sdodata;
-    ec_varsize_t *var, *next_var;
 
     slave = container_of(kobj, ec_slave_t, kobj);
 
@@ -220,18 +277,41 @@ void ec_slave_clear(struct kobject *kobj /**< kobject of the slave */)
     if (slave->sii_order) kfree(slave->sii_order);
     if (slave->sii_name) kfree(slave->sii_name);
 
-    // free all SDOs
-    list_for_each_entry_safe(sdo, next_sdo, &slave->sdo_dictionary, list) {
-        list_del(&sdo->list);
-        if (sdo->name) kfree(sdo->name);
-
-        // free all SDO entries
-        list_for_each_entry_safe(en, next_en, &sdo->entries, list) {
-            list_del(&en->list);
-            kfree(en);
-        }
-        kfree(sdo);
+    // free all SDO configurations
+    list_for_each_entry_safe(sdodata, next_sdodata, &slave->sdo_confs, list) {
+        list_del(&sdodata->list);
+        kfree(sdodata->data);
+        kfree(sdodata);
     }
+
+    if (slave->eeprom_data) kfree(slave->eeprom_data);
+    if (slave->new_eeprom_data) kfree(slave->new_eeprom_data);
+
+    kfree(slave);
+}
+
+/*****************************************************************************/
+
+/**
+*/
+
+void ec_slave_sdos_clear(struct kobject *kobj /**< kobject for SDOs */)
+{
+}
+
+/*****************************************************************************/
+
+/**
+   Reset slave from operation mode.
+*/
+
+void ec_slave_reset(ec_slave_t *slave /**< EtherCAT slave */)
+{
+    ec_sdo_data_t *sdodata, *next_sdodata;
+    ec_sii_sync_t *sync;
+
+    // remove FMMU configurations
+    slave->fmmu_count = 0;
 
     // free all SDO configurations
     list_for_each_entry_safe(sdodata, next_sdodata, &slave->sdo_confs, list) {
@@ -240,14 +320,23 @@ void ec_slave_clear(struct kobject *kobj /**< kobject of the slave */)
         kfree(sdodata);
     }
 
-    // free information about variable sized data fields
-    list_for_each_entry_safe(var, next_var, &slave->varsize_fields, list) {
-        list_del(&var->list);
-        kfree(var);
+    // remove estimated sync manager sizes
+    list_for_each_entry(sync, &slave->sii_syncs, list) {
+        sync->est_length = 0;
     }
+}
 
-    if (slave->eeprom_data) kfree(slave->eeprom_data);
-    if (slave->new_eeprom_data) kfree(slave->new_eeprom_data);
+/*****************************************************************************/
+
+/**
+ */
+
+void ec_slave_request_state(ec_slave_t *slave, /**< ETherCAT slave */
+                            ec_slave_state_t state /**< new state */
+                            )
+{
+    slave->requested_state = state;
+    slave->error_flag = 0;
 }
 
 /*****************************************************************************/
@@ -340,6 +429,8 @@ int ec_slave_fetch_sync(ec_slave_t *slave, /**< EtherCAT slave */
         sync->length                 = EC_READ_U16(data + 2);
         sync->control_register       = EC_READ_U8 (data + 4);
         sync->enable                 = EC_READ_U8 (data + 6);
+
+        sync->est_length = 0;
 
         list_add_tail(&sync->list, &slave->sii_syncs);
     }
@@ -445,7 +536,9 @@ int ec_slave_locate_string(ec_slave_t *slave, /**< EtherCAT slave */
         return 0;
     }
 
-    EC_WARN("String %i not found in slave %i.\n", index, slave->ring_position);
+    if (slave->master->debug_level)
+        EC_WARN("String %i not found in slave %i.\n",
+                index, slave->ring_position);
 
     err_string = "(string not found)";
 
@@ -478,11 +571,14 @@ int ec_slave_prepare_fmmu(ec_slave_t *slave, /**< EtherCAT slave */
                           )
 {
     unsigned int i;
+    ec_fmmu_t *fmmu;
 
     // FMMU configuration already prepared?
-    for (i = 0; i < slave->fmmu_count; i++)
-        if (slave->fmmus[i].domain == domain && slave->fmmus[i].sync == sync)
+    for (i = 0; i < slave->fmmu_count; i++) {
+        fmmu = &slave->fmmus[i];
+        if (fmmu->domain == domain && fmmu->sync == sync)
             return 0;
+    }
 
     // reserve new FMMU...
 
@@ -491,11 +587,14 @@ int ec_slave_prepare_fmmu(ec_slave_t *slave, /**< EtherCAT slave */
         return -1;
     }
 
-    slave->fmmus[slave->fmmu_count].domain = domain;
-    slave->fmmus[slave->fmmu_count].sync = sync;
-    slave->fmmus[slave->fmmu_count].logical_start_address = 0;
+    fmmu = &slave->fmmus[slave->fmmu_count];
+
+    fmmu->index = slave->fmmu_count;
+    fmmu->domain = domain;
+    fmmu->sync = sync;
+    fmmu->logical_start_address = 0;
+
     slave->fmmu_count++;
-    slave->registered = 1;
 
     return 0;
 }
@@ -515,6 +614,8 @@ size_t ec_slave_info(const ec_slave_t *slave, /**< EtherCAT slave */
     ec_sii_pdo_t *pdo;
     ec_sii_pdo_entry_t *pdo_entry;
     int first, i;
+    ec_sdo_data_t *sdodata;
+    char str[20];
 
     off += sprintf(buffer + off, "\nName: ");
 
@@ -528,7 +629,10 @@ size_t ec_slave_info(const ec_slave_t *slave, /**< EtherCAT slave */
 
     off += sprintf(buffer + off, "State: ");
     off += ec_state_string(slave->current_state, buffer + off);
-    off += sprintf(buffer + off, "\nRing position: %i\n",
+    off += sprintf(buffer + off, "\nFlags: %s, %s\n",
+                   slave->online ? "online" : "OFFLINE",
+                   slave->error_flag ? "ERROR" : "ok");
+    off += sprintf(buffer + off, "Ring position: %i\n",
                    slave->ring_position);
     off += sprintf(buffer + off, "Advanced position: %i:%i\n",
                    slave->coupler_index, slave->coupler_subindex);
@@ -641,6 +745,20 @@ size_t ec_slave_info(const ec_slave_t *slave, /**< EtherCAT slave */
                            pdo_entry->index, pdo_entry->subindex,
                            pdo_entry->bit_length);
         }
+    }
+
+    if (!list_empty(&slave->sdo_confs))
+        off += sprintf(buffer + off, "\nSDO configurations:\n");
+
+    list_for_each_entry(sdodata, &slave->sdo_confs, list) {
+        switch (sdodata->size) {
+            case 1: sprintf(str, "%i", EC_READ_U8(sdodata->data)); break;
+            case 2: sprintf(str, "%i", EC_READ_U16(sdodata->data)); break;
+            case 4: sprintf(str, "%i", EC_READ_U32(sdodata->data)); break;
+            default: sprintf(str, "(invalid size)"); break;
+        }
+        off += sprintf(buffer + off, "  0x%04X:%-3i -> %s\n",
+                       sdodata->index, sdodata->subindex, str);
     }
 
     off += sprintf(buffer + off, "\n");
@@ -789,15 +907,15 @@ ssize_t ec_store_slave_attribute(struct kobject *kobj, /**< slave's kobject */
     ec_slave_t *slave = container_of(kobj, ec_slave_t, kobj);
 
     if (attr == &attr_state) {
-        char state[25];
+        char state[EC_STATE_STRING_SIZE];
         if (!strcmp(buffer, "INIT\n"))
-            slave->requested_state = EC_SLAVE_STATE_INIT;
+            ec_slave_request_state(slave, EC_SLAVE_STATE_INIT);
         else if (!strcmp(buffer, "PREOP\n"))
-            slave->requested_state = EC_SLAVE_STATE_PREOP;
+            ec_slave_request_state(slave, EC_SLAVE_STATE_PREOP);
         else if (!strcmp(buffer, "SAVEOP\n"))
-            slave->requested_state = EC_SLAVE_STATE_SAVEOP;
+            ec_slave_request_state(slave, EC_SLAVE_STATE_SAVEOP);
         else if (!strcmp(buffer, "OP\n"))
-            slave->requested_state = EC_SLAVE_STATE_OP;
+            ec_slave_request_state(slave, EC_SLAVE_STATE_OP);
         else {
             EC_ERR("Invalid slave state \"%s\"!\n", buffer);
             return -EINVAL;
@@ -806,7 +924,6 @@ ssize_t ec_store_slave_attribute(struct kobject *kobj, /**< slave's kobject */
         ec_state_string(slave->requested_state, state);
         EC_INFO("Accepted new state %s for slave %i.\n",
                 state, slave->ring_position);
-        slave->error_flag = 0;
         return size;
     }
     else if (attr == &attr_eeprom) {
@@ -832,9 +949,10 @@ uint16_t ec_slave_calc_sync_size(const ec_slave_t *slave,
 {
     ec_sii_pdo_t *pdo;
     ec_sii_pdo_entry_t *pdo_entry;
-    unsigned int bit_size;
+    unsigned int bit_size, byte_size;
 
     if (sync->length) return sync->length;
+    if (sync->est_length) return sync->est_length;
 
     bit_size = 0;
     list_for_each_entry(pdo, &slave->sii_pdos, list) {
@@ -846,9 +964,11 @@ uint16_t ec_slave_calc_sync_size(const ec_slave_t *slave,
     }
 
     if (bit_size % 8) // round up to full bytes
-        return bit_size / 8 + 1;
+        byte_size = bit_size / 8 + 1;
     else
-        return bit_size / 8;
+        byte_size = bit_size / 8;
+
+    return byte_size;
 }
 
 /*****************************************************************************/
@@ -873,7 +993,7 @@ int ec_slave_is_coupler(const ec_slave_t *slave /**< EtherCAT slave */)
 int ec_slave_has_subbus(const ec_slave_t *slave /**< EtherCAT slave */)
 {
     return slave->sii_vendor_id == 0x00000002
-        && slave->sii_product_code == 0x13ED3052;
+        && slave->sii_product_code == 0x04602c22;
 }
 
 /*****************************************************************************/
@@ -915,6 +1035,54 @@ int ec_slave_conf_sdo(ec_slave_t *slave, /**< EtherCAT slave */
 
     list_add_tail(&sdodata->list, &slave->sdo_confs);
     return 0;
+}
+
+/*****************************************************************************/
+
+/**
+   \return 0 in case of success, else < 0
+*/
+
+int ec_slave_validate(const ec_slave_t *slave, /**< EtherCAT slave */
+                      uint32_t vendor_id, /**< vendor ID */
+                      uint32_t product_code /**< product code */
+                      )
+{
+    if (vendor_id != slave->sii_vendor_id ||
+        product_code != slave->sii_product_code) {
+        EC_ERR("Invalid slave type at position %i - Requested: 0x%08X 0x%08X,"
+               " found: 0x%08X 0x%08X\".\n", slave->ring_position, vendor_id,
+               product_code, slave->sii_vendor_id, slave->sii_product_code);
+        return -1;
+    }
+    return 0;
+}
+
+/*****************************************************************************/
+
+/**
+   Counts the total number of SDOs and entries in the dictionary.
+*/
+
+void ec_slave_sdo_dict_info(const ec_slave_t *slave, /**< EtherCAT slave */
+                            unsigned int *sdo_count, /**< number of SDOs */
+                            unsigned int *entry_count /**< total number of
+                                                         entries */
+                            )
+{
+    unsigned int sdos = 0, entries = 0;
+    ec_sdo_t *sdo;
+    ec_sdo_entry_t *entry;
+
+    list_for_each_entry(sdo, &slave->sdo_dictionary, list) {
+        sdos++;
+        list_for_each_entry(entry, &sdo->entries, list) {
+            entries++;
+        }
+    }
+
+    *sdo_count = sdos;
+    *entry_count = entries;
 }
 
 /******************************************************************************

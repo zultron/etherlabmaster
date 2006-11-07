@@ -1,6 +1,6 @@
 #------------------------------------------------------------------------------
 #
-#  $Id: Makefile 545 2006-09-19 13:28:40Z fp $
+#  $Id$
 #
 #  Copyright (C) 2006  Florian Pose, Ingenieurgemeinschaft IgH
 #
@@ -31,33 +31,6 @@
 #
 #------------------------------------------------------------------------------
 
-EXTRA_DIST = \
-	Kbuild \
-	canopen.c canopen.h \
-	datagram.c datagram.h \
-	debug.c	debug.h \
-	device.c device.h \
-	domain.c domain.h \
-	doxygen.c \
-	ethernet.c ethernet.h \
-	fsm_sii.c fsm_sii.h \
-	fsm_change.c fsm_change.h \
-	fsm_coe.c fsm_coe.h \
-	fsm.c fsm.h \
-	globals.h \
-	mailbox.c mailbox.h \
-	master.c master.h \
-	module.c \
-	slave.c slave.h
-#	xmldev.c xmldev.h
-
-modules:
-	$(MAKE) -C "$(LINUX_SOURCE_DIR)" M="@abs_top_srcdir@" modules
-
-modules_install:
-	cp $(srcdir)/ec_master.ko $(DESTDIR)$(LINUX_MOD_PATH)
-
-clean-local:
-	$(MAKE) -C "$(LINUX_SOURCE_DIR)" M="@abs_srcdir@" clean
+obj-m := master/ devices/
 
 #------------------------------------------------------------------------------

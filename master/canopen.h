@@ -33,60 +33,97 @@
 
 /**
    \file
-   EtherCAT device structure.
+   EtherCAT CANopen structures.
 */
 
 /*****************************************************************************/
 
-#ifndef _EC_DEVICE_H_
-#define _EC_DEVICE_H_
+#ifndef _EC_CANOPEN_H_
+#define _EC_CANOPEN_H_
 
-#include <linux/interrupt.h>
+#include <linux/list.h>
+#include <linux/kobject.h>
 
-#include "../include/ecrt.h"
-#include "../devices/ecdev.h"
 #include "globals.h"
-
-#ifdef EC_DBG_IF
-#include "debug.h"
-#endif
+#include "slave.h"
 
 /*****************************************************************************/
 
 /**
-   EtherCAT device.
-   An EtherCAT device is a network interface card, that is owned by an
-   EtherCAT master to send and receive EtherCAT frames with.
+   CANopen SDO.
 */
 
-struct ec_device
+typedef struct
 {
-    ec_master_t *master; /**< EtherCAT master */
-    struct net_device *dev; /**< pointer to the assigned net_device */
-    uint8_t open; /**< true, if the net_device has been opened */
-    struct sk_buff *tx_skb; /**< transmit socket buffer */
-    ec_isr_t isr; /**< pointer to the device's interrupt service routine */
-    cycles_t cycles_isr; /**< cycles of last ISR call */
-    unsigned long jiffies_isr; /**< jiffies of last ISR call */
-    struct module *module; /**< pointer to the device's owning module */
-    uint8_t link_state; /**< device link state */
-#ifdef EC_DBG_IF
-    ec_debug_t dbg; /**< debug device */
-#endif
-};
+    struct kobject kobj; /**< kobject */
+    struct list_head list; /**< list item */
+    ec_slave_t *slave; /**< parent slave */
+    uint16_t index; /**< SDO index */
+    uint8_t object_code; /**< object code */
+    char *name; /**< SDO name */
+    uint8_t subindices; /**< subindices */
+    struct list_head entries; /**< entry list */
+}
+ec_sdo_t;
 
 /*****************************************************************************/
 
-int ec_device_init(ec_device_t *, ec_master_t *, struct net_device *,
-                   ec_isr_t, struct module *);
-void ec_device_clear(ec_device_t *);
+/**
+   CANopen SDO entry.
+*/
 
-int ec_device_open(ec_device_t *);
-int ec_device_close(ec_device_t *);
+typedef struct
+{
+    struct kobject kobj; /**< kobject */
+    struct list_head list; /**< list item */
+    ec_sdo_t *sdo; /**< parent SDO */
+    uint8_t subindex; /**< entry subindex */
+    uint16_t data_type; /**< entry data type */
+    uint16_t bit_length; /**< entry length in bit */
+    char *description; /**< entry description */
+}
+ec_sdo_entry_t;
 
-void ec_device_call_isr(ec_device_t *);
-uint8_t *ec_device_tx_data(ec_device_t *);
-void ec_device_send(ec_device_t *, size_t);
+/*****************************************************************************/
+
+/**
+   CANopen SDO configuration data.
+*/
+
+typedef struct
+{
+    struct list_head list; /**< list item */
+    uint16_t index; /**< SDO index */
+    uint8_t subindex; /**< SDO subindex */
+    uint8_t *data; /**< pointer to SDO data */
+    size_t size; /**< size of SDO data */
+}
+ec_sdo_data_t;
+
+/*****************************************************************************/
+
+/**
+   CANopen SDO request.
+*/
+
+typedef struct
+{
+    struct list_head queue; /**< list item */
+    ec_sdo_t *sdo;
+    ec_sdo_entry_t *entry;
+    uint8_t *data; /**< pointer to SDO data */
+    size_t size; /**< size of SDO data */
+    int return_code;
+}
+ec_sdo_request_t;
+
+/*****************************************************************************/
+
+int ec_sdo_init(ec_sdo_t *, uint16_t, ec_slave_t *);
+void ec_sdo_destroy(ec_sdo_t *);
+
+int ec_sdo_entry_init(ec_sdo_entry_t *, uint8_t, ec_sdo_t *);
+void ec_sdo_entry_destroy(ec_sdo_entry_t *);
 
 /*****************************************************************************/
 

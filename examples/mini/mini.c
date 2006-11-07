@@ -1,9 +1,5 @@
 /******************************************************************************
  *
- *  m i n i . c
- *
- *  Minimal module for EtherCAT.
- *
  *  $Id$
  *
  *  Copyright (C) 2006  Florian Pose, Ingenieurgemeinschaft IgH
@@ -46,6 +42,8 @@
 
 #define FREQUENCY 100
 
+#define KBUS
+
 /*****************************************************************************/
 
 struct timer_list timer;
@@ -56,23 +54,26 @@ ec_domain_t *domain1 = NULL;
 spinlock_t master_lock = SPIN_LOCK_UNLOCKED;
 
 // data fields
-void *r_ana_out;
+#ifdef KBUS
+void *r_inputs;
+void *r_outputs;
+#endif
 
-// channels
-uint32_t k_pos;
-uint8_t k_stat;
+void *r_ana_in;
 
+#if 1
 ec_pdo_reg_t domain1_pdos[] = {
-    {"2", Beckhoff_EL4132_Output1, &r_ana_out},
-    {"3", Beckhoff_EL5001_Value, NULL},
+    {"2", Beckhoff_EL3102_Input1, &r_ana_in},
     {}
 };
+#endif
 
 /*****************************************************************************/
 
 void run(unsigned long data)
 {
     static unsigned int counter = 0;
+    static unsigned int einaus = 0;
 
     spin_lock(&master_lock);
 
@@ -82,6 +83,9 @@ void run(unsigned long data)
 
     // process data
     //k_pos = EC_READ_U32(r_ssi);
+#ifdef KBUS
+    EC_WRITE_U8(r_outputs + 2, einaus ? 0xFF : 0x00);
+#endif
 
     // send
     ecrt_master_run(master);
@@ -94,10 +98,7 @@ void run(unsigned long data)
     }
     else {
         counter = FREQUENCY;
-        //printk(KERN_INFO "input = ");
-        //for (i = 0; i < 22; i++)
-        //    printk("%02X ", *((uint8_t *) r_kbus_in + i));
-        //printk("\n");
+        einaus = !einaus;
     }
 
     // restart timer
@@ -124,7 +125,9 @@ void release_lock(void *data)
 
 int __init init_mini_module(void)
 {
+#if 1
     ec_slave_t *slave;
+#endif
 
     printk(KERN_INFO "=== Starting Minimal EtherCAT environment... ===\n");
 
@@ -143,16 +146,33 @@ int __init init_mini_module(void)
     }
 
     printk(KERN_INFO "Registering PDOs...\n");
+#if 1
     if (ecrt_domain_register_pdo_list(domain1, domain1_pdos)) {
         printk(KERN_ERR "PDO registration failed!\n");
         goto out_release_master;
     }
+#endif
 
-    if (!(slave = ecrt_master_get_slave(master, "3")))
+#ifdef KBUS
+    if (!ecrt_domain_register_pdo_range(domain1, "0", Beckhoff_BK1120,
+                                        EC_DIR_OUTPUT, 0, 4, &r_outputs)) {
+        printk(KERN_ERR "PDO registration failed!\n");
+        goto out_release_master;
+    }
+    if (!ecrt_domain_register_pdo_range(domain1, "0", Beckhoff_BK1120,
+                                        EC_DIR_INPUT, 0, 4, &r_inputs)) {
+        printk(KERN_ERR "PDO registration failed!\n");
+        goto out_release_master;
+    }
+#endif
+
+#if 1
+    if (!(slave = ecrt_master_get_slave(master, "2")))
         goto out_release_master;
 
     if (ecrt_slave_conf_sdo8(slave, 0x4061, 1, 0))
         goto out_release_master;
+#endif
 
     printk(KERN_INFO "Activating master...\n");
     if (ecrt_master_activate(master)) {
@@ -183,12 +203,9 @@ void __exit cleanup_mini_module(void)
 {
     printk(KERN_INFO "=== Stopping Minimal EtherCAT environment... ===\n");
 
-    if (master) {
-        del_timer_sync(&timer);
-        printk(KERN_INFO "Deactivating master...\n");
-        ecrt_master_deactivate(master);
-        ecrt_release_master(master);
-    }
+    del_timer_sync(&timer);
+    printk(KERN_INFO "Releasing master...\n");
+    ecrt_release_master(master);
 
     printk(KERN_INFO "=== Minimal EtherCAT environment stopped. ===\n");
 }

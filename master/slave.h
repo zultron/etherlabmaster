@@ -67,8 +67,8 @@ typedef enum
     /**< SAVEOP (mailbox communication and input update) */
     EC_SLAVE_STATE_OP = 0x08,
     /**< OP (mailbox communication and input/output update) */
-    EC_ACK = 0x10
-    /**< Acknoledge bit (no state) */
+    EC_SLAVE_STATE_ACK_ERR = 0x10
+    /**< Acknowledge/Error bit (no actual state) */
 }
 ec_slave_state_t;
 
@@ -116,6 +116,9 @@ typedef struct
     uint16_t length; /**< data length in bytes */
     uint8_t control_register; /**< control register value */
     uint8_t enable; /**< enable bit */
+    uint16_t est_length; /**< Estimated length. This is no field of the SII,
+                            but it is used to calculate the length via
+                            PDO ranges */
 }
 ec_sii_sync_t;
 
@@ -168,74 +171,17 @@ ec_sii_pdo_entry_t;
 /*****************************************************************************/
 
 /**
-   CANopen SDO.
-*/
-
-typedef struct
-{
-    struct list_head list; /**< list item */
-    uint16_t index; /**< SDO index */
-    uint8_t object_code; /**< object code */
-    char *name; /**< SDO name */
-    struct list_head entries; /**< entry list */
-}
-ec_sdo_t;
-
-/*****************************************************************************/
-
-/**
-   CANopen SDO entry.
-*/
-
-typedef struct
-{
-    struct list_head list; /**< list item */
-    uint8_t subindex; /**< entry subindex */
-    uint16_t data_type; /**< entry data type */
-    uint16_t bit_length; /**< entry length in bit */
-    char *name; /**< entry name */
-}
-ec_sdo_entry_t;
-
-/*****************************************************************************/
-
-typedef struct
-{
-    struct list_head list; /**< list item */
-    uint16_t index; /**< SDO index */
-    uint8_t subindex; /**< SDO subindex */
-    uint8_t *data; /**< pointer to SDO data */
-    size_t size; /**< size of SDO data */
-}
-ec_sdo_data_t;
-
-/*****************************************************************************/
-
-/**
    FMMU configuration.
 */
 
 typedef struct
 {
+    unsigned int index; /**< FMMU index */
     const ec_domain_t *domain; /**< domain */
     const ec_sii_sync_t *sync; /**< sync manager */
     uint32_t logical_start_address; /**< logical start address */
 }
 ec_fmmu_t;
-
-/*****************************************************************************/
-
-/**
-   Variable-sized field information.
-*/
-
-typedef struct
-{
-    struct list_head list; /**< list item */
-    const ec_sii_pdo_t *pdo; /**< PDO */
-    size_t size; /**< field size */
-}
-ec_varsize_t;
 
 /*****************************************************************************/
 
@@ -251,9 +197,9 @@ struct ec_slave
 
     ec_slave_state_t requested_state; /**< requested slave state */
     ec_slave_state_t current_state; /**< current slave state */
+    unsigned int configured; /**< the slave was configured by this master */
     unsigned int error_flag; /**< stop processing after an error */
     unsigned int online; /**< non-zero, if the slave responds. */
-    uint8_t registered; /**< true, if slave has been registered */
 
     // addresses
     uint16_t ring_position; /**< ring position */
@@ -302,24 +248,25 @@ struct ec_slave
     ec_fmmu_t fmmus[EC_MAX_FMMUS]; /**< FMMU configurations */
     uint8_t fmmu_count; /**< number of FMMUs used */
 
-    struct list_head sdo_dictionary; /**< SDO directory list */
+    struct kobject sdo_kobj; /**< kobject for SDOs */
+    struct list_head sdo_dictionary; /**< SDO dictionary list */
     struct list_head sdo_confs; /**< list of SDO configurations */
-
-    struct list_head varsize_fields; /**< size information for variable-sized
-                                        data fields. */
+    uint8_t sdo_dictionary_fetched; /**< dictionary has been fetched */
+    unsigned long jiffies_preop; /**< time, the slave went to PREOP */
 };
 
 /*****************************************************************************/
 
 // slave construction/destruction
 int ec_slave_init(ec_slave_t *, ec_master_t *, uint16_t, uint16_t);
-void ec_slave_clear(struct kobject *);
+void ec_slave_destroy(ec_slave_t *);
+
+void ec_slave_reset(ec_slave_t *);
 
 int ec_slave_prepare_fmmu(ec_slave_t *, const ec_domain_t *,
                           const ec_sii_sync_t *);
 
-// CoE
-//int ec_slave_fetch_sdo_list(ec_slave_t *);
+void ec_slave_request_state(ec_slave_t *, ec_slave_state_t);
 
 // SII categories
 int ec_slave_fetch_strings(ec_slave_t *, const uint8_t *);
@@ -335,6 +282,11 @@ uint16_t ec_slave_calc_sync_size(const ec_slave_t *,
 
 int ec_slave_is_coupler(const ec_slave_t *);
 int ec_slave_has_subbus(const ec_slave_t *);
+
+int ec_slave_validate(const ec_slave_t *, uint32_t, uint32_t);
+
+void ec_slave_sdo_dict_info(const ec_slave_t *,
+                            unsigned int *, unsigned int *);
 
 /*****************************************************************************/
 

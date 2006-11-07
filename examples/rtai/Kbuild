@@ -1,7 +1,5 @@
 #------------------------------------------------------------------------------
 #
-#  Kbuild
-#
 #  $Id$
 #
 #  Copyright (C) 2006  Florian Pose, Ingenieurgemeinschaft IgH
@@ -33,8 +31,12 @@
 #
 #------------------------------------------------------------------------------
 
+include $(src)/../../config.kbuild
+
 obj-m := ec_rtai_sample.o
 
 ec_rtai_sample-objs := rtai_sample.o
+
+EXTRA_CFLAGS := -I$(EC_RTAI_DIR)/include
 
 #------------------------------------------------------------------------------

@@ -33,60 +33,61 @@
 
 /**
    \file
-   EtherCAT device structure.
+   EtherCAT slave information interface FSM structure.
 */
 
 /*****************************************************************************/
 
-#ifndef _EC_DEVICE_H_
-#define _EC_DEVICE_H_
+#ifndef __EC_FSM_SII__
+#define __EC_FSM_SII__
 
-#include <linux/interrupt.h>
-
-#include "../include/ecrt.h"
-#include "../devices/ecdev.h"
 #include "globals.h"
-
-#ifdef EC_DBG_IF
-#include "debug.h"
-#endif
+#include "../include/ecrt.h"
+#include "datagram.h"
+#include "slave.h"
 
 /*****************************************************************************/
+
+typedef enum
+{
+    EC_FSM_SII_POSITION,
+    EC_FSM_SII_NODE
+}
+ec_fsm_sii_addressing_t;
+
+/*****************************************************************************/
+
+typedef struct ec_fsm_sii ec_fsm_sii_t; /**< \see ec_fsm_sii */
 
 /**
-   EtherCAT device.
-   An EtherCAT device is a network interface card, that is owned by an
-   EtherCAT master to send and receive EtherCAT frames with.
+   Slave information interface FSM.
 */
 
-struct ec_device
+struct ec_fsm_sii
 {
-    ec_master_t *master; /**< EtherCAT master */
-    struct net_device *dev; /**< pointer to the assigned net_device */
-    uint8_t open; /**< true, if the net_device has been opened */
-    struct sk_buff *tx_skb; /**< transmit socket buffer */
-    ec_isr_t isr; /**< pointer to the device's interrupt service routine */
-    cycles_t cycles_isr; /**< cycles of last ISR call */
-    unsigned long jiffies_isr; /**< jiffies of last ISR call */
-    struct module *module; /**< pointer to the device's owning module */
-    uint8_t link_state; /**< device link state */
-#ifdef EC_DBG_IF
-    ec_debug_t dbg; /**< debug device */
-#endif
+    ec_slave_t *slave; /**< slave the FSM runs on */
+    ec_datagram_t *datagram; /**< datagram used in the state machine */
+
+    void (*state)(ec_fsm_sii_t *); /**< SII state function */
+    uint16_t offset; /**< input: offset in SII */
+    ec_fsm_sii_addressing_t mode; /**< reading via APRD or NPRD */
+    uint8_t value[4]; /**< raw SII value (32bit) */
+    cycles_t cycles_start; /**< start timestamp */
+    uint8_t check_once_more; /**< one more try after timeout */
 };
 
 /*****************************************************************************/
 
-int ec_device_init(ec_device_t *, ec_master_t *, struct net_device *,
-                   ec_isr_t, struct module *);
-void ec_device_clear(ec_device_t *);
+void ec_fsm_sii_init(ec_fsm_sii_t *, ec_datagram_t *);
+void ec_fsm_sii_clear(ec_fsm_sii_t *);
 
-int ec_device_open(ec_device_t *);
-int ec_device_close(ec_device_t *);
+void ec_fsm_sii_read(ec_fsm_sii_t *, ec_slave_t *,
+                     uint16_t, ec_fsm_sii_addressing_t);
+void ec_fsm_sii_write(ec_fsm_sii_t *, ec_slave_t *, uint16_t, uint16_t *,
+                      ec_fsm_sii_addressing_t);
 
-void ec_device_call_isr(ec_device_t *);
-uint8_t *ec_device_tx_data(ec_device_t *);
-void ec_device_send(ec_device_t *, size_t);
+int ec_fsm_sii_exec(ec_fsm_sii_t *);
+int ec_fsm_sii_success(ec_fsm_sii_t *);
 
 /*****************************************************************************/
 
