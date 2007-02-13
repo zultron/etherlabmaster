@@ -4,6 +4,36 @@ $Id$
 
 -------------------------------------------------------------------------------
 
+Changes in version 1.2.0:
+
+* Realtime interface changes:
+  - Re-introduced ecrt_domain_queue() to allow datagram queuing apart
+    from datagram processing. The queuing of a domain's datagrams is not
+    done in ecrt_domain_process() any more!
+  - Removed ecrt_master_deactivate(). Its functionality was moved into
+    ecrt_master_release().
+  - Removed ecrt_master_prepare(). Its functionality was moved into
+    ecrt_master_activate().
+  - Renamed ecdev_start() and ecdev_stop() to ecdev_open() and ecdev_close().
+    These two functions now take a pointer to ec_device_t as their arguments.
+  - The data_ptr parameter of ecrt_domain_register_pdo(),
+    ecrt_domain_register_pdo_list() and ecrt_domain_register_pdo_range() may
+    not be NULL any more.
+  - Removed ecrt_slave_pdo_size(). This function was deprecated long before.
+  - Introduced ECRT_VERSION_MAGIC macro and ecrt_version_magic() function.
+* Device interface changes:
+  - ec_isr_t was replaced by ec_pollfunc_t, the device driver has to supply
+    a poll function to call its ISR. This was introduced because some network
+    drivers' interrupt functions have different arguments.
+* State machines now try to re-send datagrams on datagram timeout.
+* New option -c of the lsec script, displays slave current consumptions and
+  remaining current.
+* Added frame counter in master info file.
+
+-------------------------------------------------------------------------------
+
+Changes in version 1.1.1:
+
 * State change FSM: Clearing of sync managers before PREOP.
 * Added modules_install make target.
 * Device modules for kernel 2.6.17.

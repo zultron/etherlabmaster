@@ -693,6 +693,8 @@ MODULE_PARM_DESC(ec_device_index,
 MODULE_PARM_DESC(ec_device_master_index,
                  "Index of the EtherCAT master to register the device.");
 
+void ec_poll(struct net_device *);
+
 /* EtherCAT <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
 
 static int read_eeprom (void __iomem *ioaddr, int location, int addr_len);
@@ -709,8 +711,8 @@ static int rtl8139_poll(struct net_device *dev, int *budget);
 #ifdef CONFIG_NET_POLL_CONTROLLER
 static void rtl8139_poll_controller(struct net_device *dev);
 #endif
-irqreturn_t rtl8139_interrupt (int irq, void *dev_instance,
-                               struct pt_regs *regs);
+static irqreturn_t rtl8139_interrupt (int irq, void *dev_instance,
+			       struct pt_regs *regs);
 static int rtl8139_close (struct net_device *dev);
 static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
 static struct net_device_stats *rtl8139_get_stats (struct net_device *dev);
@@ -2337,6 +2339,15 @@ static int rtl8139_poll(struct net_device *dev, int *budget)
 	return !done;
 }
 
+/* EtherCAT >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>*/
+
+void ec_poll(struct net_device *dev)
+{
+    rtl8139_interrupt(0, dev, NULL);
+}
+
+/* EtherCAT <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
+
 /* The interrupt handler does all of the Rx thread work and cleans up
    after the Tx thread. */
 irqreturn_t rtl8139_interrupt (int irq, void *dev_instance,
@@ -2903,16 +2914,18 @@ static int __init rtl8139_init_module (void)
 	if (rtl_ec_net_dev) {
 		printk(KERN_INFO "Registering EtherCAT device...\n");
 		if (!(rtl_ec_dev = ecdev_register(ec_device_master_index,
-			rtl_ec_net_dev, rtl8139_interrupt, THIS_MODULE))) {
+			rtl_ec_net_dev, ec_poll, THIS_MODULE))) {
 			printk(KERN_ERR "Failed to register EtherCAT device!\n");
 			goto out_pci;
 		}
 
-		printk(KERN_INFO "Starting EtherCAT device...\n");
-		if (ecdev_start(ec_device_master_index)) {
-			printk(KERN_ERR "Failed to start EtherCAT device!\n");
+		printk(KERN_INFO "Opening EtherCAT device...\n");
+		if (ecdev_open(rtl_ec_dev)) {
+			printk(KERN_ERR "Failed to open EtherCAT device!\n");
 			goto out_unregister;
 		}
+
+		printk(KERN_INFO "EtherCAT device ready.\n");
 	} else {
 		printk(KERN_WARNING "No EtherCAT device registered!\n");
 	}
@@ -2920,7 +2933,9 @@ static int __init rtl8139_init_module (void)
 	return 0;
 
     out_unregister:
+	printk(KERN_INFO "Unregistering EtherCAT device...\n");
 	ecdev_unregister(ec_device_master_index, rtl_ec_dev);
+	rtl_ec_dev = NULL;
     out_pci:
 	pci_unregister_driver(&rtl8139_pci_driver);
     out_return:
@@ -2937,9 +2952,9 @@ static void __exit rtl8139_cleanup_module (void)
 	printk(KERN_INFO "Cleaning up RTL8139-EtherCAT module...\n");
 
 	if (rtl_ec_net_dev) {
-		printk(KERN_INFO "Stopping device...\n");
-		ecdev_stop(ec_device_master_index);
-		printk(KERN_INFO "Unregistering device...\n");
+		printk(KERN_INFO "Closing EtherCAT device...\n");
+		ecdev_close(rtl_ec_dev);
+		printk(KERN_INFO "Unregistering EtherCAT device...\n");
 		ecdev_unregister(ec_device_master_index, rtl_ec_dev);
 		rtl_ec_dev = NULL;
 	}

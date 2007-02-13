@@ -32,7 +32,6 @@
  *****************************************************************************/
 
 #include <linux/module.h>
-#include <linux/delay.h>
 #include <linux/timer.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
@@ -42,7 +41,7 @@
 
 #define FREQUENCY 100
 
-#define KBUS
+//#define KBUS
 
 /*****************************************************************************/
 
@@ -59,11 +58,11 @@ void *r_inputs;
 void *r_outputs;
 #endif
 
-void *r_ana_in;
+void *r_dig_out;
 
 #if 1
 ec_pdo_reg_t domain1_pdos[] = {
-    {"2", Beckhoff_EL3102_Input1, &r_ana_in},
+    {"4", Beckhoff_EL2004_Outputs, &r_dig_out},
     {}
 };
 #endif
@@ -73,33 +72,40 @@ ec_pdo_reg_t domain1_pdos[] = {
 void run(unsigned long data)
 {
     static unsigned int counter = 0;
-    static unsigned int einaus = 0;
-
-    spin_lock(&master_lock);
+    static unsigned int blink = 0;
 
     // receive
+    spin_lock(&master_lock);
     ecrt_master_receive(master);
     ecrt_domain_process(domain1);
+    spin_unlock(&master_lock);
 
     // process data
-    //k_pos = EC_READ_U32(r_ssi);
-#ifdef KBUS
-    EC_WRITE_U8(r_outputs + 2, einaus ? 0xFF : 0x00);
-#endif
-
-    // send
-    ecrt_master_run(master);
-    ecrt_master_send(master);
-
-    spin_unlock(&master_lock);
+    // k_pos = EC_READ_U32(r_ssi);
+    EC_WRITE_U8(r_dig_out, blink ? 0x0F : 0x00);
 
     if (counter) {
         counter--;
     }
     else {
         counter = FREQUENCY;
-        einaus = !einaus;
+        blink = !blink;
     }
+
+#ifdef KBUS
+    EC_WRITE_U8(r_outputs + 2, blink ? 0xFF : 0x00);
+#endif
+
+    // send
+    spin_lock(&master_lock);
+    ecrt_domain_queue(domain1);
+    spin_unlock(&master_lock);
+
+    ecrt_master_run(master);
+
+    spin_lock(&master_lock);
+    ecrt_master_send(master);
+    spin_unlock(&master_lock);
 
     // restart timer
     timer.expires += HZ / FREQUENCY;
@@ -110,7 +116,7 @@ void run(unsigned long data)
 
 int request_lock(void *data)
 {
-    spin_lock_bh(&master_lock);
+    spin_lock(&master_lock);
     return 0; // access allowed
 }
 
@@ -118,20 +124,20 @@ int request_lock(void *data)
 
 void release_lock(void *data)
 {
-    spin_unlock_bh(&master_lock);
+    spin_unlock(&master_lock);
 }
 
 /*****************************************************************************/
 
 int __init init_mini_module(void)
 {
-#if 1
+#if 0
     ec_slave_t *slave;
 #endif
 
     printk(KERN_INFO "=== Starting Minimal EtherCAT environment... ===\n");
 
-    if ((master = ecrt_request_master(0)) == NULL) {
+    if (!(master = ecrt_request_master(0))) {
         printk(KERN_ERR "Requesting master 0 failed!\n");
         goto out_return;
     }
@@ -139,8 +145,7 @@ int __init init_mini_module(void)
     ecrt_master_callbacks(master, request_lock, release_lock, NULL);
 
     printk(KERN_INFO "Registering domain...\n");
-    if (!(domain1 = ecrt_master_create_domain(master)))
-    {
+    if (!(domain1 = ecrt_master_create_domain(master))) {
         printk(KERN_ERR "Domain creation failed!\n");
         goto out_release_master;
     }
@@ -166,7 +171,7 @@ int __init init_mini_module(void)
     }
 #endif
 
-#if 1
+#if 0
     if (!(slave = ecrt_master_get_slave(master, "2")))
         goto out_release_master;
 
@@ -179,8 +184,6 @@ int __init init_mini_module(void)
         printk(KERN_ERR "Failed to activate master!\n");
         goto out_release_master;
     }
-
-    ecrt_master_prepare(master);
 
     printk("Starting cyclic sample thread.\n");
     init_timer(&timer);
@@ -213,11 +216,10 @@ void __exit cleanup_mini_module(void)
 /*****************************************************************************/
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR ("Florian Pose <fp@igh-essen.com>");
-MODULE_DESCRIPTION ("EtherCAT minimal test environment");
+MODULE_AUTHOR("Florian Pose <fp@igh-essen.com>");
+MODULE_DESCRIPTION("EtherCAT minimal test environment");
 
 module_init(init_mini_module);
 module_exit(cleanup_mini_module);
 
 /*****************************************************************************/
-

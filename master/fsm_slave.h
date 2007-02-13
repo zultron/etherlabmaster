@@ -33,52 +33,55 @@
 
 /**
    \file
-   EtherCAT domain structure.
+   EtherCAT finite state machines.
 */
 
 /*****************************************************************************/
 
-#ifndef _EC_DOMAIN_H_
-#define _EC_DOMAIN_H_
-
-#include <linux/list.h>
-#include <linux/kobject.h>
+#ifndef __EC_FSM_SLAVE__
+#define __EC_FSM_SLAVE__
 
 #include "globals.h"
+#include "../include/ecrt.h"
 #include "datagram.h"
-#include "master.h"
+#include "slave.h"
+#include "fsm_sii.h"
+#include "fsm_change.h"
+#include "fsm_coe.h"
 
 /*****************************************************************************/
 
+typedef struct ec_fsm_slave ec_fsm_slave_t; /**< \see ec_fsm_slave */
+
 /**
-   EtherCAT domain.
-   Handles the process data and the therefore needed datagrams of a certain
-   group of slaves.
+   Finite state machine of an EtherCAT slave.
 */
 
-struct ec_domain
+struct ec_fsm_slave
 {
-    struct kobject kobj; /**< kobject */
-    struct list_head list; /**< list item */
-    unsigned int index; /**< domain index (just a number) */
-    ec_master_t *master; /**< EtherCAT master owning the domain */
-    size_t data_size; /**< size of the process data */
-    struct list_head datagrams; /**< process data datagrams */
-    uint32_t base_address; /**< logical offset address of the process data */
-    unsigned int response_count; /**< number of responding slaves */
-    unsigned int state; /**< domain error state */
-    struct list_head data_regs; /**< PDO data registrations */
-    unsigned int working_counter_changes; /**< working counter changes
-                                             since last notification */
-    unsigned long notify_jiffies; /**< time of last notification */
+    ec_slave_t *slave; /**< slave the FSM runs on */
+    ec_datagram_t *datagram; /**< datagram used in the state machine */
+    unsigned int retries; /**< retries on datagram timeout. */
+
+    void (*state)(ec_fsm_slave_t *); /**< state function */
+    ec_sdo_data_t *sdodata; /**< SDO configuration data */
+    uint16_t sii_offset; 
+
+    ec_fsm_sii_t fsm_sii; /**< SII state machine */
+    ec_fsm_change_t fsm_change; /**< State change state machine */
+    ec_fsm_coe_t fsm_coe; /**< CoE state machine */
 };
 
 /*****************************************************************************/
 
-int ec_domain_init(ec_domain_t *, ec_master_t *, unsigned int);
-void ec_domain_destroy(ec_domain_t *);
+void ec_fsm_slave_init(ec_fsm_slave_t *, ec_datagram_t *);
+void ec_fsm_slave_clear(ec_fsm_slave_t *);
 
-int ec_domain_alloc(ec_domain_t *, uint32_t);
+void ec_fsm_slave_start_scan(ec_fsm_slave_t *, ec_slave_t *);
+void ec_fsm_slave_start_conf(ec_fsm_slave_t *, ec_slave_t *);
+
+int ec_fsm_slave_exec(ec_fsm_slave_t *);
+int ec_fsm_slave_success(const ec_fsm_slave_t *);
 
 /*****************************************************************************/
 

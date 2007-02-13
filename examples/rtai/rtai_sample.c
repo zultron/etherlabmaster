@@ -46,14 +46,8 @@
 
 /*****************************************************************************/
 
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Florian Pose <fp@igh-essen.com>");
-MODULE_DESCRIPTION("EtherCAT RTAI sample module");
-
-/*****************************************************************************/
-
 // RTAI task frequency in Hz
-#define FREQUENCY 10000
+#define FREQUENCY 4000
 #define INHIBIT_TIME 20
 
 #define TIMERTICKS (1000000000 / FREQUENCY)
@@ -70,13 +64,10 @@ ec_master_t *master = NULL;
 ec_domain_t *domain1 = NULL;
 
 // data fields
-void *r_ana_out;
-
-// channels
-uint32_t k_pos;
+void *r_dig_out;
 
 ec_pdo_reg_t domain1_pdos[] = {
-    {"2", Beckhoff_EL4132_Output1, &r_ana_out},
+    {"2", Beckhoff_EL2004_Outputs, &r_dig_out},
     {}
 };
 
@@ -84,21 +75,34 @@ ec_pdo_reg_t domain1_pdos[] = {
 
 void run(long data)
 {
-    while (1)
-    {
-        t_last_cycle = get_cycles();
-        rt_sem_wait(&master_sem);
+    static unsigned int blink = 0;
+    static unsigned int counter = 0;
 
+    while (1) {
+        t_last_cycle = get_cycles();
+
+        rt_sem_wait(&master_sem);
         ecrt_master_receive(master);
         ecrt_domain_process(domain1);
+        rt_sem_signal(&master_sem);
 
         // process data
-        //k_pos = EC_READ_U32(r_ssi_input);
+        EC_WRITE_U8(r_dig_out, blink ? 0x0F : 0x00);
 
+        rt_sem_wait(&master_sem);
+        ecrt_domain_queue(domain1);
         ecrt_master_run(master);
         ecrt_master_send(master);
-
         rt_sem_signal(&master_sem);
+		
+        if (counter) {
+            counter--;
+        }
+        else {
+            counter = FREQUENCY;
+            blink = !blink;
+        }
+
         rt_task_wait_period();
     }
 }
@@ -107,7 +111,7 @@ void run(long data)
 
 int request_lock(void *data)
 {
-    // too close to the next RT cycle: deny access...
+    // too close to the next real time cycle: deny access...
     if (get_cycles() - t_last_cycle > t_critical) return -1;
 
     // allow access
@@ -139,10 +143,9 @@ int __init init_mod(void)
         goto out_return;
     }
 
-
     ecrt_master_callbacks(master, request_lock, release_lock, NULL);
 
-    printk(KERN_INFO "Registering domain...\n");
+    printk(KERN_INFO "Creating domain...\n");
     if (!(domain1 = ecrt_master_create_domain(master))) {
         printk(KERN_ERR "Domain creation failed!\n");
         goto out_release_master;
@@ -159,8 +162,6 @@ int __init init_mod(void)
         printk(KERN_ERR "Failed to activate master!\n");
         goto out_release_master;
     }
-
-    ecrt_master_prepare(master);
 
     printk("Starting cyclic sample thread...\n");
     requested_ticks = nano2count(TIMERTICKS);
@@ -186,7 +187,6 @@ int __init init_mod(void)
     rt_task_delete(&task);
  out_stop_timer:
     stop_rt_timer();
-    ecrt_master_deactivate(master);
  out_release_master:
     ecrt_release_master(master);
  out_return:
@@ -210,8 +210,11 @@ void __exit cleanup_mod(void)
 
 /*****************************************************************************/
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Florian Pose <fp@igh-essen.com>");
+MODULE_DESCRIPTION("EtherCAT RTAI sample module");
+
 module_init(init_mod);
 module_exit(cleanup_mod);
 
 /*****************************************************************************/
-

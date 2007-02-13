@@ -49,7 +49,7 @@
 
 #include "device.h"
 #include "domain.h"
-#include "fsm.h"
+#include "fsm_master.h"
 
 /*****************************************************************************/
 
@@ -101,7 +101,8 @@ struct ec_master
     ec_device_t *device; /**< EtherCAT device */
     struct semaphore device_sem; /**< device semaphore */
 
-    ec_fsm_t fsm; /**< master state machine */
+    ec_fsm_master_t fsm; /**< master state machine */
+    ec_datagram_t fsm_datagram; /**< datagram used for state machines */
     ec_master_mode_t mode; /**< master mode */
 
     struct list_head slaves; /**< list of slaves on the bus */
@@ -115,8 +116,8 @@ struct ec_master
     int debug_level; /**< master debug level */
     ec_stats_t stats; /**< cyclic statistics */
 
-    struct workqueue_struct *workqueue; /**< master workqueue */
-    struct work_struct idle_work; /**< free run work object */
+    int thread_id; /**< master thread PID */
+    struct completion thread_exit; /**< thread completion object */
     uint32_t idle_cycle_times[HZ]; /**< Idle cycle times ring */
     unsigned int idle_cycle_time_pos; /**< time ring buffer position */
 
@@ -167,10 +168,6 @@ void ec_master_queue_datagram(ec_master_t *, ec_datagram_t *);
 void ec_master_output_stats(ec_master_t *);
 void ec_master_destroy_slaves(ec_master_t *);
 void ec_master_calc_addressing(ec_master_t *);
-
-// helper functions
-void ec_sync_config(const ec_sii_sync_t *, const ec_slave_t *, uint8_t *);
-void ec_fmmu_config(const ec_fmmu_t *, const ec_slave_t *, uint8_t *);
 
 /*****************************************************************************/
 

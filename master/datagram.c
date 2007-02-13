@@ -78,7 +78,6 @@ void ec_datagram_init(ec_datagram_t *datagram /**< EtherCAT datagram */)
     datagram->index = 0x00;
     datagram->working_counter = 0x00;
     datagram->state = EC_DATAGRAM_INIT;
-    datagram->cycles_queued = 0;
     datagram->cycles_sent = 0;
     datagram->jiffies_sent = 0;
     datagram->cycles_received = 0;
@@ -116,7 +115,7 @@ int ec_datagram_prealloc(ec_datagram_t *datagram, /**< EtherCAT datagram */
         datagram->mem_size = 0;
     }
 
-    if (!(datagram->data = kmalloc(size, GFP_KERNEL))) {
+    if (!(datagram->data = kmalloc(size, GFP_ATOMIC))) {
         EC_ERR("Failed to allocate %i bytes of datagram memory!\n", size);
         return -1;
     }

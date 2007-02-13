@@ -1,8 +1,11 @@
 #!/bin/bash
 
+# $Id$
+
 set -x
 mkdir -p autoconf
 aclocal -I autoconf
 autoheader
+touch ChangeLog
 automake --add-missing --copy
 autoconf

@@ -66,7 +66,7 @@ ec_domain_t *domain1 = NULL;
 // raw process data
 void *r_ana_out;
 
-// Channels
+// channels
 double k_ana_out;
 
 ec_pdo_reg_t domain1_pdos[] = {
@@ -78,19 +78,20 @@ ec_pdo_reg_t domain1_pdos[] = {
 
 void msr_controller_run(void)
 {
-    rt_sem_wait(&master_sem);
-
     // receive
+    rt_sem_wait(&master_sem);
     ecrt_master_receive(master);
     ecrt_domain_process(domain1);
+    rt_sem_signal(&master_sem);
 
     // Process data
     EC_WRITE_S16(r_ana_out, k_ana_out / 10.0 * 0x7FFF);
 
     // Send
+    rt_sem_wait(&master_sem);
+    ecrt_domain_queue(domain1);
     ecrt_master_run(master);
     ecrt_master_send(master);
-
     rt_sem_signal(&master_sem);
 
     msr_write_kanal_list();
@@ -175,8 +176,6 @@ int __init init_mod(void)
         goto out_release_master;
     }
 
-    ecrt_master_prepare(master);
-
     printk("Starting cyclic sample thread...\n");
     ticks = start_rt_timer(nano2count(TIMERTICKS));
     if (rt_task_init(&task, msr_run, 0, 2000, 0, 1, NULL)) {
@@ -195,7 +194,6 @@ int __init init_mod(void)
     rt_task_delete(&task);
  out_stop_timer:
     stop_rt_timer();
-    ecrt_master_deactivate(master);
  out_release_master:
     ecrt_release_master(master);
  out_msr_cleanup:
@@ -223,8 +221,8 @@ void __exit cleanup_mod(void)
 /*****************************************************************************/
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR ("Florian Pose <fp@igh-essen.com>");
-MODULE_DESCRIPTION ("EtherCAT RTAI MSR sample module");
+MODULE_AUTHOR("Florian Pose <fp@igh-essen.com>");
+MODULE_DESCRIPTION("EtherCAT RTAI MSR sample module");
 
 module_init(init_mod);
 module_exit(cleanup_mod);

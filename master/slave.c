@@ -112,7 +112,7 @@ int ec_slave_init(ec_slave_t *slave, /**< EtherCAT slave */
 
     slave->requested_state = EC_SLAVE_STATE_UNKNOWN;
     slave->current_state = EC_SLAVE_STATE_UNKNOWN;
-    slave->configured = 0;
+    slave->self_configured = 0;
     slave->error_flag = 0;
     slave->online = 1;
     slave->fmmu_count = 0;
@@ -145,6 +145,7 @@ int ec_slave_init(ec_slave_t *slave, /**< EtherCAT slave */
     slave->sii_image = NULL;
     slave->sii_order = NULL;
     slave->sii_name = NULL;
+    slave->sii_current_on_ebus = 0;
 
     INIT_LIST_HEAD(&slave->sii_strings);
     INIT_LIST_HEAD(&slave->sii_syncs);
@@ -398,6 +399,8 @@ void ec_slave_fetch_general(ec_slave_t *slave, /**< EtherCAT slave */
     for (i = 0; i < 4; i++)
         slave->sii_physical_layer[i] =
             (data[4] & (0x03 << (i * 2))) >> (i * 2);
+
+    slave->sii_current_on_ebus = EC_READ_S16(data + 0x0C);
 }
 
 /*****************************************************************************/
@@ -629,15 +632,19 @@ size_t ec_slave_info(const ec_slave_t *slave, /**< EtherCAT slave */
 
     off += sprintf(buffer + off, "State: ");
     off += ec_state_string(slave->current_state, buffer + off);
-    off += sprintf(buffer + off, "\nFlags: %s, %s\n",
+    off += sprintf(buffer + off, " (");
+    off += ec_state_string(slave->requested_state, buffer + off);
+    off += sprintf(buffer + off, ")\nFlags: %s, %s\n",
                    slave->online ? "online" : "OFFLINE",
                    slave->error_flag ? "ERROR" : "ok");
     off += sprintf(buffer + off, "Ring position: %i\n",
                    slave->ring_position);
     off += sprintf(buffer + off, "Advanced position: %i:%i\n",
                    slave->coupler_index, slave->coupler_subindex);
-    off += sprintf(buffer + off, "Coupler: %s\n\n",
+    off += sprintf(buffer + off, "Coupler: %s\n",
                    ec_slave_is_coupler(slave) ? "yes" : "no");
+    off += sprintf(buffer + off, "Current consumption: %i mA\n\n",
+                   slave->sii_current_on_ebus);
 
     off += sprintf(buffer + off, "Data link status:\n");
     for (i = 0; i < 4; i++) {
@@ -974,6 +981,71 @@ uint16_t ec_slave_calc_sync_size(const ec_slave_t *slave,
 /*****************************************************************************/
 
 /**
+   Initializes a sync manager configuration page with EEPROM data.
+   The referenced memory (\a data) must be at least EC_SYNC_SIZE bytes.
+*/
+
+void ec_slave_sync_config(const ec_slave_t *slave, /**< EtherCAT slave */
+        const ec_sii_sync_t *sync, /**< sync manager */
+        uint8_t *data /**> configuration memory */
+        )
+{
+    size_t sync_size;
+
+    sync_size = ec_slave_calc_sync_size(slave, sync);
+
+    if (slave->master->debug_level) {
+        EC_DBG("Slave %3i, SM %i: Addr 0x%04X, Size %3i, Ctrl 0x%02X, En %i\n",
+               slave->ring_position, sync->index, sync->physical_start_address,
+               sync_size, sync->control_register, sync->enable);
+    }
+
+    EC_WRITE_U16(data,     sync->physical_start_address);
+    EC_WRITE_U16(data + 2, sync_size);
+    EC_WRITE_U8 (data + 4, sync->control_register);
+    EC_WRITE_U8 (data + 5, 0x00); // status byte (read only)
+    EC_WRITE_U16(data + 6, sync->enable ? 0x0001 : 0x0000); // enable
+}
+
+/*****************************************************************************/
+
+/**
+   Initializes an FMMU configuration page.
+   The referenced memory (\a data) must be at least EC_FMMU_SIZE bytes.
+*/
+
+void ec_slave_fmmu_config(const ec_slave_t *slave, /**< EtherCAT slave */
+        const ec_fmmu_t *fmmu, /**< FMMU */
+        uint8_t *data /**> configuration memory */
+        )
+{
+    size_t sync_size;
+
+    sync_size = ec_slave_calc_sync_size(slave, fmmu->sync);
+
+    if (slave->master->debug_level) {
+        EC_DBG("Slave %3i, FMMU %2i:"
+               " LogAddr 0x%08X, Size %3i, PhysAddr 0x%04X, Dir %s\n",
+               slave->ring_position, fmmu->index, fmmu->logical_start_address,
+               sync_size, fmmu->sync->physical_start_address,
+               ((fmmu->sync->control_register & 0x04) ? "out" : "in"));
+    }
+
+    EC_WRITE_U32(data,      fmmu->logical_start_address);
+    EC_WRITE_U16(data + 4,  sync_size); // size of fmmu
+    EC_WRITE_U8 (data + 6,  0x00); // logical start bit
+    EC_WRITE_U8 (data + 7,  0x07); // logical end bit
+    EC_WRITE_U16(data + 8,  fmmu->sync->physical_start_address);
+    EC_WRITE_U8 (data + 10, 0x00); // physical start bit
+    EC_WRITE_U8 (data + 11, ((fmmu->sync->control_register & 0x04)
+                             ? 0x02 : 0x01));
+    EC_WRITE_U16(data + 12, 0x0001); // enable
+    EC_WRITE_U16(data + 14, 0x0000); // reserved
+}
+
+/*****************************************************************************/
+
+/**
    \return non-zero if slave is a bus coupler
 */
 
@@ -1213,13 +1285,13 @@ int ecrt_slave_pdo_size(ec_slave_t *slave, /**< EtherCAT slave */
 
 /*****************************************************************************/
 
-/**< \cond */
+/** \cond */
 
 EXPORT_SYMBOL(ecrt_slave_conf_sdo8);
 EXPORT_SYMBOL(ecrt_slave_conf_sdo16);
 EXPORT_SYMBOL(ecrt_slave_conf_sdo32);
 EXPORT_SYMBOL(ecrt_slave_pdo_size);
 
-/**< \endcond */
+/** \endcond */
 
 /*****************************************************************************/

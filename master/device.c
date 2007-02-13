@@ -57,19 +57,22 @@
 int ec_device_init(ec_device_t *device, /**< EtherCAT device */
                    ec_master_t *master, /**< master owning the device */
                    struct net_device *net_dev, /**< net_device structure */
-                   ec_isr_t isr, /**< pointer to device's ISR */
-                   struct module *module /**< pointer to the owning module */
+                   ec_pollfunc_t poll, /**< pointer to device's poll function */
+                   struct module *module /**< the device's module */
                    )
 {
     struct ethhdr *eth;
 
     device->master = master;
     device->dev = net_dev;
-    device->isr = isr;
+    device->poll = poll;
     device->module = module;
 
     device->open = 0;
     device->link_state = 0; // down
+
+    device->tx_count = 0;
+    device->rx_count = 0;
 
 #ifdef EC_DBG_IF
     if (ec_debug_init(&device->dbg)) {
@@ -143,9 +146,11 @@ int ec_device_open(ec_device_t *device /**< EtherCAT device */)
     }
 
     // device could have received frames before
-    for (i = 0; i < 4; i++) ec_device_call_isr(device);
+    for (i = 0; i < 4; i++) ec_device_poll(device);
 
     device->link_state = 0;
+    device->tx_count = 0;
+    device->rx_count = 0;
 
     if (device->dev->open(device->dev) == 0) device->open = 1;
 
@@ -217,22 +222,23 @@ void ec_device_send(ec_device_t *device, /**< EtherCAT device */
 
     // start sending
     device->dev->hard_start_xmit(device->tx_skb, device->dev);
+    device->tx_count++;
 }
 
 /*****************************************************************************/
 
 /**
-   Calls the interrupt service routine of the assigned net_device.
+   Calls the poll function of the assigned net_device.
    The master itself works without using interrupts. Therefore the processing
    of received data and status changes of the network device has to be
    done by the master calling the ISR "manually".
 */
 
-void ec_device_call_isr(ec_device_t *device /**< EtherCAT device */)
+void ec_device_poll(ec_device_t *device /**< EtherCAT device */)
 {
-    device->cycles_isr = get_cycles();
-    device->jiffies_isr = jiffies;
-    if (likely(device->isr)) device->isr(0, device->dev, NULL);
+    device->cycles_poll = get_cycles();
+    device->jiffies_poll = jiffies;
+    device->poll(device->dev);
 }
 
 /******************************************************************************
@@ -251,6 +257,8 @@ void ecdev_receive(ec_device_t *device, /**< EtherCAT device */
                    size_t size /**< number of bytes received */
                    )
 {
+    device->rx_count++;
+
     if (unlikely(device->master->debug_level > 1)) {
         EC_DBG("Received frame:\n");
         ec_print_data_diff(device->tx_skb->data + ETH_HLEN,

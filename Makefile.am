@@ -36,7 +36,6 @@ SUBDIRS = master devices script include
 DIST_SUBDIRS = master devices script include examples
 
 EXTRA_DIST = \
-	documentation/ethercat_doc.pdf \
 	Doxyfile \
 	FEATURES \
 	globals.h \
@@ -54,6 +53,7 @@ clean-local:
 	@rm -f Modules.symvers
 
 mydist:
+	svn2cl $(srcdir)
 	@SVNREV=`svnversion $(srcdir)` && \
 	  $(MAKE) dist-bzip2 \
 	  distdir=$(PACKAGE)-$(VERSION)-$(BRANCH)-r$${SVNREV}

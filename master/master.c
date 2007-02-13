@@ -57,7 +57,7 @@
 void ec_master_clear(struct kobject *);
 void ec_master_destroy_domains(ec_master_t *);
 void ec_master_sync_io(ec_master_t *);
-void ec_master_idle_run(void *);
+static int ec_master_thread(void *);
 void ec_master_eoe_run(unsigned long);
 void ec_master_check_sdo(unsigned long);
 int ec_master_measure_bus_time(ec_master_t *);
@@ -133,8 +133,6 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     master->stats.unmatched = 0;
     master->stats.output_jiffies = 0;
 
-    INIT_WORK(&master->idle_work, ec_master_idle_run, (void *) master);
-
     for (i = 0; i < HZ; i++) {
         master->idle_cycle_times[i] = 0;
         master->eoe_cycle_times[i] = 0;
@@ -165,12 +163,6 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     master->sdo_timer.data = (unsigned long) master;
     init_completion(&master->sdo_complete);
 
-    // create workqueue
-    if (!(master->workqueue = create_singlethread_workqueue("EtherCAT"))) {
-        EC_ERR("Failed to create master workqueue.\n");
-        goto out_return;
-    }
-
     // create EoE handlers
     for (i = 0; i < eoeif_count; i++) {
         if (!(eoe = (ec_eoe_t *) kmalloc(sizeof(ec_eoe_t), GFP_KERNEL))) {
@@ -184,8 +176,15 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
         list_add_tail(&eoe->list, &master->eoe_handlers);
     }
 
+    // init state machine datagram
+    ec_datagram_init(&master->fsm_datagram);
+    if (ec_datagram_prealloc(&master->fsm_datagram, EC_MAX_DATA_SIZE)) {
+        EC_ERR("Failed to allocate FSM datagram.\n");
+        goto out_clear_eoe;
+    }
+
     // create state machine object
-    if (ec_fsm_init(&master->fsm, master)) goto out_clear_eoe;
+    ec_fsm_master_init(&master->fsm, master, &master->fsm_datagram);
 
     // init kobject and add it to the hierarchy
     memset(&master->kobj, 0x00, sizeof(struct kobject));
@@ -204,13 +203,12 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 
     return 0;
 
- out_clear_eoe:
+out_clear_eoe:
     list_for_each_entry_safe(eoe, next_eoe, &master->eoe_handlers, list) {
         list_del(&eoe->list);
         ec_eoe_clear(eoe);
         kfree(eoe);
     }
-    destroy_workqueue(master->workqueue);
  out_return:
     return -1;
 }
@@ -253,8 +251,8 @@ void ec_master_clear(struct kobject *kobj /**< kobject of the master */)
         list_del_init(&datagram->queue);
     }
 
-    ec_fsm_clear(&master->fsm);
-    destroy_workqueue(master->workqueue);
+    ec_fsm_master_clear(&master->fsm);
+    ec_datagram_clear(&master->fsm_datagram);
 
     // clear EoE objects
     list_for_each_entry_safe(eoe, next_eoe, &master->eoe_handlers, list) {
@@ -320,57 +318,121 @@ void ec_master_flush_sdo_requests(ec_master_t *master)
 /*****************************************************************************/
 
 /**
+   Internal locking callback.
 */
 
-int ec_master_enter_idle_mode(ec_master_t *master /**< EtherCAT master */)
+int ec_master_request_cb(void *master /**< callback data */)
 {
-    master->mode = EC_MASTER_MODE_IDLE;
-    queue_delayed_work(master->workqueue, &master->idle_work, 1);
+    spin_lock(&((ec_master_t *) master)->internal_lock);
     return 0;
 }
 
 /*****************************************************************************/
 
 /**
+   Internal unlocking callback.
+*/
+
+void ec_master_release_cb(void *master /**< callback data */)
+{
+    spin_unlock(&((ec_master_t *) master)->internal_lock);
+}
+
+/*****************************************************************************/
+
+/**
+ * Starts the master thread.
+*/
+
+int ec_master_thread_start(ec_master_t *master /**< EtherCAT master */)
+{
+    init_completion(&master->thread_exit);
+    
+    EC_INFO("Starting master thread.\n");
+    if (!(master->thread_id =
+                kernel_thread(ec_master_thread, master, CLONE_KERNEL)))
+        return -1;
+    
+    return 0;
+}
+
+/*****************************************************************************/
+
+/**
+ * Stops the master thread.
+*/
+
+void ec_master_thread_stop(ec_master_t *master /**< EtherCAT master */)
+{
+    if (master->thread_id) {
+        kill_proc(master->thread_id, SIGTERM, 1);
+        wait_for_completion(&master->thread_exit);
+        EC_INFO("Master thread exited.\n");
+    }    
+}
+
+/*****************************************************************************/
+
+/**
+ * Transition function from ORPHANED to IDLE mode.
+*/
+
+int ec_master_enter_idle_mode(ec_master_t *master /**< EtherCAT master */)
+{
+    master->request_cb = ec_master_request_cb;
+    master->release_cb = ec_master_release_cb;
+    master->cb_data = master;
+	
+    master->mode = EC_MASTER_MODE_IDLE;
+    if (ec_master_thread_start(master)) {
+        master->mode = EC_MASTER_MODE_ORPHANED;
+        return -1;
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
+
+/**
+ * Transition function from IDLE to ORPHANED mode.
 */
 
 void ec_master_leave_idle_mode(ec_master_t *master /**< EtherCAT master */)
 {
-    ec_master_eoe_stop(master);
-
     master->mode = EC_MASTER_MODE_ORPHANED;
-    while (!cancel_delayed_work(&master->idle_work)) {
-        flush_workqueue(master->workqueue);
-    }
-
+    
+    ec_master_eoe_stop(master);
+    ec_master_thread_stop(master);
     ec_master_flush_sdo_requests(master);
 }
 
 /*****************************************************************************/
 
 /**
+ * Transition function from IDLE to OPERATION mode.
 */
 
 int ec_master_enter_operation_mode(ec_master_t *master /**< EtherCAT master */)
 {
     ec_slave_t *slave;
-    ec_datagram_t *datagram = &master->fsm.datagram;
+
+    ec_master_eoe_stop(master); // stop EoE timer
+    master->eoe_checked = 1; // prevent from starting again by FSM
+    ec_master_thread_stop(master);
 
     master->mode = EC_MASTER_MODE_OPERATION;
-    while (!cancel_delayed_work(&master->idle_work)) {
-        flush_workqueue(master->workqueue);
-    }
 
     // wait for FSM datagram
-    if (datagram->state == EC_DATAGRAM_SENT) {;
-        while (get_cycles() - datagram->cycles_sent
+    if (master->fsm_datagram.state == EC_DATAGRAM_SENT) {
+        while (get_cycles() - master->fsm_datagram.cycles_sent
                < (cycles_t) EC_IO_TIMEOUT /* us */ * (cpu_khz / 1000)) {}
         ecrt_master_receive(master);
     }
 
     // finish running master FSM
-    if (ec_fsm_running(&master->fsm)) {
-        while (ec_fsm_exec(&master->fsm)) {
+    if (ec_fsm_master_running(&master->fsm)) {
+        while (ec_fsm_master_exec(&master->fsm)) {
             ec_master_sync_io(master);
         }
     }
@@ -392,64 +454,85 @@ int ec_master_enter_operation_mode(ec_master_t *master /**< EtherCAT master */)
         }
     }
 
+    master->eoe_checked = 0; // allow starting EoE again
+
     return 0;
 
  out_idle:
     master->mode = EC_MASTER_MODE_IDLE;
-    queue_delayed_work(master->workqueue, &master->idle_work, 1);
+    if (ec_master_thread_start(master)) {
+        EC_WARN("Failed to start master thread again!\n");
+    }
     return -1;
 }
 
 /*****************************************************************************/
 
 /**
+ * Transition function from OPERATION to IDLE mode.
 */
 
 void ec_master_leave_operation_mode(ec_master_t *master
                                     /**< EtherCAT master */)
 {
     ec_slave_t *slave;
-    ec_fsm_t *fsm = &master->fsm;
-    ec_datagram_t *datagram = &master->fsm.datagram;
+    ec_fsm_master_t *fsm = &master->fsm;
+    ec_fsm_slave_t fsm_slave;
+
+    ec_master_eoe_stop(master); // stop EoE timer
+    master->eoe_checked = 1; // prevent from starting again by FSM
 
     // wait for FSM datagram
-    if (datagram->state == EC_DATAGRAM_SENT) {
-        while (get_cycles() - datagram->cycles_sent
-               < (cycles_t) EC_IO_TIMEOUT /* us */ * (cpu_khz / 1000)) {}
+    if (master->fsm_datagram.state == EC_DATAGRAM_SENT) {
+        // active waiting
+        while (get_cycles() - master->fsm_datagram.cycles_sent
+               < (cycles_t) EC_IO_TIMEOUT /* us */ * (cpu_khz / 1000));
         ecrt_master_receive(master);
     }
 
     // finish running master FSM
-    if (ec_fsm_running(fsm)) {
-        while (ec_fsm_exec(fsm)) {
+    if (ec_fsm_master_running(fsm)) {
+        while (ec_fsm_master_exec(fsm)) {
             ec_master_sync_io(master);
         }
     }
 
+    ec_fsm_slave_init(&fsm_slave, &master->fsm_datagram);
+    
     // set states for all slaves
     list_for_each_entry(slave, &master->slaves, list) {
         ec_slave_reset(slave);
         ec_slave_request_state(slave, EC_SLAVE_STATE_PREOP);
 
-        fsm->slave = slave;
-        fsm->slave_state = ec_fsm_slaveconf_state_start;
+        // don't try to set PREOP for slaves that don't respond,
+        // because of 3 second timeout.
+        if (!slave->online) {
+            if (master->debug_level)
+                EC_DBG("Skipping to configure offline slave %i.\n",
+                        slave->ring_position);
+            continue;
+        }
 
-        do {
-            fsm->slave_state(fsm);
+        ec_fsm_slave_start_conf(&fsm_slave, slave);
+        while (ec_fsm_slave_exec(&fsm_slave)) {
             ec_master_sync_io(master);
         }
-        while (fsm->slave_state != ec_fsm_slave_state_end
-               && fsm->slave_state != ec_fsm_slave_state_error);
     }
+
+    ec_fsm_slave_clear(&fsm_slave);
 
     ec_master_destroy_domains(master);
 
-    master->request_cb = NULL;
-    master->release_cb = NULL;
-    master->cb_data = NULL;
+    master->request_cb = ec_master_request_cb;
+    master->release_cb = ec_master_release_cb;
+    master->cb_data = master;
+
+    master->eoe_checked = 0; // allow EoE again
 
     master->mode = EC_MASTER_MODE_IDLE;
-    queue_delayed_work(master->workqueue, &master->idle_work, 1);
+    if (ec_master_thread_start(master)) {
+        EC_WARN("Failed to start master thread!\n");
+    }
 }
 
 /*****************************************************************************/
@@ -476,7 +559,6 @@ void ec_master_queue_datagram(ec_master_t *master, /**< EtherCAT master */
 
     list_add_tail(&datagram->queue, &master->datagram_queue);
     datagram->state = EC_DATAGRAM_QUEUED;
-    datagram->cycles_queued = get_cycles();
 }
 
 /*****************************************************************************/
@@ -676,8 +758,8 @@ void ec_master_receive_datagrams(ec_master_t *master, /**< EtherCAT master */
 
         // dequeue the received datagram
         datagram->state = EC_DATAGRAM_RECEIVED;
-        datagram->cycles_received = master->device->cycles_isr;
-        datagram->jiffies_received = master->device->jiffies_isr;
+        datagram->cycles_received = master->device->cycles_poll;
+        datagram->jiffies_received = master->device->jiffies_poll;
         list_del_init(&datagram->queue);
     }
 }
@@ -721,101 +803,45 @@ void ec_master_output_stats(ec_master_t *master /**< EtherCAT master */)
 /*****************************************************************************/
 
 /**
-   Idle mode function.
+   Master kernel thread function.
 */
 
-void ec_master_idle_run(void *data /**< master pointer */)
+static int ec_master_thread(void *data)
 {
     ec_master_t *master = (ec_master_t *) data;
     cycles_t cycles_start, cycles_end;
 
-    // aquire master lock
-    spin_lock_bh(&master->internal_lock);
+    daemonize("EtherCAT");
+    allow_signal(SIGTERM);
 
-    cycles_start = get_cycles();
-    ecrt_master_receive(master);
+    while (!signal_pending(current) && master->mode == EC_MASTER_MODE_IDLE) {
+        cycles_start = get_cycles();
 
-    // execute master state machine
-    ec_fsm_exec(&master->fsm);
+        // receive
+        spin_lock_bh(&master->internal_lock);
+        ecrt_master_receive(master);
+        spin_unlock_bh(&master->internal_lock);
 
-    ecrt_master_send(master);
-    cycles_end = get_cycles();
+        // execute master state machine
+        ec_fsm_master_exec(&master->fsm);
 
-    // release master lock
-    spin_unlock_bh(&master->internal_lock);
+        // send
+        spin_lock_bh(&master->internal_lock);
+        ecrt_master_send(master);
+        spin_unlock_bh(&master->internal_lock);
+        
+        cycles_end = get_cycles();
+        master->idle_cycle_times[master->idle_cycle_time_pos]
+            = (u32) (cycles_end - cycles_start) * 1000 / cpu_khz;
+        master->idle_cycle_time_pos++;
+        master->idle_cycle_time_pos %= HZ;
 
-    master->idle_cycle_times[master->idle_cycle_time_pos]
-        = (u32) (cycles_end - cycles_start) * 1000 / cpu_khz;
-    master->idle_cycle_time_pos++;
-    master->idle_cycle_time_pos %= HZ;
-
-    if (master->mode == EC_MASTER_MODE_IDLE)
-        queue_delayed_work(master->workqueue, &master->idle_work, 1);
-}
-
-/*****************************************************************************/
-
-/**
-   Initializes a sync manager configuration page with EEPROM data.
-   The referenced memory (\a data) must be at least EC_SYNC_SIZE bytes.
-*/
-
-void ec_sync_config(const ec_sii_sync_t *sync, /**< sync manager */
-                    const ec_slave_t *slave, /**< EtherCAT slave */
-                    uint8_t *data /**> configuration memory */
-                    )
-{
-    size_t sync_size;
-
-    sync_size = ec_slave_calc_sync_size(slave, sync);
-
-    if (slave->master->debug_level) {
-        EC_DBG("Slave %3i, SM %i: Addr 0x%04X, Size %3i, Ctrl 0x%02X, En %i\n",
-               slave->ring_position, sync->index, sync->physical_start_address,
-               sync_size, sync->control_register, sync->enable);
+        set_current_state(TASK_INTERRUPTIBLE);
+        schedule_timeout(1);
     }
-
-    EC_WRITE_U16(data,     sync->physical_start_address);
-    EC_WRITE_U16(data + 2, sync_size);
-    EC_WRITE_U8 (data + 4, sync->control_register);
-    EC_WRITE_U8 (data + 5, 0x00); // status byte (read only)
-    EC_WRITE_U16(data + 6, sync->enable ? 0x0001 : 0x0000); // enable
-}
-
-/*****************************************************************************/
-
-/**
-   Initializes an FMMU configuration page.
-   The referenced memory (\a data) must be at least EC_FMMU_SIZE bytes.
-*/
-
-void ec_fmmu_config(const ec_fmmu_t *fmmu, /**< FMMU */
-                    const ec_slave_t *slave, /**< EtherCAT slave */
-                    uint8_t *data /**> configuration memory */
-                    )
-{
-    size_t sync_size;
-
-    sync_size = ec_slave_calc_sync_size(slave, fmmu->sync);
-
-    if (slave->master->debug_level) {
-        EC_DBG("Slave %3i, FMMU %2i:"
-               " LogAddr 0x%08X, Size %3i, PhysAddr 0x%04X, Dir %s\n",
-               slave->ring_position, fmmu->index, fmmu->logical_start_address,
-               sync_size, fmmu->sync->physical_start_address,
-               ((fmmu->sync->control_register & 0x04) ? "out" : "in"));
-    }
-
-    EC_WRITE_U32(data,      fmmu->logical_start_address);
-    EC_WRITE_U16(data + 4,  sync_size); // size of fmmu
-    EC_WRITE_U8 (data + 6,  0x00); // logical start bit
-    EC_WRITE_U8 (data + 7,  0x07); // logical end bit
-    EC_WRITE_U16(data + 8,  fmmu->sync->physical_start_address);
-    EC_WRITE_U8 (data + 10, 0x00); // physical start bit
-    EC_WRITE_U8 (data + 11, ((fmmu->sync->control_register & 0x04)
-                             ? 0x02 : 0x01));
-    EC_WRITE_U16(data + 12, 0x0001); // enable
-    EC_WRITE_U16(data + 14, 0x0000); // reserved
+    
+    master->thread_id = 0;
+    complete_and_exit(&master->thread_exit, 0);
 }
 
 /*****************************************************************************/
@@ -832,6 +858,7 @@ ssize_t ec_master_info(ec_master_t *master, /**< EtherCAT master */
     off_t off = 0;
     ec_eoe_t *eoe;
     uint32_t cur, sum, min, max, pos, i;
+    unsigned int frames_lost;
 
     off += sprintf(buffer + off, "\nVersion: %s", ec_master_version_str);
     off += sprintf(buffer + off, "\nMode: ");
@@ -849,6 +876,14 @@ ssize_t ec_master_info(ec_master_t *master, /**< EtherCAT master */
 
     off += sprintf(buffer + off, "\nSlaves: %i\n",
                    master->slave_count);
+    off += sprintf(buffer + off, "\nDevice:\n");
+    off += sprintf(buffer + off, "  Frames sent:     %u\n",
+		   master->device->tx_count);
+    off += sprintf(buffer + off, "  Frames received: %u\n",
+		   master->device->rx_count);
+    frames_lost = master->device->tx_count - master->device->rx_count;
+    if (frames_lost) frames_lost--;
+    off += sprintf(buffer + off, "  Frames lost:     %u\n", frames_lost);
 
     off += sprintf(buffer + off, "\nTiming (min/avg/max) [us]:\n");
 
@@ -990,14 +1025,6 @@ void ec_master_eoe_start(ec_master_t *master /**< EtherCAT master */)
 
     master->eoe_checked = 1;
 
-    // if the locking callbacks are not set in operation mode,
-    // the EoE timer my not be started.
-    if (master->mode == EC_MASTER_MODE_OPERATION
-        && (!master->request_cb || !master->release_cb)) {
-        EC_INFO("No EoE processing because of missing locking callbacks.\n");
-        return;
-    }
-
     // decouple all EoE handlers
     list_for_each_entry(eoe, &master->eoe_handlers, list)
         eoe->slave = NULL;
@@ -1092,36 +1119,22 @@ void ec_master_eoe_run(unsigned long data /**< master pointer */)
     }
     if (!active) goto queue_timer;
 
-    // aquire master lock...
-    if (master->mode == EC_MASTER_MODE_OPERATION) {
-        // request_cb must return 0, if the lock has been aquired!
-        if (master->request_cb(master->cb_data))
-            goto queue_timer;
-    }
-    else if (master->mode == EC_MASTER_MODE_IDLE) {
-        spin_lock(&master->internal_lock);
-    }
-    else
-        goto queue_timer;
-
-    // actual EoE processing
+    // receive datagrams
+    if (master->request_cb(master->cb_data)) goto queue_timer;
     cycles_start = get_cycles();
     ecrt_master_receive(master);
+    master->release_cb(master->cb_data);
 
+    // actual EoE processing
     list_for_each_entry(eoe, &master->eoe_handlers, list) {
         ec_eoe_run(eoe);
     }
 
+    // send datagrams
+    if (master->request_cb(master->cb_data)) goto queue_timer;
     ecrt_master_send(master);
     cycles_end = get_cycles();
-
-    // release lock...
-    if (master->mode == EC_MASTER_MODE_OPERATION) {
-        master->release_cb(master->cb_data);
-    }
-    else if (master->mode == EC_MASTER_MODE_IDLE) {
-        spin_unlock(&master->internal_lock);
-    }
+    master->release_cb(master->cb_data);
 
     master->eoe_cycle_times[master->eoe_cycle_time_pos]
         = (u32) (cycles_end - cycles_start) * 1000 / cpu_khz;
@@ -1249,6 +1262,36 @@ int ec_master_measure_bus_time(ec_master_t *master)
     return -1;
 }
 
+/*****************************************************************************/
+
+/**
+   Prepares synchronous IO.
+   Queues all domain datagrams and sends them. Then waits a certain time, so
+   that ecrt_master_receive() can be called securely.
+*/
+
+void ec_master_prepare(ec_master_t *master /**< EtherCAT master */)
+{
+    ec_domain_t *domain;
+    cycles_t cycles_start, cycles_end, cycles_timeout;
+
+    // queue datagrams of all domains
+    list_for_each_entry(domain, &master->domains, list)
+        ecrt_domain_queue(domain);
+
+    ecrt_master_send(master);
+
+    cycles_start = get_cycles();
+    cycles_timeout = (cycles_t) EC_IO_TIMEOUT /* us */ * (cpu_khz / 1000);
+
+    // active waiting
+    while (1) {
+        udelay(100);
+        cycles_end = get_cycles();
+        if (cycles_end - cycles_start >= cycles_timeout) break;
+    }
+}
+
 /******************************************************************************
  *  Realtime interface
  *****************************************************************************/
@@ -1300,7 +1343,7 @@ int ecrt_master_activate(ec_master_t *master /**< EtherCAT master */)
 {
     uint32_t domain_offset;
     ec_domain_t *domain;
-    ec_fsm_t *fsm = &master->fsm;
+    ec_fsm_slave_t fsm_slave;
     ec_slave_t *slave;
 
     // allocate all domains
@@ -1313,39 +1356,26 @@ int ecrt_master_activate(ec_master_t *master /**< EtherCAT master */)
         domain_offset += domain->data_size;
     }
 
+    ec_fsm_slave_init(&fsm_slave, &master->fsm_datagram);
+
     // configure all slaves
     list_for_each_entry(slave, &master->slaves, list) {
-        fsm->slave = slave;
-        fsm->slave_state = ec_fsm_slaveconf_state_start;
-
-        do {
-            fsm->slave_state(fsm);
+        ec_fsm_slave_start_conf(&fsm_slave, slave);
+        while (ec_fsm_slave_exec(&fsm_slave)) { 
             ec_master_sync_io(master);
         }
-        while (fsm->slave_state != ec_fsm_slave_state_end
-               && fsm->slave_state != ec_fsm_slave_state_error);
 
-        if (fsm->slave_state == ec_fsm_slave_state_error) {
+        if (!ec_fsm_slave_success(&fsm_slave)) {
+            ec_fsm_slave_clear(&fsm_slave);
             EC_ERR("Failed to configure slave %i!\n", slave->ring_position);
             return -1;
         }
     }
 
+    ec_fsm_slave_clear(&fsm_slave);
+    ec_master_prepare(master); // prepare asynchronous IO
+
     return 0;
-}
-
-/*****************************************************************************/
-
-/**
-   Resets all slaves to INIT state.
-   This method is deprecated and will disappear in the next version
-   of the realtime interface. The functionality is moved to
-   ecrt_master_release().
-   \ingroup RealtimeInterface
-*/
-
-void ecrt_master_deactivate(ec_master_t *master /**< EtherCAT master */)
-{
 }
 
 /*****************************************************************************/
@@ -1357,22 +1387,26 @@ void ecrt_master_deactivate(ec_master_t *master /**< EtherCAT master */)
 void ec_master_sync_io(ec_master_t *master /**< EtherCAT master */)
 {
     ec_datagram_t *datagram;
-    unsigned int datagrams_waiting;
+    unsigned int datagrams_sent;
 
-    // send datagrams
+    // send all datagrams
     ecrt_master_send(master);
 
     while (1) { // active waiting
+        schedule(); // schedule other processes while waiting.
         ecrt_master_receive(master); // receive and dequeue datagrams
 
         // count number of datagrams still waiting for response
-        datagrams_waiting = 0;
+        datagrams_sent = 0;
         list_for_each_entry(datagram, &master->datagram_queue, queue) {
-            datagrams_waiting++;
+            // there may be another process that queued commands
+            // in the meantime.
+            if (datagram->state == EC_DATAGRAM_QUEUED) continue;
+            datagrams_sent++;
         }
 
-        // if there are no more datagrams waiting, abort loop.
-        if (!datagrams_waiting) break;
+        // abort loop if there are no more datagrams marked as sent.
+        if (!datagrams_sent) break;
     }
 }
 
@@ -1395,7 +1429,7 @@ void ecrt_master_send(ec_master_t *master /**< EtherCAT master */)
         }
 
         // query link state
-        ec_device_call_isr(master->device);
+        ec_device_poll(master->device);
         return;
     }
 
@@ -1416,65 +1450,21 @@ void ecrt_master_receive(ec_master_t *master /**< EtherCAT master */)
     cycles_t cycles_timeout;
 
     // receive datagrams
-    ec_device_call_isr(master->device);
+    ec_device_poll(master->device);
 
     cycles_timeout = (cycles_t) EC_IO_TIMEOUT /* us */ * (cpu_khz / 1000);
 
     // dequeue all datagrams that timed out
     list_for_each_entry_safe(datagram, next, &master->datagram_queue, queue) {
-        switch (datagram->state) {
-            case EC_DATAGRAM_QUEUED:
-                if (master->device->cycles_isr
-                    - datagram->cycles_queued > cycles_timeout) {
-                    list_del_init(&datagram->queue);
-                    datagram->state = EC_DATAGRAM_TIMED_OUT;
-                    master->stats.timeouts++;
-                    ec_master_output_stats(master);
-                }
-                break;
-            case EC_DATAGRAM_SENT:
-                if (master->device->cycles_isr
-                    - datagram->cycles_sent > cycles_timeout) {
-                    list_del_init(&datagram->queue);
-                    datagram->state = EC_DATAGRAM_TIMED_OUT;
-                    master->stats.timeouts++;
-                    ec_master_output_stats(master);
-                }
-                break;
-            default:
-                break;
+        if (datagram->state != EC_DATAGRAM_SENT) continue;
+
+        if (master->device->cycles_poll - datagram->cycles_sent
+            > cycles_timeout) {
+            list_del_init(&datagram->queue);
+            datagram->state = EC_DATAGRAM_TIMED_OUT;
+            master->stats.timeouts++;
+            ec_master_output_stats(master);
         }
-    }
-}
-
-/*****************************************************************************/
-
-/**
-   Prepares synchronous IO.
-   Queues all domain datagrams and sends them. Then waits a certain time, so
-   that ecrt_master_receive() can be called securely.
-   \ingroup RealtimeInterface
-*/
-
-void ecrt_master_prepare(ec_master_t *master /**< EtherCAT master */)
-{
-    ec_domain_t *domain;
-    cycles_t cycles_start, cycles_end, cycles_timeout;
-
-    // queue datagrams of all domains
-    list_for_each_entry(domain, &master->domains, list)
-        ec_domain_queue_datagrams(domain);
-
-    ecrt_master_send(master);
-
-    cycles_start = get_cycles();
-    cycles_timeout = (cycles_t) EC_IO_TIMEOUT /* us */ * (cpu_khz / 1000);
-
-    // active waiting
-    while (1) {
-        udelay(100);
-        cycles_end = get_cycles();
-        if (cycles_end - cycles_start >= cycles_timeout) break;
     }
 }
 
@@ -1491,7 +1481,7 @@ void ecrt_master_run(ec_master_t *master /**< EtherCAT master */)
     ec_master_output_stats(master);
 
     // execute master state machine in a loop
-    ec_fsm_exec(&master->fsm);
+    ec_fsm_master_exec(&master->fsm);
 }
 
 /*****************************************************************************/
@@ -1515,8 +1505,11 @@ ec_slave_t *ecrt_master_get_slave(const ec_master_t *master, /**< Master */
 {
     unsigned long first, second;
     char *remainder, *remainder2;
+    const char *original;
     unsigned int alias_requested, alias_found;
     ec_slave_t *alias_slave = NULL, *slave;
+
+    original = address;
 
     if (!address || address[0] == 0) return NULL;
 
@@ -1528,7 +1521,7 @@ ec_slave_t *ecrt_master_get_slave(const ec_master_t *master, /**< Master */
 
     first = simple_strtoul(address, &remainder, 0);
     if (remainder == address) {
-        EC_ERR("Slave address \"%s\" - First number empty!\n", address);
+        EC_ERR("Slave address \"%s\" - First number empty!\n", original);
         return NULL;
     }
 
@@ -1541,7 +1534,7 @@ ec_slave_t *ecrt_master_get_slave(const ec_master_t *master, /**< Master */
             }
         }
         if (!alias_found) {
-            EC_ERR("Slave address \"%s\" - Alias not found!\n", address);
+            EC_ERR("Slave address \"%s\" - Alias not found!\n", original);
             return NULL;
         }
     }
@@ -1555,7 +1548,7 @@ ec_slave_t *ecrt_master_get_slave(const ec_master_t *master, /**< Master */
                 if (slave->ring_position == first) return slave;
             }
             EC_ERR("Slave address \"%s\" - Absolute position invalid!\n",
-                   address);
+                   original);
         }
     }
     else if (remainder[0] == ':') { // field position
@@ -1563,19 +1556,19 @@ ec_slave_t *ecrt_master_get_slave(const ec_master_t *master, /**< Master */
         second = simple_strtoul(remainder, &remainder2, 0);
 
         if (remainder2 == remainder) {
-            EC_ERR("Slave address \"%s\" - Second number empty!\n", address);
+            EC_ERR("Slave address \"%s\" - Second number empty!\n", original);
             return NULL;
         }
 
         if (remainder2[0]) {
-            EC_ERR("Slave address \"%s\" - Invalid trailer!\n", address);
+            EC_ERR("Slave address \"%s\" - Invalid trailer!\n", original);
             return NULL;
         }
 
         if (alias_requested) {
             if (!ec_slave_is_coupler(alias_slave)) {
                 EC_ERR("Slave address \"%s\": Alias slave must be bus coupler"
-                       " in colon mode.\n", address);
+                       " in colon mode.\n", original);
                 return NULL;
             }
             list_for_each_entry(slave, &master->slaves, list) {
@@ -1584,7 +1577,7 @@ ec_slave_t *ecrt_master_get_slave(const ec_master_t *master, /**< Master */
                     return slave;
             }
             EC_ERR("Slave address \"%s\" - Bus coupler %i has no %lu. slave"
-                   " following!\n", address, alias_slave->ring_position,
+                   " following!\n", original, alias_slave->ring_position,
                    second);
             return NULL;
         }
@@ -1596,7 +1589,7 @@ ec_slave_t *ecrt_master_get_slave(const ec_master_t *master, /**< Master */
         }
     }
     else
-        EC_ERR("Slave address \"%s\" - Invalid format!\n", address);
+        EC_ERR("Slave address \"%s\" - Invalid format!\n", original);
 
     return NULL;
 }
@@ -1628,8 +1621,6 @@ void ecrt_master_callbacks(ec_master_t *master, /**< EtherCAT master */
 
 EXPORT_SYMBOL(ecrt_master_create_domain);
 EXPORT_SYMBOL(ecrt_master_activate);
-EXPORT_SYMBOL(ecrt_master_deactivate);
-EXPORT_SYMBOL(ecrt_master_prepare);
 EXPORT_SYMBOL(ecrt_master_send);
 EXPORT_SYMBOL(ecrt_master_receive);
 EXPORT_SYMBOL(ecrt_master_run);

@@ -274,7 +274,7 @@ size_t ec_state_string(uint8_t states, /**< slave states */
 ec_device_t *ecdev_register(unsigned int master_index, /**< master index */
                             struct net_device *net_dev, /**< net_device of
                                                            the device */
-                            ec_isr_t isr, /**< interrupt service routine */
+                            ec_pollfunc_t poll, /**< device poll function */
                             struct module *module /**< pointer to the module */
                             )
 {
@@ -298,7 +298,7 @@ ec_device_t *ecdev_register(unsigned int master_index, /**< master index */
         goto out_up;
     }
 
-    if (ec_device_init(master->device, master, net_dev, isr, module)) {
+    if (ec_device_init(master->device, master, net_dev, poll, module)) {
         EC_ERR("Failed to init device!\n");
         goto out_free;
     }
@@ -352,24 +352,22 @@ void ecdev_unregister(unsigned int master_index, /**< master index */
 /*****************************************************************************/
 
 /**
-   Starts the master associated with the device.
-   This function has to be called by the network device driver to tell the
-   master that the device is ready to send and receive data. The master
-   will enter the idle mode then.
+   Opens the network device and makes the master enter IDLE mode.
+   \return 0 on success, else < 0
    \ingroup DeviceInterface
 */
 
-int ecdev_start(unsigned int master_index /**< master index */)
+int ecdev_open(ec_device_t *device /**< EtherCAT device */)
 {
-    ec_master_t *master;
-    if (!(master = ec_find_master(master_index))) return -1;
-
-    if (ec_device_open(master->device)) {
+    if (ec_device_open(device)) {
         EC_ERR("Failed to open device!\n");
         return -1;
     }
 
-    ec_master_enter_idle_mode(master);
+    if (ec_master_enter_idle_mode(device->master)) {
+        EC_ERR("Failed to enter idle mode!\n");
+        return -1;
+    }
 
     return 0;
 }
@@ -377,26 +375,35 @@ int ecdev_start(unsigned int master_index /**< master index */)
 /*****************************************************************************/
 
 /**
-   Stops the master associated with the device.
-   Tells the master to stop using the device for frame IO. Has to be called
-   before unregistering the device.
+   Makes the master leave IDLE mode and closes the network device.
+   \return 0 on success, else < 0
    \ingroup DeviceInterface
 */
 
-void ecdev_stop(unsigned int master_index /**< master index */)
+void ecdev_close(ec_device_t *device /**< EtherCAT device */)
 {
-    ec_master_t *master;
-    if (!(master = ec_find_master(master_index))) return;
+    ec_master_leave_idle_mode(device->master);
 
-    ec_master_leave_idle_mode(master);
-
-    if (ec_device_close(master->device))
+    if (ec_device_close(device))
         EC_WARN("Failed to close device!\n");
 }
 
 /******************************************************************************
  *  Realtime interface
  *****************************************************************************/
+
+/**
+ * Returns the version magic of the realtime interface.
+ * \return ECRT version magic.
+ * \ingroup RealtimeInterface
+ */
+
+unsigned int ecrt_version_magic(void)
+{
+    return ECRT_VERSION_MAGIC;
+}
+
+/*****************************************************************************/
 
 /**
    Reserves an EtherCAT master for realtime operation.
@@ -469,13 +476,19 @@ ec_master_t *ecrt_request_master(unsigned int master_index
 
 void ecrt_release_master(ec_master_t *master /**< EtherCAT master */)
 {
+    EC_INFO("Releasing master %i...\n", master->index);
+
+    if (master->mode != EC_MASTER_MODE_OPERATION) {
+        EC_WARN("Master %i was was not requested!\n", master->index);
+        return;
+    }
+
     ec_master_leave_operation_mode(master);
 
     module_put(master->device->module);
     atomic_inc(&master->available);
 
     EC_INFO("Released master %i.\n", master->index);
-    return;
 }
 
 /*****************************************************************************/
@@ -487,10 +500,11 @@ module_exit(ec_cleanup_module);
 
 EXPORT_SYMBOL(ecdev_register);
 EXPORT_SYMBOL(ecdev_unregister);
-EXPORT_SYMBOL(ecdev_start);
-EXPORT_SYMBOL(ecdev_stop);
+EXPORT_SYMBOL(ecdev_open);
+EXPORT_SYMBOL(ecdev_close);
 EXPORT_SYMBOL(ecrt_request_master);
 EXPORT_SYMBOL(ecrt_release_master);
+EXPORT_SYMBOL(ecrt_version_magic);
 
 /** \endcond */
 

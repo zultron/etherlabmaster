@@ -479,21 +479,6 @@ int ec_domain_alloc(ec_domain_t *domain, /**< EtherCAT domain */
 /*****************************************************************************/
 
 /**
-   Places all process data datagrams in the masters datagram queue.
-*/
-
-void ec_domain_queue_datagrams(ec_domain_t *domain /**< EtherCAT domain */)
-{
-    ec_datagram_t *datagram;
-
-    list_for_each_entry(datagram, &domain->datagrams, list) {
-        ec_master_queue_datagram(domain->master, datagram);
-    }
-}
-
-/*****************************************************************************/
-
-/**
    Formats attribute data for SysFS reading.
    \return number of bytes to read
 */
@@ -518,7 +503,6 @@ ssize_t ec_show_domain_attribute(struct kobject *kobj, /**< kobject */
 
 /**
    Registers a PDO in a domain.
-   - If \a data_ptr is NULL, the slave is only validated.
    \return pointer to the slave on success, else NULL
    \ingroup RealtimeInterface
 */
@@ -552,8 +536,6 @@ ec_slave_t *ecrt_domain_register_pdo(ec_domain_t *domain,
     if (!(slave = ecrt_master_get_slave(master, address))) return NULL;
     if (ec_slave_validate(slave, vendor_id, product_code)) return NULL;
 
-    if (!data_ptr) return slave;
-
     list_for_each_entry(pdo, &slave->sii_pdos, list) {
         list_for_each_entry(entry, &pdo->entries, list) {
             if (entry->index != pdo_index
@@ -576,7 +558,7 @@ ec_slave_t *ecrt_domain_register_pdo(ec_domain_t *domain,
 
 /**
    Registeres a bunch of data fields.
-   Caution! The list has to be terminated with a NULL structure ({})!
+   \attention The list has to be terminated with a NULL structure ({})!
    \return 0 in case of success, else < 0
    \ingroup RealtimeInterface
 */
@@ -605,7 +587,6 @@ int ecrt_domain_register_pdo_list(ec_domain_t *domain,
 
 /**
    Registers a PDO range in a domain.
-   - If \a data_ptr is NULL, the slave is only validated.
    \return pointer to the slave on success, else NULL
    \ingroup RealtimeInterface
 */
@@ -638,8 +619,6 @@ ec_slave_t *ecrt_domain_register_pdo_range(ec_domain_t *domain,
     // translate address and validate slave
     if (!(slave = ecrt_master_get_slave(master, address))) return NULL;
     if (ec_slave_validate(slave, vendor_id, product_code)) return NULL;
-
-    if (!data_ptr) return slave;
 
     if (ec_domain_reg_pdo_range(domain, slave,
                                 direction, offset, length, data_ptr)) {
@@ -691,8 +670,22 @@ void ecrt_domain_process(ec_domain_t *domain /**< EtherCAT domain */)
         }
         domain->working_counter_changes = 0;
     }
+}
 
-    ec_domain_queue_datagrams(domain);
+/*****************************************************************************/
+
+/**
+   Places all process data datagrams in the masters datagram queue.
+   \ingroup RealtimeInterface
+*/
+
+void ecrt_domain_queue(ec_domain_t *domain /**< EtherCAT domain */)
+{
+    ec_datagram_t *datagram;
+
+    list_for_each_entry(datagram, &domain->datagrams, list) {
+        ec_master_queue_datagram(domain->master, datagram);
+    }
 }
 
 /*****************************************************************************/
@@ -716,6 +709,7 @@ EXPORT_SYMBOL(ecrt_domain_register_pdo);
 EXPORT_SYMBOL(ecrt_domain_register_pdo_list);
 EXPORT_SYMBOL(ecrt_domain_register_pdo_range);
 EXPORT_SYMBOL(ecrt_domain_process);
+EXPORT_SYMBOL(ecrt_domain_queue);
 EXPORT_SYMBOL(ecrt_domain_state);
 
 /** \endcond */
