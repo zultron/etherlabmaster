@@ -53,7 +53,7 @@ clean-local:
 	@rm -f Modules.symvers
 
 mydist:
-	svn2cl $(srcdir)
+	svn2cl svn://yak/vol/projekte/msr_messen_steuern_regeln/ethercat/rep
 	@SVNREV=`svnversion $(srcdir)` && \
 	  $(MAKE) dist-bzip2 \
 	  distdir=$(PACKAGE)-$(VERSION)-$(BRANCH)-r$${SVNREV}
