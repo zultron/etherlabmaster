@@ -49,7 +49,6 @@ EXTRA_DIST = \
 	master.c master.h \
 	module.c \
 	slave.c slave.h
-#	xmldev.c xmldev.h
 
 modules:
 	$(MAKE) -C "$(LINUX_SOURCE_DIR)" M="@abs_top_srcdir@" modules
