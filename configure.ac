@@ -3,7 +3,7 @@
 #------------------------------------------------------------------------------
 
 AC_PREREQ(2.59)
-AC_INIT([ethercat],[1.2.0-rc2],[fp@igh-essen.com])
+AC_INIT([ethercat],[1.2.0],[fp@igh-essen.com])
 AC_CONFIG_AUX_DIR([autoconf])
 AM_INIT_AUTOMAKE([-Wall -Werror dist-bzip2])
 AC_PREFIX_DEFAULT([/opt/etherlab])
@@ -211,6 +211,8 @@ AC_CONFIG_FILES([
         master/Makefile
         devices/Makefile
         script/Makefile
+        script/init.d/Makefile
+        script/sysconfig/Makefile
         include/Makefile
         examples/Makefile
         examples/mini/Makefile
