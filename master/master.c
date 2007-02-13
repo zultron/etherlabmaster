@@ -209,7 +209,6 @@ out_clear_eoe:
         ec_eoe_clear(eoe);
         kfree(eoe);
     }
- out_return:
     return -1;
 }
 
