@@ -42,10 +42,21 @@
 #include <linux/skbuff.h>
 #include <linux/if_ether.h>
 #include <linux/netdevice.h>
-#include <linux/delay.h>
 
 #include "device.h"
 #include "master.h"
+
+#ifdef EC_DEBUG_RING
+#define timersub(a, b, result) \
+    do { \
+        (result)->tv_sec = (a)->tv_sec - (b)->tv_sec; \
+        (result)->tv_usec = (a)->tv_usec - (b)->tv_usec; \
+        if ((result)->tv_usec < 0) { \
+            --(result)->tv_sec; \
+            (result)->tv_usec += 1000000; \
+        } \
+    } while (0)
+#endif
 
 /*****************************************************************************/
 
@@ -55,57 +66,64 @@
 */
 
 int ec_device_init(ec_device_t *device, /**< EtherCAT device */
-                   ec_master_t *master, /**< master owning the device */
-                   struct net_device *net_dev, /**< net_device structure */
-                   ec_pollfunc_t poll, /**< pointer to device's poll function */
-                   struct module *module /**< the device's module */
-                   )
+        ec_master_t *master /**< master owning the device */
+        )
 {
+    unsigned int i;
     struct ethhdr *eth;
+#ifdef EC_DEBUG_IF
+    char ifname[10];
+    char mb = 'x';
+#endif
+#ifdef EC_DEBUG_RING
+    device->debug_frame_index = 0;
+    device->debug_frame_count = 0;
+#endif
 
     device->master = master;
-    device->dev = net_dev;
-    device->poll = poll;
-    device->module = module;
+    device->tx_ring_index = 0;
 
-    device->open = 0;
-    device->link_state = 0; // down
+#ifdef EC_DEBUG_IF
+    if (device == &master->main_device)
+        mb = 'm';
+    else if (device == &master->backup_device)
+        mb = 'b';
 
-    device->tx_count = 0;
-    device->rx_count = 0;
+    sprintf(ifname, "ecdbg%c%u", mb, master->index);
 
-#ifdef EC_DBG_IF
-    if (ec_debug_init(&device->dbg)) {
+    if (ec_debug_init(&device->dbg, ifname)) {
         EC_ERR("Failed to init debug device!\n");
         goto out_return;
     }
 #endif
 
-    if (!(device->tx_skb = dev_alloc_skb(ETH_FRAME_LEN))) {
-        EC_ERR("Error allocating device socket buffer!\n");
-#ifdef EC_DBG_IF
-        goto out_debug;
-#else
-        goto out_return;
-#endif
+    for (i = 0; i < EC_TX_RING_SIZE; i++)
+        device->tx_skb[i] = NULL;
+
+    for (i = 0; i < EC_TX_RING_SIZE; i++) {
+        if (!(device->tx_skb[i] = dev_alloc_skb(ETH_FRAME_LEN))) {
+            EC_ERR("Error allocating device socket buffer!\n");
+            goto out_tx_ring;
+        }
+
+        // add Ethernet-II-header
+        skb_reserve(device->tx_skb[i], ETH_HLEN);
+        eth = (struct ethhdr *) skb_push(device->tx_skb[i], ETH_HLEN);
+        eth->h_proto = htons(0x88A4);
+        memset(eth->h_dest, 0xFF, ETH_ALEN);
     }
 
-    device->tx_skb->dev = net_dev;
-
-    // add Ethernet-II-header
-    skb_reserve(device->tx_skb, ETH_HLEN);
-    eth = (struct ethhdr *) skb_push(device->tx_skb, ETH_HLEN);
-    eth->h_proto = htons(0x88A4);
-    memcpy(eth->h_source, net_dev->dev_addr, net_dev->addr_len);
-    memset(eth->h_dest, 0xFF, net_dev->addr_len);
-
+    ec_device_detach(device); // resets remaining fields
     return 0;
 
-#ifdef EC_DBG_IF
- out_debug:
+out_tx_ring:
+    for (i = 0; i < EC_TX_RING_SIZE; i++)
+        if (device->tx_skb[i])
+            dev_kfree_skb(device->tx_skb[i]);
+#ifdef EC_DEBUG_IF
     ec_debug_clear(&device->dbg);
+out_return:
 #endif
- out_return:
     return -1;
 }
 
@@ -117,11 +135,63 @@ int ec_device_init(ec_device_t *device, /**< EtherCAT device */
 
 void ec_device_clear(ec_device_t *device /**< EtherCAT device */)
 {
+    unsigned int i;
+
     if (device->open) ec_device_close(device);
-    if (device->tx_skb) dev_kfree_skb(device->tx_skb);
-#ifdef EC_DBG_IF
+    for (i = 0; i < EC_TX_RING_SIZE; i++)
+        dev_kfree_skb(device->tx_skb[i]);
+#ifdef EC_DEBUG_IF
     ec_debug_clear(&device->dbg);
 #endif
+}
+
+/*****************************************************************************/
+
+/**
+   Associate with net_device.
+*/
+
+void ec_device_attach(ec_device_t *device, /**< EtherCAT device */
+        struct net_device *net_dev, /**< net_device structure */
+        ec_pollfunc_t poll, /**< pointer to device's poll function */
+        struct module *module /**< the device's module */
+        )
+{
+    unsigned int i;
+    struct ethhdr *eth;
+
+    ec_device_detach(device); // resets fields
+
+    device->dev = net_dev;
+    device->poll = poll;
+    device->module = module;
+
+    for (i = 0; i < EC_TX_RING_SIZE; i++) {
+        device->tx_skb[i]->dev = net_dev;
+        eth = (struct ethhdr *) (device->tx_skb[i]->data + ETH_HLEN);
+        memcpy(eth->h_source, net_dev->dev_addr, ETH_ALEN);
+    }
+}
+
+/*****************************************************************************/
+
+/**
+   Disconnect from net_device.
+*/
+
+void ec_device_detach(ec_device_t *device /**< EtherCAT device */)
+{
+    unsigned int i;
+
+    device->dev = NULL;
+    device->poll = NULL;
+    device->module = NULL;
+    device->open = 0;
+    device->link_state = 0; // down
+    device->tx_count = 0;
+    device->rx_count = 0;
+    for (i = 0; i < EC_TX_RING_SIZE; i++)
+        device->tx_skb[i]->dev = NULL;
 }
 
 /*****************************************************************************/
@@ -133,8 +203,6 @@ void ec_device_clear(ec_device_t *device /**< EtherCAT device */)
 
 int ec_device_open(ec_device_t *device /**< EtherCAT device */)
 {
-    unsigned int i;
-
     if (!device->dev) {
         EC_ERR("No net_device to open!\n");
         return -1;
@@ -144,9 +212,6 @@ int ec_device_open(ec_device_t *device /**< EtherCAT device */)
         EC_WARN("Device already opened!\n");
         return 0;
     }
-
-    // device could have received frames before
-    for (i = 0; i < 4; i++) ec_device_poll(device);
 
     device->link_state = 0;
     device->tx_count = 0;
@@ -190,7 +255,12 @@ int ec_device_close(ec_device_t *device /**< EtherCAT device */)
 
 uint8_t *ec_device_tx_data(ec_device_t *device /**< EtherCAT device */)
 {
-    return device->tx_skb->data + ETH_HLEN;
+    /* cycle through socket buffers, because otherwise there is a race
+     * condition, if multiple frames are sent and the DMA is not scheduled in
+     * between. */
+    device->tx_ring_index++;
+    device->tx_ring_index %= EC_TX_RING_SIZE;
+    return device->tx_skb[device->tx_ring_index]->data + ETH_HLEN;
 }
 
 /*****************************************************************************/
@@ -205,25 +275,104 @@ void ec_device_send(ec_device_t *device, /**< EtherCAT device */
                     size_t size /**< number of bytes to send */
                     )
 {
+    struct sk_buff *skb = device->tx_skb[device->tx_ring_index];
+
     if (unlikely(!device->link_state)) // Link down
         return;
 
     // set the right length for the data
-    device->tx_skb->len = ETH_HLEN + size;
+    skb->len = ETH_HLEN + size;
 
     if (unlikely(device->master->debug_level > 1)) {
         EC_DBG("sending frame:\n");
-        ec_print_data(device->tx_skb->data + ETH_HLEN, size);
+        ec_print_data(skb->data + ETH_HLEN, size);
     }
 
-#ifdef EC_DBG_IF
-    ec_debug_send(&device->dbg, device->tx_skb->data, ETH_HLEN + size);
+#ifdef EC_DEBUG_IF
+    ec_debug_send(&device->dbg, skb->data, ETH_HLEN + size);
+#endif
+#ifdef EC_DEBUG_RING
+    ec_device_debug_ring_append(
+            device, TX, skb->data + ETH_HLEN, size);
 #endif
 
     // start sending
-    device->dev->hard_start_xmit(device->tx_skb, device->dev);
+    device->dev->hard_start_xmit(skb, device->dev);
     device->tx_count++;
 }
+
+/*****************************************************************************/
+
+#ifdef EC_DEBUG_RING
+/**
+ * Appends frame data to the debug ring.
+ */
+
+void ec_device_debug_ring_append(
+        ec_device_t *device, /**< EtherCAT device */
+        ec_debug_frame_dir_t dir, /**< direction */
+        const void *data, /**< frame data */
+        size_t size /**< data size */
+        )
+{
+    ec_debug_frame_t *df = &device->debug_frames[device->debug_frame_index];
+
+    df->dir = dir;
+    if (dir == TX)
+        do_gettimeofday(&df->t);
+    else
+        df->t = device->timeval_poll;
+    memcpy(df->data, data, size);
+    df->data_size = size;
+
+    device->debug_frame_index++;
+    device->debug_frame_index %= EC_DEBUG_RING_SIZE;
+    if (unlikely(device->debug_frame_count < EC_DEBUG_RING_SIZE))
+        device->debug_frame_count++;
+}
+
+/*****************************************************************************/
+
+/**
+ * Outputs the debug ring.
+ */
+
+void ec_device_debug_ring_print(
+        const ec_device_t *device /**< EtherCAT device */
+        )
+{
+    int i;
+    unsigned int ring_index;
+    const ec_debug_frame_t *df;
+    struct timeval t0, diff;
+
+    // calculate index of the newest frame in the ring to get its time
+    ring_index = (device->debug_frame_index + EC_DEBUG_RING_SIZE - 1)
+        % EC_DEBUG_RING_SIZE;
+    t0 = device->debug_frames[ring_index].t;
+
+    EC_DBG("Debug ring %i:\n", ring_index);
+
+    // calculate index of the oldest frame in the ring
+    ring_index = (device->debug_frame_index + EC_DEBUG_RING_SIZE
+            - device->debug_frame_count) % EC_DEBUG_RING_SIZE;
+
+    for (i = 0; i < device->debug_frame_count; i++) {
+        df = &device->debug_frames[ring_index];
+        timersub(&t0, &df->t, &diff);
+
+        EC_DBG("Frame %i, dt=%u.%06u s, %s:\n",
+                i + 1 - device->debug_frame_count,
+                (unsigned int) diff.tv_sec,
+                (unsigned int) diff.tv_usec,
+                (df->dir == TX) ? "TX" : "RX");
+        ec_print_data(df->data, df->data_size);
+
+        ring_index++;
+        ring_index %= EC_DEBUG_RING_SIZE;
+    }
+}
+#endif
 
 /*****************************************************************************/
 
@@ -238,6 +387,9 @@ void ec_device_poll(ec_device_t *device /**< EtherCAT device */)
 {
     device->cycles_poll = get_cycles();
     device->jiffies_poll = jiffies;
+#ifdef EC_DEBUG_RING
+    do_gettimeofday(&device->timeval_poll);
+#endif
     device->poll(device->dev);
 }
 
@@ -257,21 +409,23 @@ void ecdev_receive(ec_device_t *device, /**< EtherCAT device */
                    size_t size /**< number of bytes received */
                    )
 {
+    const void *ec_data = data + ETH_HLEN;
+    size_t ec_size = size - ETH_HLEN;
     device->rx_count++;
 
     if (unlikely(device->master->debug_level > 1)) {
         EC_DBG("Received frame:\n");
-        ec_print_data_diff(device->tx_skb->data + ETH_HLEN,
-                           data + ETH_HLEN, size - ETH_HLEN);
+        ec_print_data(ec_data, ec_size);
     }
 
-#ifdef EC_DBG_IF
+#ifdef EC_DEBUG_IF
     ec_debug_send(&device->dbg, data, size);
 #endif
+#ifdef EC_DEBUG_RING
+    ec_device_debug_ring_append(device, RX, ec_data, ec_size);
+#endif
 
-    ec_master_receive_datagrams(device->master,
-                                data + ETH_HLEN,
-                                size - ETH_HLEN);
+    ec_master_receive_datagrams(device->master, ec_data, ec_size);
 }
 
 /*****************************************************************************/
@@ -283,9 +437,9 @@ void ecdev_receive(ec_device_t *device, /**< EtherCAT device */
    \ingroup DeviceInterface
 */
 
-void ecdev_link_state(ec_device_t *device, /**< EtherCAT device */
-                      uint8_t state /**< new link state */
-                      )
+void ecdev_set_link(ec_device_t *device, /**< EtherCAT device */
+        uint8_t state /**< new link state */
+        )
 {
     if (unlikely(!device)) {
         EC_WARN("ecdev_link_state: no device!\n");
@@ -300,10 +454,28 @@ void ecdev_link_state(ec_device_t *device, /**< EtherCAT device */
 
 /*****************************************************************************/
 
+/**
+   Reads the link state.
+   \ingroup DeviceInterface
+*/
+
+uint8_t ecdev_get_link(ec_device_t *device /**< EtherCAT device */)
+{
+    if (unlikely(!device)) {
+        EC_WARN("ecdev_link_state: no device!\n");
+        return 0;
+    }
+
+    return device->link_state;
+}
+
+/*****************************************************************************/
+
 /** \cond */
 
 EXPORT_SYMBOL(ecdev_receive);
-EXPORT_SYMBOL(ecdev_link_state);
+EXPORT_SYMBOL(ecdev_get_link);
+EXPORT_SYMBOL(ecdev_set_link);
 
 /** \endcond */
 

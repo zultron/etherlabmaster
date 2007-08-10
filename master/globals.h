@@ -49,12 +49,6 @@
  *  EtherCAT master
  *****************************************************************************/
 
-/** maximum number of FMMUs per slave */
-#define EC_MAX_FMMUS 16
-
-/** size of the EoE tx queue */
-#define EC_EOE_TX_QUEUE_SIZE 100
-
 /** clock frequency for the EoE state machines */
 #define EC_EOE_FREQUENCY 1000
 
@@ -71,6 +65,9 @@
 /** minimum size of a buffer used with ec_state_string() */
 #define EC_STATE_STRING_SIZE 32
 
+/** maximum EEPROM size in words, to avoid infinite reading. */
+#define EC_MAX_EEPROM_SIZE 512
+
 /******************************************************************************
  *  EtherCAT protocol
  *****************************************************************************/
@@ -84,15 +81,12 @@
 /** size of an EtherCAT datagram footer */
 #define EC_DATAGRAM_FOOTER_SIZE 2
 
-/** size of a sync manager configuration page */
-#define EC_SYNC_SIZE 8
-
-/** size of an FMMU configuration page */
-#define EC_FMMU_SIZE 16
-
 /** resulting maximum data size of a single datagram in a frame */
 #define EC_MAX_DATA_SIZE (ETH_DATA_LEN - EC_FRAME_HEADER_SIZE \
                           - EC_DATAGRAM_HEADER_SIZE - EC_DATAGRAM_FOOTER_SIZE)
+
+/** word offset of first EEPROM category. */
+#define EC_FIRST_EEPROM_CATEGORY_OFFSET 0x40
 
 /*****************************************************************************/
 
@@ -169,6 +163,8 @@ extern char *ec_master_version_str;
 void ec_print_data(const uint8_t *, size_t);
 void ec_print_data_diff(const uint8_t *, const uint8_t *, size_t);
 size_t ec_state_string(uint8_t, char *);
+ssize_t ec_mac_print(const uint8_t *, char *);
+int ec_mac_is_zero(const uint8_t *);
 
 /*****************************************************************************/
 
@@ -184,6 +180,21 @@ typedef struct
     const char *message; /**< message belonging to \a code */
 }
 ec_code_msg_t;
+
+/*****************************************************************************/
+
+/**
+ * Master request state.
+ */
+
+typedef enum
+{
+    EC_REQUEST_QUEUED,
+    EC_REQUEST_IN_PROGRESS,
+    EC_REQUEST_COMPLETE,
+    EC_REQUEST_FAILURE
+}
+ec_request_state_t;
 
 /*****************************************************************************/
 

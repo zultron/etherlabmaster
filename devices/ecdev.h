@@ -64,12 +64,11 @@ typedef struct ec_device ec_device_t; /**< \see ec_device */
 typedef void (*ec_pollfunc_t)(struct net_device *);
 
 /*****************************************************************************/
-// Registration functions
+// Offering/withdrawal functions
 
-ec_device_t *ecdev_register(unsigned int master_index,
-                            struct net_device *net_dev, ec_pollfunc_t poll,
-                            struct module *module);
-void ecdev_unregister(unsigned int master_index, ec_device_t *device);
+int ecdev_offer(struct net_device *net_dev, ec_pollfunc_t poll,
+        struct module *module, ec_device_t **);
+void ecdev_withdraw(ec_device_t *device);
 
 /*****************************************************************************/
 // Device methods
@@ -77,7 +76,8 @@ void ecdev_unregister(unsigned int master_index, ec_device_t *device);
 int ecdev_open(ec_device_t *device);
 void ecdev_close(ec_device_t *device);
 void ecdev_receive(ec_device_t *device, const void *data, size_t size);
-void ecdev_link_state(ec_device_t *device, uint8_t newstate);
+void ecdev_set_link(ec_device_t *device, uint8_t state);
+uint8_t ecdev_get_link(ec_device_t *device);
 
 /*****************************************************************************/
 

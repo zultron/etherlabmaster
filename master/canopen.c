@@ -298,33 +298,66 @@ ssize_t ec_sdo_entry_format_data(ec_sdo_entry_t *entry, /**< SDO entry */
     off_t off = 0;
     unsigned int i;
 
-    if (entry->data_type == 0x0002 && entry->bit_length == 8) { // int8
-        off += sprintf(buffer + off, "%i\n", *((int8_t *) request->data));
+    if (entry->data_type == 0x0002) { // int8
+        int8_t value;
+        if (entry->bit_length != 8)
+            goto not_fit;
+        value = EC_READ_S8(request->data);
+        off += sprintf(buffer + off, "%i (0x%02X)\n", value, value);
     }
-    else if (entry->data_type == 0x0003 && entry->bit_length == 16) { // int16
-        off += sprintf(buffer + off, "%i\n", *((int16_t *) request->data));
+    else if (entry->data_type == 0x0003) { // int16
+        int16_t value;
+        if (entry->bit_length != 16)
+            goto not_fit;
+        value = EC_READ_S16(request->data);
+        off += sprintf(buffer + off, "%i (0x%04X)\n", value, value);
     }
-    else if (entry->data_type == 0x0004 && entry->bit_length == 32) { // int32
-        off += sprintf(buffer + off, "%i\n", *((int32_t *) request->data));
+    else if (entry->data_type == 0x0004) { // int32
+        int32_t value;
+        if (entry->bit_length != 32)
+            goto not_fit;
+        value = EC_READ_S16(request->data);
+        off += sprintf(buffer + off, "%i (0x%08X)\n", value, value);
     }
-    else if (entry->data_type == 0x0005 && entry->bit_length == 8) { // uint8
-        off += sprintf(buffer + off, "%i\n", *((uint8_t *) request->data));
+    else if (entry->data_type == 0x0005) { // uint8
+        uint8_t value;
+        if (entry->bit_length != 8)
+            goto not_fit;
+        value = EC_READ_U8(request->data);
+        off += sprintf(buffer + off, "%u (0x%02X)\n", value, value);
     }
-    else if (entry->data_type == 0x0006 && entry->bit_length == 16) { // uint16
-        off += sprintf(buffer + off, "%i\n", *((uint16_t *) request->data));
+    else if (entry->data_type == 0x0006) { // uint16
+        uint16_t value;
+        if (entry->bit_length != 16)
+            goto not_fit;
+        value = EC_READ_U16(request->data); 
+        off += sprintf(buffer + off, "%u (0x%04X)\n", value, value);
     }
-    else if (entry->data_type == 0x0007 && entry->bit_length == 32) { // uint32
-        off += sprintf(buffer + off, "%i\n", *((uint32_t *) request->data));
+    else if (entry->data_type == 0x0007) { // uint32
+        uint32_t value;
+        if (entry->bit_length != 32)
+            goto not_fit;
+        value = EC_READ_U32(request->data);
+        off += sprintf(buffer + off, "%i (0x%08X)\n", value, value);
     }
     else if (entry->data_type == 0x0009) { // string
         off += sprintf(buffer + off, "%s\n", request->data);
     }
     else {
-        for (i = 0; i < request->size; i++)
-            off += sprintf(buffer + off, "%02X (%c)\n",
-                           request->data[i], request->data[i]);
+        off += sprintf(buffer + off, "Unknown data type %04X. Data:\n",
+                entry->data_type);
+        goto raw_data;
     }
+    return off;
 
+not_fit:
+    off += sprintf(buffer + off,
+            "Invalid bit length %u for data type 0x%04X. Data:\n",
+            entry->bit_length, entry->data_type);
+raw_data:
+    for (i = 0; i < request->size; i++)
+        off += sprintf(buffer + off, "%02X (%c)\n",
+                request->data[i], request->data[i]);
     return off;
 }
 
@@ -339,33 +372,34 @@ ssize_t ec_sdo_entry_read_value(ec_sdo_entry_t *entry, /**< SDO entry */
     off_t off = 0;
     ec_sdo_request_t request;
 
-    if (down_interruptible(&master->sdo_sem)) {
-        // interrupted by signal
-        return -ERESTARTSYS;
-    }
-
     ec_sdo_request_init_read(&request, sdo, entry);
 
-    // this is necessary, because the completion object
-    // is completed by the ec_master_flush_sdo_requests() function.
-    INIT_COMPLETION(master->sdo_complete);
-
-    master->sdo_request = &request;
-    master->sdo_seq_user++;
-    master->sdo_timer.expires = jiffies + 10;
-    add_timer(&master->sdo_timer);
-
-    wait_for_completion(&master->sdo_complete);
-
-    master->sdo_request = NULL;
+    // schedule request.
+    down(&master->sdo_sem);
+    list_add_tail(&request.list, &master->sdo_requests);
     up(&master->sdo_sem);
 
-    if (request.return_code == 1 && request.data) {
-        off += ec_sdo_entry_format_data(entry, &request, buffer);
+    // wait for processing through FSM
+    if (wait_event_interruptible(master->sdo_queue,
+                request.state != EC_REQUEST_QUEUED)) {
+        // interrupted by signal
+        down(&master->sdo_sem);
+        if (request.state == EC_REQUEST_QUEUED) {
+            list_del(&request.list);
+            up(&master->sdo_sem);
+            return -EINTR;
+        }
+        // request already processing: interrupt not possible.
+        up(&master->sdo_sem);
     }
-    else {
-        off = -EINVAL;
-    }
+
+    // wait until master FSM has finished processing
+    wait_event(master->sdo_queue, request.state != EC_REQUEST_IN_PROGRESS);
+
+    if (request.state != EC_REQUEST_COMPLETE)
+        return -EIO;
+
+    off += ec_sdo_entry_format_data(entry, &request, buffer);
 
     ec_sdo_request_clear(&request);
     return off;
@@ -405,7 +439,7 @@ void ec_sdo_request_init_read(ec_sdo_request_t *req, /**< SDO request */
     req->entry = entry;
     req->data = NULL;
     req->size = 0;
-    req->return_code = 0;
+    req->state = EC_REQUEST_QUEUED;
 }
 
 /*****************************************************************************/

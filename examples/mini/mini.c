@@ -39,30 +39,39 @@
 #include "../../include/ecrt.h" // EtherCAT realtime interface
 #include "../../include/ecdb.h" // EtherCAT slave database
 
+#define PFX "ec_mini: "
+
 #define FREQUENCY 100
 
 //#define KBUS
 
 /*****************************************************************************/
 
-struct timer_list timer;
+static struct timer_list timer;
 
 // EtherCAT
-ec_master_t *master = NULL;
-ec_domain_t *domain1 = NULL;
+static ec_master_t *master = NULL;
+static ec_domain_t *domain1 = NULL;
 spinlock_t master_lock = SPIN_LOCK_UNLOCKED;
+static ec_master_status_t master_status, old_status = {};
 
 // data fields
 #ifdef KBUS
-void *r_inputs;
-void *r_outputs;
+static void *r_inputs;
+static void *r_outputs;
 #endif
 
-void *r_dig_out;
+static void *r_dig_out;
+static void *r_ana_out;
+static void *r_count;
+static void *r_freq;
 
 #if 1
-ec_pdo_reg_t domain1_pdos[] = {
-    {"4", Beckhoff_EL2004_Outputs, &r_dig_out},
+const static ec_pdo_reg_t domain1_pdo_regs[] = {
+    {"2",      Beckhoff_EL2004_Outputs,   &r_dig_out},
+    {"3",      Beckhoff_EL4132_Output1,   &r_ana_out},
+    {"#888:1", Beckhoff_EL5101_Value,     &r_count},
+    {"4",      Beckhoff_EL5101_Frequency, &r_freq},
     {}
 };
 #endif
@@ -90,6 +99,26 @@ void run(unsigned long data)
     else {
         counter = FREQUENCY;
         blink = !blink;
+
+        spin_lock(&master_lock);
+        ecrt_master_get_status(master, &master_status);
+        spin_unlock(&master_lock);
+
+        if (master_status.bus_status != old_status.bus_status) {
+            printk(KERN_INFO PFX "bus status changed to %i.\n",
+                    master_status.bus_status);
+        }
+        if (master_status.bus_tainted != old_status.bus_tainted) {
+            printk(KERN_INFO PFX "tainted flag changed to %u.\n",
+                    master_status.bus_tainted);
+        }
+        if (master_status.slaves_responding !=
+                old_status.slaves_responding) {
+            printk(KERN_INFO PFX "slaves_responding changed to %u.\n",
+                    master_status.slaves_responding);
+        }
+       
+        old_status = master_status;
     }
 
 #ifdef KBUS
@@ -100,8 +129,6 @@ void run(unsigned long data)
     spin_lock(&master_lock);
     ecrt_domain_queue(domain1);
     spin_unlock(&master_lock);
-
-    ecrt_master_run(master);
 
     spin_lock(&master_lock);
     ecrt_master_send(master);
@@ -131,72 +158,90 @@ void release_lock(void *data)
 
 int __init init_mini_module(void)
 {
-#if 0
+#if 1
     ec_slave_t *slave;
 #endif
 
-    printk(KERN_INFO "=== Starting Minimal EtherCAT environment... ===\n");
+    printk(KERN_INFO PFX "Starting...\n");
 
     if (!(master = ecrt_request_master(0))) {
-        printk(KERN_ERR "Requesting master 0 failed!\n");
+        printk(KERN_ERR PFX "Requesting master 0 failed!\n");
         goto out_return;
     }
 
     ecrt_master_callbacks(master, request_lock, release_lock, NULL);
 
-    printk(KERN_INFO "Registering domain...\n");
+    printk(KERN_INFO PFX "Registering domain...\n");
     if (!(domain1 = ecrt_master_create_domain(master))) {
-        printk(KERN_ERR "Domain creation failed!\n");
+        printk(KERN_ERR PFX "Domain creation failed!\n");
         goto out_release_master;
     }
 
-    printk(KERN_INFO "Registering PDOs...\n");
 #if 1
-    if (ecrt_domain_register_pdo_list(domain1, domain1_pdos)) {
-        printk(KERN_ERR "PDO registration failed!\n");
+    printk(KERN_INFO PFX "Configuring alternative PDO mapping...\n");
+    if (!(slave = ecrt_master_get_slave(master, "4", Beckhoff_EL5101)))
+        goto out_release_master;
+
+    if (ecrt_slave_pdo_mapping(slave, EC_DIR_INPUT, 2, 0x1A00, 0x1A02))
+        goto out_release_master;
+#endif
+
+    printk(KERN_INFO PFX "Registering PDOs...\n");
+#if 1
+    if (ecrt_domain_register_pdo_list(domain1, domain1_pdo_regs)) {
+        printk(KERN_ERR PFX "PDO registration failed!\n");
         goto out_release_master;
     }
 #endif
 
 #ifdef KBUS
-    if (!ecrt_domain_register_pdo_range(domain1, "0", Beckhoff_BK1120,
-                                        EC_DIR_OUTPUT, 0, 4, &r_outputs)) {
-        printk(KERN_ERR "PDO registration failed!\n");
+    if (!(slave = ecrt_master_get_slave(master, "0", Beckhoff_BK1120)))
+        goto out_release_master;
+    
+    if (!ecrt_domain_register_pdo_range(
+                domain1, slave, EC_DIR_OUTPUT, 0, 4, &r_outputs)) {
+        printk(KERN_ERR PFX "PDO registration failed!\n");
         goto out_release_master;
     }
-    if (!ecrt_domain_register_pdo_range(domain1, "0", Beckhoff_BK1120,
-                                        EC_DIR_INPUT, 0, 4, &r_inputs)) {
-        printk(KERN_ERR "PDO registration failed!\n");
+    
+    if (!ecrt_domain_register_pdo_range(
+                domain1, slave, EC_DIR_INPUT, 0, 4, &r_inputs)) {
+        printk(KERN_ERR PFX "PDO registration failed!\n");
         goto out_release_master;
     }
 #endif
 
 #if 0
-    if (!(slave = ecrt_master_get_slave(master, "2")))
+    if (!(slave = ecrt_master_get_slave(master, "4", Beckhoff_EL5001)))
         goto out_release_master;
 
     if (ecrt_slave_conf_sdo8(slave, 0x4061, 1, 0))
         goto out_release_master;
 #endif
 
-    printk(KERN_INFO "Activating master...\n");
+#if 1
+#endif
+
+    printk(KERN_INFO PFX "Activating master...\n");
     if (ecrt_master_activate(master)) {
-        printk(KERN_ERR "Failed to activate master!\n");
+        printk(KERN_ERR PFX "Failed to activate master!\n");
         goto out_release_master;
     }
 
-    printk("Starting cyclic sample thread.\n");
+    printk(KERN_INFO PFX "Starting cyclic sample thread.\n");
     init_timer(&timer);
     timer.function = run;
     timer.expires = jiffies + 10;
     add_timer(&timer);
 
-    printk(KERN_INFO "=== Minimal EtherCAT environment started. ===\n");
+    printk(KERN_INFO PFX "Started.\n");
     return 0;
 
  out_release_master:
+    printk(KERN_ERR PFX "Releasing master...\n");
     ecrt_release_master(master);
  out_return:
+    printk(KERN_ERR PFX "Failed to load. Aborting.\n");
     return -1;
 }
 
@@ -204,13 +249,13 @@ int __init init_mini_module(void)
 
 void __exit cleanup_mini_module(void)
 {
-    printk(KERN_INFO "=== Stopping Minimal EtherCAT environment... ===\n");
+    printk(KERN_INFO PFX "Stopping...\n");
 
     del_timer_sync(&timer);
-    printk(KERN_INFO "Releasing master...\n");
+    printk(KERN_INFO PFX "Releasing master...\n");
     ecrt_release_master(master);
 
-    printk(KERN_INFO "=== Minimal EtherCAT environment stopped. ===\n");
+    printk(KERN_INFO PFX "Unloading.\n");
 }
 
 /*****************************************************************************/

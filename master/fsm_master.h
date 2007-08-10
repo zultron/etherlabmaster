@@ -51,6 +51,23 @@
 
 /*****************************************************************************/
 
+/**
+ * EEPROM write request.
+ */
+
+typedef struct
+{
+    struct list_head list;
+    ec_slave_t *slave;
+    off_t offset;
+    size_t size;
+    const uint16_t *words;
+    ec_request_state_t state;
+}
+ec_eeprom_write_request_t;
+
+/*****************************************************************************/
+
 typedef struct ec_fsm_master ec_fsm_master_t; /**< \see ec_fsm_master */
 
 /**
@@ -64,13 +81,19 @@ struct ec_fsm_master
     unsigned int retries; /**< retries on datagram timeout. */
 
     void (*state)(ec_fsm_master_t *); /**< master state function */
+    int idle; /**< state machine is in idle phase */
+    unsigned long scan_jiffies; /**< beginning of slave scanning */
     unsigned int slaves_responding; /**< number of responding slaves */
     unsigned int topology_change_pending; /**< bus topology changed */
     ec_slave_state_t slave_states; /**< states of responding slaves */
     unsigned int validate; /**< non-zero, if validation to do */
+    unsigned int tainted; /**< non-zero, if the current bus topology does
+                            not meet the initial conditions */
+    unsigned int config_error; /**< error during slave configuration */
     ec_slave_t *slave; /**< current slave */
+    ec_eeprom_write_request_t *eeprom_request; /**< EEPROM write request */
+    off_t eeprom_index; /**< index to EEPROM write request data */
     ec_sdo_request_t *sdo_request; /**< SDO request to process */
-    uint16_t sii_offset; 
 
     ec_fsm_slave_t fsm_slave; /**< slave state machine */
     ec_fsm_sii_t fsm_sii; /**< SII state machine */
@@ -84,8 +107,8 @@ void ec_fsm_master_init(ec_fsm_master_t *, ec_master_t *, ec_datagram_t *);
 void ec_fsm_master_clear(ec_fsm_master_t *);
 
 int ec_fsm_master_exec(ec_fsm_master_t *);
-int ec_fsm_master_running(ec_fsm_master_t *);
-int ec_fsm_master_success(ec_fsm_master_t *);
+int ec_fsm_master_running(const ec_fsm_master_t *);
+int ec_fsm_master_idle(const ec_fsm_master_t *);
 
 /*****************************************************************************/
 

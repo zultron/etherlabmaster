@@ -48,14 +48,28 @@
 
 /*****************************************************************************/
 
-int __init ec_init_module(void);
-void __exit ec_cleanup_module(void);
+#define MAX_MASTERS 5 /**< maximum number of masters */
 
 /*****************************************************************************/
 
-static int ec_master_count = 1; /**< parameter value, number of masters */
-static int ec_eoeif_count = 0; /**< parameter value, number of EoE interf. */
-static struct list_head ec_masters; /**< list of masters */
+int __init ec_init_module(void);
+void __exit ec_cleanup_module(void);
+
+static int ec_mac_parse(uint8_t *, const char *, int);
+
+/*****************************************************************************/
+
+struct kobject kobj; /**< kobject for master module */
+
+static char *main[MAX_MASTERS]; /**< main devices parameter */
+static char *backup[MAX_MASTERS]; /**< backup devices parameter */
+
+static ec_master_t *masters; /**< master array */
+static struct semaphore master_sem; /**< master semaphore */
+static unsigned int master_count; /**< number of masters */
+static unsigned int backup_count; /**< number of backup devices */
+
+static uint8_t macs[MAX_MASTERS][2][ETH_ALEN]; /**< MAC addresses */
 
 char *ec_master_version_str = EC_MASTER_VERSION;
 
@@ -63,66 +77,94 @@ char *ec_master_version_str = EC_MASTER_VERSION;
 
 /** \cond */
 
-module_param(ec_master_count, int, S_IRUGO);
-module_param(ec_eoeif_count, int, S_IRUGO);
-
 MODULE_AUTHOR("Florian Pose <fp@igh-essen.com>");
 MODULE_DESCRIPTION("EtherCAT master driver module");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(EC_MASTER_VERSION);
-MODULE_PARM_DESC(ec_master_count, "number of EtherCAT masters to initialize");
-MODULE_PARM_DESC(ec_eoeif_count, "number of EoE interfaces per master");
+
+module_param_array(main, charp, &master_count, S_IRUGO);
+MODULE_PARM_DESC(main, "MAC addresses of main devices");
+module_param_array(backup, charp, &backup_count, S_IRUGO);
+MODULE_PARM_DESC(backup, "MAC addresses of backup devices");
 
 /** \endcond */
 
 /*****************************************************************************/
 
 /**
-   Module initialization.
-   Initializes \a ec_master_count masters.
-   \return 0 on success, else < 0
-*/
+ * Module initialization.
+ * Initializes \a ec_master_count masters.
+ * \return 0 on success, else < 0
+ */
 
 int __init ec_init_module(void)
 {
-    unsigned int i;
-    ec_master_t *master, *next;
+    int i, ret = 0;
 
     EC_INFO("Master driver %s\n", EC_MASTER_VERSION);
 
-    if (ec_master_count < 1) {
-        EC_ERR("Error - Invalid ec_master_count: %i\n", ec_master_count);
-        goto out_return;
+    init_MUTEX(&master_sem);
+
+    // init kobject and add it to the hierarchy
+    memset(&kobj, 0x00, sizeof(struct kobject));
+    kobject_init(&kobj); // no ktype
+    
+    if (kobject_set_name(&kobj, "ethercat")) {
+        EC_ERR("Failed to set module kobject name.\n");
+        ret = -ENOMEM;
+        goto out_put;
     }
+    
+    if (kobject_add(&kobj)) {
+        EC_ERR("Failed to add module kobject.\n");
+        ret = -EEXIST;
+        goto out_put;
+    }
+    
+    // zero MAC addresses
+    memset(macs, 0x00, sizeof(uint8_t) * MAX_MASTERS * 2 * ETH_ALEN);
 
-    EC_INFO("Initializing %i EtherCAT master(s)...\n", ec_master_count);
-
-    INIT_LIST_HEAD(&ec_masters);
-
-    for (i = 0; i < ec_master_count; i++) {
-        if (!(master =
-              (ec_master_t *) kmalloc(sizeof(ec_master_t), GFP_KERNEL))) {
-            EC_ERR("Failed to allocate memory for EtherCAT master %i.\n", i);
-            goto out_free;
+    // process MAC parameters
+    for (i = 0; i < master_count; i++) {
+        if (ec_mac_parse(macs[i][0], main[i], 0)) {
+            ret = -EINVAL;
+            goto out_del;
         }
-
-        if (ec_master_init(master, i, ec_eoeif_count))
-            goto out_free;
-
-        list_add_tail(&master->list, &ec_masters);
+        
+        if (i < backup_count && ec_mac_parse(macs[i][1], backup[i], 1)) {
+            ret = -EINVAL;
+            goto out_del;
+        }
     }
-
-    EC_INFO("Master driver initialized.\n");
-    return 0;
-
- out_free:
-    list_for_each_entry_safe(master, next, &ec_masters, list) {
-        list_del(&master->list);
-        kobject_del(&master->kobj);
-        kobject_put(&master->kobj);
+    
+    if (master_count) {
+        if (!(masters = kmalloc(sizeof(ec_master_t) * master_count,
+                        GFP_KERNEL))) {
+            EC_ERR("Failed to allocate memory for EtherCAT masters.\n");
+            ret = -ENOMEM;
+            goto out_del;
+        }
     }
- out_return:
-    return -1;
+    
+    for (i = 0; i < master_count; i++) {
+        if (ec_master_init(&masters[i], &kobj, i, macs[i][0], macs[i][1])) {
+            ret = -EIO;
+            goto out_free_masters;
+        }
+    }
+    
+    EC_INFO("%u master%s waiting for devices.\n",
+            master_count, (master_count == 1 ? "" : "s"));
+    return ret;
+
+out_free_masters:
+    for (i--; i >= 0; i--) ec_master_clear(&masters[i]);
+    kfree(masters);
+out_del:
+    kobject_del(&kobj);
+out_put:
+    kobject_put(&kobj);
+    return ret;
 }
 
 /*****************************************************************************/
@@ -134,35 +176,108 @@ int __init ec_init_module(void)
 
 void __exit ec_cleanup_module(void)
 {
-    ec_master_t *master, *next;
+    unsigned int i;
 
-    EC_INFO("Cleaning up master driver...\n");
+    for (i = 0; i < master_count; i++) {
+        ec_master_clear(&masters[i]);
+    }
+    if (master_count)
+        kfree(masters);
+    
+    kobject_del(&kobj);
+    kobject_put(&kobj);
 
-    list_for_each_entry_safe(master, next, &ec_masters, list) {
-        list_del(&master->list);
-        ec_master_destroy(master);
+    EC_INFO("Master module cleaned up.\n");
+}
+
+/*****************************************************************************
+ * MAC address functions
+ ****************************************************************************/
+
+int ec_mac_equal(const uint8_t *mac1, const uint8_t *mac2)
+{
+    unsigned int i;
+    
+    for (i = 0; i < ETH_ALEN; i++)
+        if (mac1[i] != mac2[i])
+            return 0;
+
+    return 1;
+}
+                
+/*****************************************************************************/
+
+ssize_t ec_mac_print(const uint8_t *mac, char *buffer)
+{
+    off_t off = 0;
+    unsigned int i;
+    
+    for (i = 0; i < ETH_ALEN; i++) {
+        off += sprintf(buffer + off, "%02X", mac[i]);
+        if (i < ETH_ALEN - 1) off += sprintf(buffer + off, ":");
     }
 
-    EC_INFO("Master driver cleaned up.\n");
+    return off;
 }
 
 /*****************************************************************************/
 
-/**
-   Gets a handle to a certain master.
-   \returns pointer to master
-*/
-
-ec_master_t *ec_find_master(unsigned int master_index /**< master index */)
+int ec_mac_is_zero(const uint8_t *mac)
 {
-    ec_master_t *master;
+    unsigned int i;
+    
+    for (i = 0; i < ETH_ALEN; i++)
+        if (mac[i])
+            return 0;
 
-    list_for_each_entry(master, &ec_masters, list) {
-        if (master->index == master_index) return master;
+    return 1;
+}
+
+/*****************************************************************************/
+
+int ec_mac_is_broadcast(const uint8_t *mac)
+{
+    unsigned int i;
+    
+    for (i = 0; i < ETH_ALEN; i++)
+        if (mac[i] != 0xff)
+            return 0;
+
+    return 1;
+}
+
+/*****************************************************************************/
+
+static int ec_mac_parse(uint8_t *mac, const char *src, int allow_empty)
+{
+    unsigned int i, value;
+    const char *orig = src;
+    char *rem;
+
+    if (!strlen(src)) {
+        if (allow_empty){
+            return 0;
+        }
+        else {
+            EC_ERR("MAC address may not be empty.\n");
+            return -EINVAL;
+        }
     }
 
-    EC_ERR("Master %i does not exist!\n", master_index);
-    return NULL;
+    for (i = 0; i < ETH_ALEN; i++) {
+        value = simple_strtoul(src, &rem, 16);
+        if (rem != src + 2
+                || value > 0xFF
+                || (i < ETH_ALEN - 1 && *rem != ':')) {
+            EC_ERR("Invalid MAC address \"%s\".\n", orig);
+            return -EINVAL;
+        }
+        mac[i] = value;
+        if (i < ETH_ALEN - 1)
+            src = rem + 1; // skip colon
+    }
+
+    return 0;
 }
 
 /*****************************************************************************/
@@ -263,62 +378,66 @@ size_t ec_state_string(uint8_t states, /**< slave states */
  *****************************************************************************/
 
 /**
-   Connects an EtherCAT device to a certain master.
-   The master will use the device for sending and receiving frames. It is
-   required that no other instance (for example the kernel IP stack) uses
-   the device.
+   Offers an EtherCAT device to a certain master.
+   The master decides, if it wants to use the device for EtherCAT operation,
+   or not. It is important, that the offered net_device is not used by
+   the kernel IP stack. If the master, accepted the offer, the address of
+   the newly created EtherCAT device is written to the ecdev pointer, else
+   the pointer is written to zero.
    \return 0 on success, else < 0
    \ingroup DeviceInterface
 */
 
-ec_device_t *ecdev_register(unsigned int master_index, /**< master index */
-                            struct net_device *net_dev, /**< net_device of
-                                                           the device */
-                            ec_pollfunc_t poll, /**< device poll function */
-                            struct module *module /**< pointer to the module */
-                            )
+int ecdev_offer(struct net_device *net_dev, /**< net_device to offer */
+        ec_pollfunc_t poll, /**< device poll function */
+        struct module *module, /**< pointer to the module */
+        ec_device_t **ecdev /**< pointer to store a device on success */
+        )
 {
     ec_master_t *master;
+    char str[20];
+    unsigned int i;
 
-    if (!(master = ec_find_master(master_index))) return NULL;
+    for (i = 0; i < master_count; i++) {
+        master = &masters[i];
 
-    if (down_interruptible(&master->device_sem)) {
-        EC_ERR("Interrupted while waiting for device!\n");
-        goto out_return;
+        down(&master->device_sem);
+        if (master->main_device.dev) { // master already has a device
+            up(&master->device_sem);
+            continue;
+        }
+            
+        if (ec_mac_equal(master->main_mac, net_dev->dev_addr)
+                || ec_mac_is_broadcast(master->main_mac)) {
+            ec_mac_print(net_dev->dev_addr, str);
+            EC_INFO("Accepting device %s for master %u.\n",
+                    str, master->index);
+
+            ec_device_attach(&master->main_device, net_dev, poll, module);
+            up(&master->device_sem);
+            
+            sprintf(net_dev->name, "ec%u", master->index);
+            *ecdev = &master->main_device; // offer accepted
+            return 0; // no error
+        }
+        else {
+            up(&master->device_sem);
+
+            if (master->debug_level) {
+                ec_mac_print(net_dev->dev_addr, str);
+                EC_DBG("Master %u declined device %s.\n", master->index, str);
+            }
+        }
     }
 
-    if (master->device) {
-        EC_ERR("Master %i already has a device!\n", master_index);
-        goto out_up;
-    }
-
-    if (!(master->device =
-          (ec_device_t *) kmalloc(sizeof(ec_device_t), GFP_KERNEL))) {
-        EC_ERR("Failed to allocate device!\n");
-        goto out_up;
-    }
-
-    if (ec_device_init(master->device, master, net_dev, poll, module)) {
-        EC_ERR("Failed to init device!\n");
-        goto out_free;
-    }
-
-    up(&master->device_sem);
-    return master->device;
-
- out_free:
-    kfree(master->device);
-    master->device = NULL;
- out_up:
-    up(&master->device_sem);
- out_return:
-    return NULL;
+    *ecdev = NULL; // offer declined
+    return 0; // no error
 }
 
 /*****************************************************************************/
 
 /**
-   Disconnect an EtherCAT device from the master.
+   Withdraws an EtherCAT device from the master.
    The device is disconnected from the master and all device ressources
    are freed.
    \attention Before calling this function, the ecdev_stop() function has
@@ -326,26 +445,16 @@ ec_device_t *ecdev_register(unsigned int master_index, /**< master index */
    \ingroup DeviceInterface
 */
 
-void ecdev_unregister(unsigned int master_index, /**< master index */
-                      ec_device_t *device /**< EtherCAT device */
-                      )
+void ecdev_withdraw(ec_device_t *device /**< EtherCAT device */)
 {
-    ec_master_t *master;
+    ec_master_t *master = device->master;
+    char str[20];
 
-    if (!(master = ec_find_master(master_index))) return;
-
+    ec_mac_print(device->dev->dev_addr, str);
+    EC_INFO("Master %u releasing main device %s.\n", master->index, str);
+    
     down(&master->device_sem);
-
-    if (!master->device || master->device != device) {
-        up(&master->device_sem);
-        EC_WARN("Unable to unregister device!\n");
-        return;
-    }
-
-    ec_device_clear(master->device);
-    kfree(master->device);
-    master->device = NULL;
-
+    ec_device_detach(device);
     up(&master->device_sem);
 }
 
@@ -417,28 +526,32 @@ ec_master_t *ecrt_request_master(unsigned int master_index
 {
     ec_master_t *master;
 
-    EC_INFO("Requesting master %i...\n", master_index);
+    EC_INFO("Requesting master %u...\n", master_index);
 
-    if (!(master = ec_find_master(master_index))) goto out_return;
-
-    if (!atomic_dec_and_test(&master->available)) {
-        atomic_inc(&master->available);
-        EC_ERR("Master %i is already in use!\n", master_index);
+    if (master_index >= master_count) {
+        EC_ERR("Invalid master index %u.\n", master_index);
         goto out_return;
     }
+    master = &masters[master_index];
 
-    if (down_interruptible(&master->device_sem)) {
-        EC_ERR("Interrupted while waiting for device!\n");
-        goto out_release;
+    down(&master_sem);
+    if (master->reserved) {
+        up(&master_sem);
+        EC_ERR("Master %u is already in use!\n", master_index);
+        goto out_return;
     }
+    master->reserved = 1;
+    up(&master_sem);
 
-    if (!master->device) {
+    down(&master->device_sem);
+    
+    if (master->mode != EC_MASTER_MODE_IDLE) {
         up(&master->device_sem);
-        EC_ERR("Master %i has no assigned device!\n", master_index);
+        EC_ERR("Master %u still waiting for devices!\n", master_index);
         goto out_release;
     }
 
-    if (!try_module_get(master->device->module)) {
+    if (!try_module_get(master->main_device.module)) {
         up(&master->device_sem);
         EC_ERR("Device module is unloading!\n");
         goto out_release;
@@ -446,7 +559,7 @@ ec_master_t *ecrt_request_master(unsigned int master_index
 
     up(&master->device_sem);
 
-    if (!master->device->link_state) {
+    if (!master->main_device.link_state) {
         EC_ERR("Link is DOWN.\n");
         goto out_module_put;
     }
@@ -456,13 +569,13 @@ ec_master_t *ecrt_request_master(unsigned int master_index
         goto out_module_put;
     }
 
-    EC_INFO("Successfully requested master %i.\n", master_index);
+    EC_INFO("Successfully requested master %u.\n", master_index);
     return master;
 
  out_module_put:
-    module_put(master->device->module);
+    module_put(master->main_device.module);
  out_release:
-    atomic_inc(&master->available);
+    master->reserved = 0;
  out_return:
     return NULL;
 }
@@ -476,19 +589,19 @@ ec_master_t *ecrt_request_master(unsigned int master_index
 
 void ecrt_release_master(ec_master_t *master /**< EtherCAT master */)
 {
-    EC_INFO("Releasing master %i...\n", master->index);
+    EC_INFO("Releasing master %u...\n", master->index);
 
     if (master->mode != EC_MASTER_MODE_OPERATION) {
-        EC_WARN("Master %i was was not requested!\n", master->index);
+        EC_WARN("Master %u was was not requested!\n", master->index);
         return;
     }
 
     ec_master_leave_operation_mode(master);
 
-    module_put(master->device->module);
-    atomic_inc(&master->available);
+    module_put(master->main_device.module);
+    master->reserved = 0;
 
-    EC_INFO("Released master %i.\n", master->index);
+    EC_INFO("Released master %u.\n", master->index);
 }
 
 /*****************************************************************************/
@@ -498,8 +611,8 @@ void ecrt_release_master(ec_master_t *master /**< EtherCAT master */)
 module_init(ec_init_module);
 module_exit(ec_cleanup_module);
 
-EXPORT_SYMBOL(ecdev_register);
-EXPORT_SYMBOL(ecdev_unregister);
+EXPORT_SYMBOL(ecdev_offer);
+EXPORT_SYMBOL(ecdev_withdraw);
 EXPORT_SYMBOL(ecdev_open);
 EXPORT_SYMBOL(ecdev_close);
 EXPORT_SYMBOL(ecrt_request_master);

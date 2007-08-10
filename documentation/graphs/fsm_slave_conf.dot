@@ -1,0 +1,57 @@
+digraph slaveconf {
+    size="7,9"
+    center=1
+	ratio=fill
+
+    enter_mbox_sync [shape=point,label=""]
+    enter_fmmu [shape=point,label=""]
+    enter_sdoconf [shape=point,label=""]
+    enter_mapconf [shape=point,label=""]
+    enter_pdo_sync [shape=point,label=""]
+
+    start -> init [weight=10]
+    init -> init
+    init -> error
+    init -> enter_mbox_sync
+    init -> clear_fmmus [label="has FMMUs", weight=10]
+    clear_fmmus -> clear_fmmus
+    clear_fmmus -> error
+    clear_fmmus -> enter_mbox_sync [weight=10]
+    enter_mbox_sync -> end [label="INIT req."]
+    enter_mbox_sync -> preop
+    enter_mbox_sync -> mbox_sync [label="mailbox SMs", weight=10]
+    mbox_sync -> mbox_sync
+    mbox_sync -> error
+    mbox_sync -> preop [weight=10]
+    preop -> preop
+    preop -> error
+    preop -> end [label="PREOP req."]
+    preop -> enter_sdoconf [weight=10]
+    enter_sdoconf -> enter_mapconf
+    enter_sdoconf -> sdoconf [label="SDOs to configure", weight=10]
+    sdoconf -> sdoconf
+    sdoconf -> error
+    sdoconf -> enter_mapconf [weight=10]
+    enter_mapconf -> mapconf [label="CoE supported", weight=10]
+    enter_mapconf -> enter_pdo_sync
+    mapconf -> mapconf
+    mapconf -> error
+    mapconf -> enter_pdo_sync [weight=10]
+    enter_pdo_sync -> pdo_sync [label="PDO SMs", weight=10]
+    enter_pdo_sync -> enter_fmmu
+    pdo_sync -> pdo_sync
+    pdo_sync -> error
+    pdo_sync -> enter_fmmu [weight=10]
+    enter_fmmu -> saveop
+    enter_fmmu -> fmmu [label="FMMUs to configure", weight=10]
+    fmmu -> fmmu
+    fmmu -> error
+    fmmu -> saveop [weight=10]
+    saveop -> saveop
+    saveop -> error
+    saveop -> end [label="SAVEOP req."]
+    saveop -> op [weight=10]
+    op -> op
+    op -> error
+    op -> end [weight=10]
+}

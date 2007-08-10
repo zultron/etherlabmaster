@@ -57,6 +57,7 @@ void ec_slave_sdos_clear(struct kobject *);
 ssize_t ec_show_slave_attribute(struct kobject *, struct attribute *, char *);
 ssize_t ec_store_slave_attribute(struct kobject *, struct attribute *,
                                  const char *, size_t);
+char *ec_slave_sii_string(ec_slave_t *, unsigned int);
 
 /*****************************************************************************/
 
@@ -65,11 +66,13 @@ ssize_t ec_store_slave_attribute(struct kobject *, struct attribute *,
 EC_SYSFS_READ_ATTR(info);
 EC_SYSFS_READ_WRITE_ATTR(state);
 EC_SYSFS_READ_WRITE_ATTR(eeprom);
+EC_SYSFS_READ_WRITE_ATTR(alias);
 
 static struct attribute *def_attrs[] = {
     &attr_info,
     &attr_state,
     &attr_eeprom,
+    &attr_alias,
     NULL,
 };
 
@@ -110,26 +113,21 @@ int ec_slave_init(ec_slave_t *slave, /**< EtherCAT slave */
 
     slave->master = master;
 
-    slave->requested_state = EC_SLAVE_STATE_UNKNOWN;
+    slave->requested_state = EC_SLAVE_STATE_PREOP;
     slave->current_state = EC_SLAVE_STATE_UNKNOWN;
     slave->self_configured = 0;
     slave->error_flag = 0;
-    slave->online = 1;
+    slave->online_state = EC_SLAVE_ONLINE;
     slave->fmmu_count = 0;
-
-    slave->coupler_index = 0;
-    slave->coupler_subindex = 0xFFFF;
+    slave->pdos_registered = 0;
 
     slave->base_type = 0;
     slave->base_revision = 0;
     slave->base_build = 0;
     slave->base_fmmu_count = 0;
-    slave->base_sync_count = 0;
 
     slave->eeprom_data = NULL;
     slave->eeprom_size = 0;
-    slave->new_eeprom_data = NULL;
-    slave->new_eeprom_size = 0;
 
     slave->sii_alias = 0;
     slave->sii_vendor_id = 0;
@@ -147,8 +145,10 @@ int ec_slave_init(ec_slave_t *slave, /**< EtherCAT slave */
     slave->sii_name = NULL;
     slave->sii_current_on_ebus = 0;
 
-    INIT_LIST_HEAD(&slave->sii_strings);
-    INIT_LIST_HEAD(&slave->sii_syncs);
+    slave->sii_strings = NULL;
+    slave->sii_string_count = 0;
+    slave->sii_syncs = NULL;
+    slave->sii_sync_count = 0;
     INIT_LIST_HEAD(&slave->sii_pdos);
     INIT_LIST_HEAD(&slave->sdo_dictionary);
     INIT_LIST_HEAD(&slave->sdo_confs);
@@ -238,45 +238,33 @@ void ec_slave_destroy(ec_slave_t *slave /**< EtherCAT slave */)
 void ec_slave_clear(struct kobject *kobj /**< kobject of the slave */)
 {
     ec_slave_t *slave;
-    ec_sii_string_t *string, *next_str;
-    ec_sii_sync_t *sync, *next_sync;
-    ec_sii_pdo_t *pdo, *next_pdo;
-    ec_sii_pdo_entry_t *entry, *next_ent;
+    ec_pdo_t *pdo, *next_pdo;
     ec_sdo_data_t *sdodata, *next_sdodata;
+    unsigned int i;
 
     slave = container_of(kobj, ec_slave_t, kobj);
 
-    // free all string objects
-    list_for_each_entry_safe(string, next_str, &slave->sii_strings, list) {
-        list_del(&string->list);
-        kfree(string);
+    // free all strings
+    if (slave->sii_strings) {
+        for (i = 0; i < slave->sii_string_count; i++)
+            kfree(slave->sii_strings[i]);
+        kfree(slave->sii_strings);
     }
 
     // free all sync managers
-    list_for_each_entry_safe(sync, next_sync, &slave->sii_syncs, list) {
-        list_del(&sync->list);
-        kfree(sync);
+    if (slave->sii_syncs) {
+        for (i = 0; i < slave->sii_sync_count; i++) {
+            ec_sync_clear(&slave->sii_syncs[i]);
+        }
+        kfree(slave->sii_syncs);
     }
 
-    // free all PDOs
+    // free all SII PDOs
     list_for_each_entry_safe(pdo, next_pdo, &slave->sii_pdos, list) {
         list_del(&pdo->list);
-        if (pdo->name) kfree(pdo->name);
-
-        // free all PDO entries
-        list_for_each_entry_safe(entry, next_ent, &pdo->entries, list) {
-            list_del(&entry->list);
-            if (entry->name) kfree(entry->name);
-            kfree(entry);
-        }
-
+        ec_pdo_clear(pdo);
         kfree(pdo);
     }
-
-    if (slave->sii_group) kfree(slave->sii_group);
-    if (slave->sii_image) kfree(slave->sii_image);
-    if (slave->sii_order) kfree(slave->sii_order);
-    if (slave->sii_name) kfree(slave->sii_name);
 
     // free all SDO configurations
     list_for_each_entry_safe(sdodata, next_sdodata, &slave->sdo_confs, list) {
@@ -286,7 +274,6 @@ void ec_slave_clear(struct kobject *kobj /**< kobject of the slave */)
     }
 
     if (slave->eeprom_data) kfree(slave->eeprom_data);
-    if (slave->new_eeprom_data) kfree(slave->new_eeprom_data);
 
     kfree(slave);
 }
@@ -309,10 +296,10 @@ void ec_slave_sdos_clear(struct kobject *kobj /**< kobject for SDOs */)
 void ec_slave_reset(ec_slave_t *slave /**< EtherCAT slave */)
 {
     ec_sdo_data_t *sdodata, *next_sdodata;
-    ec_sii_sync_t *sync;
+    unsigned int i;
 
-    // remove FMMU configurations
     slave->fmmu_count = 0;
+    slave->pdos_registered = 0;
 
     // free all SDO configurations
     list_for_each_entry_safe(sdodata, next_sdodata, &slave->sdo_confs, list) {
@@ -322,9 +309,65 @@ void ec_slave_reset(ec_slave_t *slave /**< EtherCAT slave */)
     }
 
     // remove estimated sync manager sizes
-    list_for_each_entry(sync, &slave->sii_syncs, list) {
-        sync->est_length = 0;
+    for (i = 0; i < slave->sii_sync_count; i++) {
+        slave->sii_syncs[i].est_length = 0;
     }
+}
+
+/*****************************************************************************/
+
+/**
+ * Sets the application state of a slave.
+ */
+
+void ec_slave_set_state(ec_slave_t *slave, /**< EtherCAT slave */
+        ec_slave_state_t new_state /**< new application state */
+        )
+{
+    if (new_state != slave->current_state) {
+        if (slave->master->debug_level) {
+            char old_state[EC_STATE_STRING_SIZE],
+                cur_state[EC_STATE_STRING_SIZE];
+            ec_state_string(slave->current_state, old_state);
+            ec_state_string(new_state, cur_state);
+            EC_DBG("Slave %i: %s -> %s.\n",
+                   slave->ring_position, old_state, cur_state);
+        }
+        slave->current_state = new_state;
+    }
+}
+
+/*****************************************************************************/
+
+/**
+ * Sets the online state of a slave.
+ */
+
+void ec_slave_set_online_state(ec_slave_t *slave, /**< EtherCAT slave */
+        ec_slave_online_state_t new_state /**< new online state */
+        )
+{
+    if (new_state == EC_SLAVE_OFFLINE &&
+            slave->online_state == EC_SLAVE_ONLINE) {
+        if (slave->pdos_registered)
+            slave->master->pdo_slaves_offline++;
+        if (slave->master->debug_level)
+            EC_DBG("Slave %i: offline.\n", slave->ring_position);
+    }
+    else if (new_state == EC_SLAVE_ONLINE &&
+            slave->online_state == EC_SLAVE_OFFLINE) {
+        slave->error_flag = 0; // clear error flag
+        if (slave->pdos_registered)
+            slave->master->pdo_slaves_offline--;
+        if (slave->master->debug_level) {
+            char cur_state[EC_STATE_STRING_SIZE];
+            ec_state_string(slave->current_state, cur_state);
+            EC_DBG("Slave %i: online (%s).\n",
+                   slave->ring_position, cur_state);
+        }
+    }
+
+    slave->online_state = new_state;
 }
 
 /*****************************************************************************/
@@ -332,7 +375,7 @@ void ec_slave_reset(ec_slave_t *slave /**< EtherCAT slave */)
 /**
  */
 
-void ec_slave_request_state(ec_slave_t *slave, /**< ETherCAT slave */
+void ec_slave_request_state(ec_slave_t *slave, /**< EtherCAT slave */
                             ec_slave_state_t state /**< new state */
                             )
 {
@@ -347,35 +390,50 @@ void ec_slave_request_state(ec_slave_t *slave, /**< ETherCAT slave */
    \return 0 in case of success, else < 0
 */
 
-int ec_slave_fetch_strings(ec_slave_t *slave, /**< EtherCAT slave */
-                           const uint8_t *data /**< category data */
-                           )
+int ec_slave_fetch_sii_strings(
+        ec_slave_t *slave, /**< EtherCAT slave */
+        const uint8_t *data /**< category data */
+        )
 {
-    unsigned int string_count, i;
+    int i;
     size_t size;
     off_t offset;
-    ec_sii_string_t *string;
 
-    string_count = data[0];
+    slave->sii_string_count = data[0];
+
+    if (!slave->sii_string_count)
+        return 0;
+
+    if (!(slave->sii_strings =
+                kmalloc(sizeof(char *) * slave->sii_string_count,
+                    GFP_KERNEL))) {
+        EC_ERR("Failed to allocate string array memory.\n");
+        goto out_zero;
+    }
+
     offset = 1;
-    for (i = 0; i < string_count; i++) {
+    for (i = 0; i < slave->sii_string_count; i++) {
         size = data[offset];
         // allocate memory for string structure and data at a single blow
-        if (!(string = (ec_sii_string_t *)
-              kmalloc(sizeof(ec_sii_string_t) + size + 1, GFP_ATOMIC))) {
+        if (!(slave->sii_strings[i] =
+                    kmalloc(sizeof(char) * size + 1, GFP_KERNEL))) {
             EC_ERR("Failed to allocate string memory.\n");
-            return -1;
+            goto out_free;
         }
-        string->size = size;
-        // string memory appended to string structure
-        string->data = (char *) string + sizeof(ec_sii_string_t);
-        memcpy(string->data, data + offset + 1, size);
-        string->data[size] = 0x00;
-        list_add_tail(&string->list, &slave->sii_strings);
+        memcpy(slave->sii_strings[i], data + offset + 1, size);
+        slave->sii_strings[i][size] = 0x00; // append binary zero
         offset += 1 + size;
     }
 
     return 0;
+
+out_free:
+    for (i--; i >= 0; i--) kfree(slave->sii_strings[i]);
+    kfree(slave->sii_strings);
+    slave->sii_strings = NULL;
+out_zero:
+    slave->sii_string_count = 0;
+    return -1;
 }
 
 /*****************************************************************************/
@@ -385,16 +443,17 @@ int ec_slave_fetch_strings(ec_slave_t *slave, /**< EtherCAT slave */
    \return 0 in case of success, else < 0
 */
 
-void ec_slave_fetch_general(ec_slave_t *slave, /**< EtherCAT slave */
-                            const uint8_t *data /**< category data */
-                            )
+void ec_slave_fetch_sii_general(
+        ec_slave_t *slave, /**< EtherCAT slave */
+        const uint8_t *data /**< category data */
+        )
 {
     unsigned int i;
 
-    ec_slave_locate_string(slave, data[0], &slave->sii_group);
-    ec_slave_locate_string(slave, data[1], &slave->sii_image);
-    ec_slave_locate_string(slave, data[2], &slave->sii_order);
-    ec_slave_locate_string(slave, data[3], &slave->sii_name);
+    slave->sii_group = ec_slave_sii_string(slave, data[0]);
+    slave->sii_image = ec_slave_sii_string(slave, data[1]);
+    slave->sii_order = ec_slave_sii_string(slave, data[2]);
+    slave->sii_name = ec_slave_sii_string(slave, data[3]);
 
     for (i = 0; i < 4; i++)
         slave->sii_physical_layer[i] =
@@ -410,32 +469,34 @@ void ec_slave_fetch_general(ec_slave_t *slave, /**< EtherCAT slave */
    \return 0 in case of success, else < 0
 */
 
-int ec_slave_fetch_sync(ec_slave_t *slave, /**< EtherCAT slave */
-                        const uint8_t *data, /**< category data */
-                        size_t word_count /**< number of words */
-                        )
+int ec_slave_fetch_sii_syncs(
+        ec_slave_t *slave, /**< EtherCAT slave */
+        const uint8_t *data, /**< category data */
+        size_t word_count /**< number of words */
+        )
 {
-    unsigned int sync_count, i;
-    ec_sii_sync_t *sync;
+    unsigned int i;
+    ec_sync_t *sync;
 
-    sync_count = word_count / 4; // sync manager struct is 4 words long
+    // sync manager struct is 4 words long
+    slave->sii_sync_count = word_count / 4;
 
-    for (i = 0; i < sync_count; i++, data += 8) {
-        if (!(sync = (ec_sii_sync_t *)
-              kmalloc(sizeof(ec_sii_sync_t), GFP_ATOMIC))) {
-            EC_ERR("Failed to allocate Sync-Manager memory.\n");
-            return -1;
-        }
+    if (!(slave->sii_syncs =
+                kmalloc(sizeof(ec_sync_t) * slave->sii_sync_count,
+                    GFP_KERNEL))) {
+        EC_ERR("Failed to allocate memory for sync managers.\n");
+        slave->sii_sync_count = 0;
+        return -1;
+    }
+    
+    for (i = 0; i < slave->sii_sync_count; i++, data += 8) {
+        sync = &slave->sii_syncs[i];
 
-        sync->index = i;
+        ec_sync_init(sync, slave, i);
         sync->physical_start_address = EC_READ_U16(data);
-        sync->length                 = EC_READ_U16(data + 2);
-        sync->control_register       = EC_READ_U8 (data + 4);
-        sync->enable                 = EC_READ_U8 (data + 6);
-
-        sync->est_length = 0;
-
-        list_add_tail(&sync->list, &slave->sii_syncs);
+        sync->length = EC_READ_U16(data + 2);
+        sync->control_register = EC_READ_U8 (data + 4);
+        sync->enable = EC_READ_U8 (data + 6);
     }
 
     return 0;
@@ -448,54 +509,73 @@ int ec_slave_fetch_sync(ec_slave_t *slave, /**< EtherCAT slave */
    \return 0 in case of success, else < 0
 */
 
-int ec_slave_fetch_pdo(ec_slave_t *slave, /**< EtherCAT slave */
-                       const uint8_t *data, /**< category data */
-                       size_t word_count, /**< number of words */
-                       ec_sii_pdo_type_t pdo_type /**< PDO type */
-                       )
+int ec_slave_fetch_sii_pdos(
+        ec_slave_t *slave, /**< EtherCAT slave */
+        const uint8_t *data, /**< category data */
+        size_t word_count, /**< number of words */
+        ec_pdo_type_t pdo_type /**< PDO type */
+        )
 {
-    ec_sii_pdo_t *pdo;
-    ec_sii_pdo_entry_t *entry;
+    ec_pdo_t *pdo;
+    ec_pdo_entry_t *entry;
     unsigned int entry_count, i;
 
     while (word_count >= 4) {
-        if (!(pdo = (ec_sii_pdo_t *)
-              kmalloc(sizeof(ec_sii_pdo_t), GFP_ATOMIC))) {
+        if (!(pdo = kmalloc(sizeof(ec_pdo_t), GFP_KERNEL))) {
             EC_ERR("Failed to allocate PDO memory.\n");
             return -1;
         }
 
-        INIT_LIST_HEAD(&pdo->entries);
+        ec_pdo_init(pdo);
         pdo->type = pdo_type;
-
         pdo->index = EC_READ_U16(data);
         entry_count = EC_READ_U8(data + 2);
         pdo->sync_index = EC_READ_U8(data + 3);
-        pdo->name = NULL;
-        ec_slave_locate_string(slave, EC_READ_U8(data + 5), &pdo->name);
-
+        pdo->name = ec_slave_sii_string(slave, EC_READ_U8(data + 5));
         list_add_tail(&pdo->list, &slave->sii_pdos);
 
         word_count -= 4;
         data += 8;
 
         for (i = 0; i < entry_count; i++) {
-            if (!(entry = (ec_sii_pdo_entry_t *)
-                  kmalloc(sizeof(ec_sii_pdo_entry_t), GFP_ATOMIC))) {
+            if (!(entry = kmalloc(sizeof(ec_pdo_entry_t), GFP_KERNEL))) {
                 EC_ERR("Failed to allocate PDO entry memory.\n");
                 return -1;
             }
 
             entry->index = EC_READ_U16(data);
             entry->subindex = EC_READ_U8(data + 2);
-            entry->name = NULL;
-            ec_slave_locate_string(slave, EC_READ_U8(data + 3), &entry->name);
+            entry->name = ec_slave_sii_string(slave, EC_READ_U8(data + 3));
             entry->bit_length = EC_READ_U8(data + 5);
-
             list_add_tail(&entry->list, &pdo->entries);
 
             word_count -= 4;
             data += 8;
+        }
+
+        // if sync manager index is positive, the PDO is mapped by default
+        if (pdo->sync_index >= 0) {
+            ec_pdo_t *mapped_pdo;
+
+            if (pdo->sync_index >= slave->sii_sync_count) {
+                EC_ERR("Invalid SM index %i for PDO 0x%04X in slave %u.",
+                        pdo->sync_index, pdo->index, slave->ring_position);
+                return -1;
+            }
+
+            if (!(mapped_pdo = kmalloc(sizeof(ec_pdo_t), GFP_KERNEL))) {
+                EC_ERR("Failed to allocate PDO memory.\n");
+                return -1;
+            }
+
+            if (ec_pdo_copy(mapped_pdo, pdo)) {
+                EC_ERR("Failed to copy PDO.\n");
+                kfree(mapped_pdo);
+                return -1;
+            }
+
+            list_add_tail(&mapped_pdo->list,
+                    &slave->sii_syncs[pdo->sync_index].pdos);
         }
     }
 
@@ -510,68 +590,43 @@ int ec_slave_fetch_pdo(ec_slave_t *slave, /**< EtherCAT slave */
    \todo documentation
 */
 
-int ec_slave_locate_string(ec_slave_t *slave, /**< EtherCAT slave */
-                           unsigned int index, /**< string index */
-                           char **ptr /**< Address of the string pointer */
-                           )
+char *ec_slave_sii_string(
+        ec_slave_t *slave, /**< EtherCAT slave */
+        unsigned int index /**< string index */
+        )
 {
-    ec_sii_string_t *string;
-    char *err_string;
+    if (!index--) 
+        return NULL;
 
-    // Erst alten Speicher freigeben
-    if (*ptr) {
-        kfree(*ptr);
-        *ptr = NULL;
+    if (index >= slave->sii_string_count) {
+        if (slave->master->debug_level)
+            EC_WARN("String %i not found in slave %i.\n",
+                    index, slave->ring_position);
+        return NULL;
     }
 
-    // Index 0 bedeutet "nicht belegt"
-    if (!index) return 0;
-
-    // EEPROM-String mit Index finden und kopieren
-    list_for_each_entry(string, &slave->sii_strings, list) {
-        if (--index) continue;
-
-        if (!(*ptr = (char *) kmalloc(string->size + 1, GFP_ATOMIC))) {
-            EC_ERR("Unable to allocate string memory.\n");
-            return -1;
-        }
-        memcpy(*ptr, string->data, string->size + 1);
-        return 0;
-    }
-
-    if (slave->master->debug_level)
-        EC_WARN("String %i not found in slave %i.\n",
-                index, slave->ring_position);
-
-    err_string = "(string not found)";
-
-    if (!(*ptr = (char *) kmalloc(strlen(err_string) + 1, GFP_ATOMIC))) {
-        EC_WARN("Unable to allocate string memory.\n");
-        return -1;
-    }
-
-    memcpy(*ptr, err_string, strlen(err_string) + 1);
-    return 0;
+    return slave->sii_strings[index];
 }
 
 /*****************************************************************************/
 
 /**
-   Prepares an FMMU configuration.
-   Configuration data for the FMMU is saved in the slave structure and is
-   written to the slave in ecrt_master_activate().
-   The FMMU configuration is done in a way, that the complete data range
-   of the corresponding sync manager is covered. Seperate FMMUs are configured
-   for each domain.
-   If the FMMU configuration is already prepared, the function returns with
-   success.
-   \return 0 in case of success, else < 0
-*/
+ * Prepares an FMMU configuration.
+ * Configuration data for the FMMU is saved in the slave structure and is
+ * written to the slave in ecrt_master_activate().
+ * The FMMU configuration is done in a way, that the complete data range
+ * of the corresponding sync manager is covered. Seperate FMMUs are configured
+ * for each domain.
+ * If the FMMU configuration is already prepared, the function returns with
+ * success.
+ * \return 0 in case of success, else < 0
+ */
 
-int ec_slave_prepare_fmmu(ec_slave_t *slave, /**< EtherCAT slave */
-                          const ec_domain_t *domain, /**< domain */
-                          const ec_sii_sync_t *sync  /**< sync manager */
-                          )
+int ec_slave_prepare_fmmu(
+        ec_slave_t *slave, /**< EtherCAT slave */
+        const ec_domain_t *domain, /**< domain */
+        const ec_sync_t *sync  /**< sync manager */
+        )
 {
     unsigned int i;
     ec_fmmu_t *fmmu;
@@ -592,12 +647,14 @@ int ec_slave_prepare_fmmu(ec_slave_t *slave, /**< EtherCAT slave */
 
     fmmu = &slave->fmmus[slave->fmmu_count];
 
-    fmmu->index = slave->fmmu_count;
+    ec_fmmu_init(fmmu, slave, slave->fmmu_count++);
     fmmu->domain = domain;
     fmmu->sync = sync;
     fmmu->logical_start_address = 0;
 
-    slave->fmmu_count++;
+    slave->pdos_registered = 1;
+    
+    ec_slave_request_state(slave, EC_SLAVE_STATE_OP);
 
     return 0;
 }
@@ -613,9 +670,9 @@ size_t ec_slave_info(const ec_slave_t *slave, /**< EtherCAT slave */
                      )
 {
     off_t off = 0;
-    ec_sii_sync_t *sync;
-    ec_sii_pdo_t *pdo;
-    ec_sii_pdo_entry_t *pdo_entry;
+    ec_sync_t *sync;
+    ec_pdo_t *pdo;
+    ec_pdo_entry_t *pdo_entry;
     int first, i;
     ec_sdo_data_t *sdodata;
     char str[20];
@@ -635,14 +692,10 @@ size_t ec_slave_info(const ec_slave_t *slave, /**< EtherCAT slave */
     off += sprintf(buffer + off, " (");
     off += ec_state_string(slave->requested_state, buffer + off);
     off += sprintf(buffer + off, ")\nFlags: %s, %s\n",
-                   slave->online ? "online" : "OFFLINE",
-                   slave->error_flag ? "ERROR" : "ok");
+            slave->online_state == EC_SLAVE_ONLINE ? "online" : "OFFLINE",
+            slave->error_flag ? "ERROR" : "ok");
     off += sprintf(buffer + off, "Ring position: %i\n",
                    slave->ring_position);
-    off += sprintf(buffer + off, "Advanced position: %i:%i\n",
-                   slave->coupler_index, slave->coupler_subindex);
-    off += sprintf(buffer + off, "Coupler: %s\n",
-                   ec_slave_is_coupler(slave) ? "yes" : "no");
     off += sprintf(buffer + off, "Current consumption: %i mA\n\n",
                    slave->sii_current_on_ebus);
 
@@ -725,31 +778,52 @@ size_t ec_slave_info(const ec_slave_t *slave, /**< EtherCAT slave */
     if (slave->sii_order)
         off += sprintf(buffer + off, "  Order number: %s\n", slave->sii_order);
 
-    if (!list_empty(&slave->sii_syncs))
-        off += sprintf(buffer + off, "\nSync-Managers:\n");
+    if (slave->sii_sync_count)
+        off += sprintf(buffer + off, "\nSync managers / PDO mapping:\n");
 
-    list_for_each_entry(sync, &slave->sii_syncs, list) {
-        off += sprintf(buffer + off, "  %i: 0x%04X, length %i,"
-                       " control 0x%02X, %s\n",
-                       sync->index, sync->physical_start_address,
-                       sync->length, sync->control_register,
-                       sync->enable ? "enable" : "disable");
+    for (i = 0; i < slave->sii_sync_count; i++) {
+        sync = &slave->sii_syncs[i];
+        off += sprintf(buffer + off,
+                "  SM%u: addr 0x%04X, size %i, control 0x%02X, %s\n",
+                sync->index, sync->physical_start_address,
+                ec_sync_size(sync), sync->control_register,
+                sync->enable ? "enable" : "disable");
+
+        if (list_empty(&sync->pdos))
+            off += sprintf(buffer + off, "    No PDOs mapped.\n");
+
+        list_for_each_entry(pdo, &sync->pdos, list) {
+            off += sprintf(buffer + off, "    %s 0x%04X \"%s\"\n",
+                    pdo->type == EC_RX_PDO ? "RXPDO" : "TXPDO",
+                    pdo->index, pdo->name ? pdo->name : "???");
+
+            list_for_each_entry(pdo_entry, &pdo->entries, list) {
+                off += sprintf(buffer + off,
+                        "      0x%04X:%X \"%s\", %i bit\n",
+                        pdo_entry->index, pdo_entry->subindex,
+                        pdo_entry->name ? pdo_entry->name : "???",
+                        pdo_entry->bit_length);
+            }
+        }
     }
 
     if (!list_empty(&slave->sii_pdos))
-        off += sprintf(buffer + off, "\nPDOs:\n");
+        off += sprintf(buffer + off, "\nAvailable PDOs:\n");
 
     list_for_each_entry(pdo, &slave->sii_pdos, list) {
-        off += sprintf(buffer + off,
-                       "  %s \"%s\" (0x%04X), Sync-Manager %i\n",
+        off += sprintf(buffer + off, "  %s 0x%04X \"%s\"",
                        pdo->type == EC_RX_PDO ? "RXPDO" : "TXPDO",
-                       pdo->name ? pdo->name : "???",
-                       pdo->index, pdo->sync_index);
+                       pdo->index, pdo->name ? pdo->name : "???");
+        if (pdo->sync_index >= 0)
+            off += sprintf(buffer + off, ", default mapping: SM%u.\n",
+                    pdo->sync_index);
+        else
+            off += sprintf(buffer + off, ", no default mapping.\n");
 
         list_for_each_entry(pdo_entry, &pdo->entries, list) {
-            off += sprintf(buffer + off, "    \"%s\" 0x%04X:%X, %i bit\n",
-                           pdo_entry->name ? pdo_entry->name : "???",
+            off += sprintf(buffer + off, "    0x%04X:%X \"%s\", %i bit\n",
                            pdo_entry->index, pdo_entry->subindex,
+                           pdo_entry->name ? pdo_entry->name : "???",
                            pdo_entry->bit_length);
         }
     }
@@ -776,79 +850,150 @@ size_t ec_slave_info(const ec_slave_t *slave, /**< EtherCAT slave */
 /*****************************************************************************/
 
 /**
-   Schedules an EEPROM write operation.
-   \return 0 in case of success, else < 0
-*/
+ * Schedules an EEPROM write request.
+ * \return 0 case of success, otherwise error code.
+ */
+
+int ec_slave_schedule_eeprom_writing(ec_eeprom_write_request_t *request)
+{
+    ec_master_t *master = request->slave->master;
+
+    request->state = EC_REQUEST_QUEUED;
+
+    // schedule EEPROM write request.
+    down(&master->eeprom_sem);
+    list_add_tail(&request->list, &master->eeprom_requests);
+    up(&master->eeprom_sem);
+
+    // wait for processing through FSM
+    if (wait_event_interruptible(master->eeprom_queue,
+                request->state != EC_REQUEST_QUEUED)) {
+        // interrupted by signal
+        down(&master->eeprom_sem);
+        if (request->state == EC_REQUEST_QUEUED) {
+            list_del(&request->list);
+            up(&master->eeprom_sem);
+            return -EINTR;
+        }
+        // request already processing: interrupt not possible.
+        up(&master->eeprom_sem);
+    }
+
+    // wait until master FSM has finished processing
+    wait_event(master->eeprom_queue,
+            request->state != EC_REQUEST_IN_PROGRESS);
+
+    return request->state == EC_REQUEST_COMPLETE ? 0 : -EIO;
+}
+
+/*****************************************************************************/
+
+/**
+ * Writes complete EEPROM contents to a slave.
+ * \return data size written in case of success, otherwise error code.
+ */
 
 ssize_t ec_slave_write_eeprom(ec_slave_t *slave, /**< EtherCAT slave */
-                              const uint8_t *data, /**< new EEPROM data */
-                              size_t size /**< size of data in bytes */
-                              )
+        const uint8_t *data, /**< new EEPROM data */
+        size_t size /**< size of data in bytes */
+        )
 {
-    uint16_t word_size, cat_type, cat_size;
-    const uint16_t *data_words, *next_header;
-    uint16_t *new_data;
+    ec_eeprom_write_request_t request;
+    const uint16_t *cat_header;
+    uint16_t cat_type, cat_size;
+    int ret;
 
-    if (!slave->master->eeprom_write_enable) {
-        EC_ERR("Writing EEPROMs not allowed! Enable via"
-               " eeprom_write_enable SysFS entry.\n");
-        return -1;
-    }
-
-    if (slave->master->mode != EC_MASTER_MODE_IDLE) {
+    if (slave->master->mode != EC_MASTER_MODE_IDLE) { // FIXME
         EC_ERR("Writing EEPROMs only allowed in idle mode!\n");
-        return -1;
+        return -EBUSY;
     }
-
-    if (slave->new_eeprom_data) {
-        EC_ERR("Slave %i already has a pending EEPROM write operation!\n",
-               slave->ring_position);
-        return -1;
-    }
-
-    // coarse check of the data
 
     if (size % 2) {
-        EC_ERR("EEPROM size is odd! Dropping.\n");
-        return -1;
+        EC_ERR("EEPROM data size is odd! Dropping.\n");
+        return -EINVAL;
     }
 
-    data_words = (const uint16_t *) data;
-    word_size = size / 2;
+    // init EEPROM write request
+    INIT_LIST_HEAD(&request.list);
+    request.slave = slave;
+    request.words = (const uint16_t *) data;
+    request.offset = 0;
+    request.size = size / 2;
 
-    if (word_size < 0x0041) {
+    if (request.size < 0x0041) {
         EC_ERR("EEPROM data too short! Dropping.\n");
-        return -1;
+        return -EINVAL;
     }
 
-    next_header = data_words + 0x0040;
-    cat_type = EC_READ_U16(next_header);
-    while (cat_type != 0xFFFF) {
-        cat_type = EC_READ_U16(next_header);
-        cat_size = EC_READ_U16(next_header + 1);
-        if ((next_header + cat_size + 2) - data_words >= word_size) {
-            EC_ERR("EEPROM data seems to be corrupted! Dropping.\n");
-            return -1;
+    cat_header = request.words + EC_FIRST_EEPROM_CATEGORY_OFFSET;
+    cat_type = EC_READ_U16(cat_header);
+    while (cat_type != 0xFFFF) { // cycle through categories
+        if (cat_header + 1 > request.words + request.size) {
+            EC_ERR("EEPROM data corrupted! Dropping.\n");
+            return -EINVAL;
         }
-        next_header += cat_size + 2;
-        cat_type = EC_READ_U16(next_header);
+        cat_size = EC_READ_U16(cat_header + 1);
+        if (cat_header + cat_size + 2 > request.words + request.size) {
+            EC_ERR("EEPROM data corrupted! Dropping.\n");
+            return -EINVAL;
+        }
+        cat_header += cat_size + 2;
+        cat_type = EC_READ_U16(cat_header);
     }
 
-    // data ok!
+    // EEPROM data ok. schedule writing.
+    if ((ret = ec_slave_schedule_eeprom_writing(&request)))
+        return ret; // error code
 
-    if (!(new_data = (uint16_t *) kmalloc(word_size * 2, GFP_KERNEL))) {
-        EC_ERR("Unable to allocate memory for new EEPROM data!\n");
-        return -1;
-    }
-    memcpy(new_data, data, size);
-
-    slave->new_eeprom_size = word_size;
-    slave->new_eeprom_data = new_data;
-
-    EC_INFO("EEPROM writing scheduled for slave %i, %i words.\n",
-            slave->ring_position, word_size);
-    return 0;
+    return size; // success
 }
+
+/*****************************************************************************/
+
+/**
+ * Writes the Secondary slave address (alias) to the slave's EEPROM.
+ * \return data size written in case of success, otherwise error code.
+ */
+
+ssize_t ec_slave_write_alias(ec_slave_t *slave, /**< EtherCAT slave */
+        const uint8_t *data, /**< alias string */
+        size_t size /**< size of data in bytes */
+        )
+{
+    ec_eeprom_write_request_t request;
+    char *remainder;
+    uint16_t alias, word;
+    int ret;
+
+    if (slave->master->mode != EC_MASTER_MODE_IDLE) { // FIXME
+        EC_ERR("Writing EEPROMs only allowed in idle mode!\n");
+        return -EBUSY;
+    }
+
+    alias = simple_strtoul(data, &remainder, 0);
+    if (remainder == (char *) data || (*remainder && *remainder != '\n')) {
+        EC_ERR("Invalid alias value! Dropping.\n");
+        return -EINVAL;
+    }
+    
+    // correct endianess
+    EC_WRITE_U16(&word, alias);
+
+    // init EEPROM write request
+    INIT_LIST_HEAD(&request.list);
+    request.slave = slave;
+    request.words = &word;
+    request.offset = 0x0004;
+    request.size = 1;
+
+    if ((ret = ec_slave_schedule_eeprom_writing(&request)))
+        return ret; // error code
+
+    slave->sii_alias = alias; // FIXME: do this in state machine
+
+    return size; // success
+}
+
 
 /*****************************************************************************/
 
@@ -894,6 +1039,9 @@ ssize_t ec_show_slave_attribute(struct kobject *kobj, /**< slave's kobject */
             }
         }
     }
+    else if (attr == &attr_alias) {
+        return sprintf(buffer, "%u\n", slave->sii_alias);
+    }
 
     return 0;
 }
@@ -934,138 +1082,39 @@ ssize_t ec_store_slave_attribute(struct kobject *kobj, /**< slave's kobject */
         return size;
     }
     else if (attr == &attr_eeprom) {
-        if (!ec_slave_write_eeprom(slave, buffer, size))
-            return size;
+        return ec_slave_write_eeprom(slave, buffer, size);
+    }
+    else if (attr == &attr_alias) {
+        return ec_slave_write_alias(slave, buffer, size);
     }
 
-    return -EINVAL;
+    return -EIO;
 }
 
 /*****************************************************************************/
 
 /**
-   Calculates the size of a sync manager by evaluating PDO sizes.
-   \return sync manager size
-*/
+ */
 
-uint16_t ec_slave_calc_sync_size(const ec_slave_t *slave,
-                                 /**< EtherCAT slave */
-                                 const ec_sii_sync_t *sync
-                                 /**< sync manager */
-                                 )
-{
-    ec_sii_pdo_t *pdo;
-    ec_sii_pdo_entry_t *pdo_entry;
-    unsigned int bit_size, byte_size;
-
-    if (sync->length) return sync->length;
-    if (sync->est_length) return sync->est_length;
-
-    bit_size = 0;
-    list_for_each_entry(pdo, &slave->sii_pdos, list) {
-        if (pdo->sync_index != sync->index) continue;
-
-        list_for_each_entry(pdo_entry, &pdo->entries, list) {
-            bit_size += pdo_entry->bit_length;
-        }
-    }
-
-    if (bit_size % 8) // round up to full bytes
-        byte_size = bit_size / 8 + 1;
-    else
-        byte_size = bit_size / 8;
-
-    return byte_size;
-}
-
-/*****************************************************************************/
-
-/**
-   Initializes a sync manager configuration page with EEPROM data.
-   The referenced memory (\a data) must be at least EC_SYNC_SIZE bytes.
-*/
-
-void ec_slave_sync_config(const ec_slave_t *slave, /**< EtherCAT slave */
-        const ec_sii_sync_t *sync, /**< sync manager */
-        uint8_t *data /**> configuration memory */
+ec_sync_t *ec_slave_get_pdo_sync(
+        ec_slave_t *slave, /**< EtherCAT slave */
+        ec_direction_t dir /**< input or output */
         )
 {
-    size_t sync_size;
+    unsigned int sync_index;
 
-    sync_size = ec_slave_calc_sync_size(slave, sync);
-
-    if (slave->master->debug_level) {
-        EC_DBG("Slave %3i, SM %i: Addr 0x%04X, Size %3i, Ctrl 0x%02X, En %i\n",
-               slave->ring_position, sync->index, sync->physical_start_address,
-               sync_size, sync->control_register, sync->enable);
+    if (dir != EC_DIR_INPUT && dir != EC_DIR_OUTPUT) {
+        EC_ERR("Invalid direction!\n");
+        return NULL;
     }
 
-    EC_WRITE_U16(data,     sync->physical_start_address);
-    EC_WRITE_U16(data + 2, sync_size);
-    EC_WRITE_U8 (data + 4, sync->control_register);
-    EC_WRITE_U8 (data + 5, 0x00); // status byte (read only)
-    EC_WRITE_U16(data + 6, sync->enable ? 0x0001 : 0x0000); // enable
-}
+    sync_index = (unsigned int) dir;
+    if (slave->sii_mailbox_protocols) sync_index += 2;
 
-/*****************************************************************************/
+    if (sync_index >= slave->sii_sync_count)
+        return NULL;
 
-/**
-   Initializes an FMMU configuration page.
-   The referenced memory (\a data) must be at least EC_FMMU_SIZE bytes.
-*/
-
-void ec_slave_fmmu_config(const ec_slave_t *slave, /**< EtherCAT slave */
-        const ec_fmmu_t *fmmu, /**< FMMU */
-        uint8_t *data /**> configuration memory */
-        )
-{
-    size_t sync_size;
-
-    sync_size = ec_slave_calc_sync_size(slave, fmmu->sync);
-
-    if (slave->master->debug_level) {
-        EC_DBG("Slave %3i, FMMU %2i:"
-               " LogAddr 0x%08X, Size %3i, PhysAddr 0x%04X, Dir %s\n",
-               slave->ring_position, fmmu->index, fmmu->logical_start_address,
-               sync_size, fmmu->sync->physical_start_address,
-               ((fmmu->sync->control_register & 0x04) ? "out" : "in"));
-    }
-
-    EC_WRITE_U32(data,      fmmu->logical_start_address);
-    EC_WRITE_U16(data + 4,  sync_size); // size of fmmu
-    EC_WRITE_U8 (data + 6,  0x00); // logical start bit
-    EC_WRITE_U8 (data + 7,  0x07); // logical end bit
-    EC_WRITE_U16(data + 8,  fmmu->sync->physical_start_address);
-    EC_WRITE_U8 (data + 10, 0x00); // physical start bit
-    EC_WRITE_U8 (data + 11, ((fmmu->sync->control_register & 0x04)
-                             ? 0x02 : 0x01));
-    EC_WRITE_U16(data + 12, 0x0001); // enable
-    EC_WRITE_U16(data + 14, 0x0000); // reserved
-}
-
-/*****************************************************************************/
-
-/**
-   \return non-zero if slave is a bus coupler
-*/
-
-int ec_slave_is_coupler(const ec_slave_t *slave /**< EtherCAT slave */)
-{
-    // TODO: Better bus coupler criterion
-    return slave->sii_vendor_id == 0x00000002
-        && slave->sii_product_code == 0x044C2C52;
-}
-
-/*****************************************************************************/
-
-/**
-   \return non-zero if slave is a bus coupler
-*/
-
-int ec_slave_has_subbus(const ec_slave_t *slave /**< EtherCAT slave */)
-{
-    return slave->sii_vendor_id == 0x00000002
-        && slave->sii_product_code == 0x04602c22;
+    return &slave->sii_syncs[sync_index];
 }
 
 /*****************************************************************************/
@@ -1122,9 +1171,10 @@ int ec_slave_validate(const ec_slave_t *slave, /**< EtherCAT slave */
 {
     if (vendor_id != slave->sii_vendor_id ||
         product_code != slave->sii_product_code) {
-        EC_ERR("Invalid slave type at position %i - Requested: 0x%08X 0x%08X,"
-               " found: 0x%08X 0x%08X\".\n", slave->ring_position, vendor_id,
-               product_code, slave->sii_vendor_id, slave->sii_product_code);
+        EC_ERR("Invalid slave type at position %i:\n", slave->ring_position);
+        EC_ERR("  Requested: 0x%08X 0x%08X\n", vendor_id, product_code);
+        EC_ERR("      Found: 0x%08X 0x%08X\n",
+                slave->sii_vendor_id, slave->sii_product_code);
         return -1;
     }
     return 0;
@@ -1215,73 +1265,96 @@ int ecrt_slave_conf_sdo32(ec_slave_t *slave, /**< EtherCAT slave */
 
 /*****************************************************************************/
 
-/**
-   \return 0 in case of success, else < 0
-   \ingroup RealtimeInterface
-*/
-
-int ecrt_slave_pdo_size(ec_slave_t *slave, /**< EtherCAT slave */
-                        uint16_t pdo_index, /**< PDO index */
-                        uint8_t pdo_subindex, /**< PDO subindex */
-                        size_t size /**< new PDO size */
-                        )
+void ecrt_slave_pdo_mapping_clear(
+        ec_slave_t *slave, /**< EtherCAT slave */
+        ec_direction_t dir /**< output/input */
+        )
 {
-    EC_WARN("ecrt_slave_pdo_size() currently not available.\n");
-    return -1;
+    ec_sync_t *sync;
 
-#if 0
-    unsigned int i, j, field_counter;
-    const ec_sii_sync_t *sync;
-    const ec_pdo_t *pdo;
-    ec_varsize_t *var;
+    if (!(slave->sii_mailbox_protocols & EC_MBOX_COE)) {
+        EC_ERR("Slave %i does not support CoE!\n", slave->ring_position);
+        return;
+    }
 
-    if (!slave->type) {
-        EC_ERR("Slave %i has no type information!\n", slave->ring_position);
+    if (!(sync = ec_slave_get_pdo_sync(slave, dir)))
+        return;
+
+    ec_sync_clear_pdos(sync);
+}
+
+/*****************************************************************************/
+
+int ecrt_slave_pdo_mapping_add(
+        ec_slave_t *slave, /**< EtherCAT slave */
+        ec_direction_t dir, /**< input/output */
+        uint16_t pdo_index /**< Index of PDO mapping list */)
+{
+    ec_pdo_t *pdo;
+    ec_sync_t *sync;
+    unsigned int not_found = 1;
+
+    if (!(slave->sii_mailbox_protocols & EC_MBOX_COE)) {
+        EC_ERR("Slave %u does not support CoE!\n", slave->ring_position);
         return -1;
     }
 
-    field_counter = 0;
-    for (i = 0; (sync = slave->type->sync_managers[i]); i++) {
-        for (j = 0; (field = sync->fields[j]); j++) {
-            if (!strcmp(field->name, field_name)) {
-                if (field_counter++ == field_index) {
-                    // is the size of this field variable?
-                    if (field->size) {
-                        EC_ERR("Field \"%s\"[%i] of slave %i has no variable"
-                               " size!\n", field->name, field_index,
-                               slave->ring_position);
-                        return -1;
-                    }
-                    // does a size specification already exist?
-                    list_for_each_entry(var, &slave->varsize_fields, list) {
-                        if (var->field == field) {
-                            EC_WARN("Resizing field \"%s\"[%i] of slave %i.\n",
-                                    field->name, field_index,
-                                    slave->ring_position);
-                            var->size = size;
-                            return 0;
-                        }
-                    }
-                    // create a new size specification...
-                    if (!(var = kmalloc(sizeof(ec_varsize_t), GFP_KERNEL))) {
-                        EC_ERR("Failed to allocate memory for varsize_t!\n");
-                        return -1;
-                    }
-                    var->field = field;
-                    var->size = size;
-                    list_add_tail(&var->list, &slave->varsize_fields);
-                    return 0;
-                }
-            }
+    // does the slave provide the PDO list?
+    list_for_each_entry(pdo, &slave->sii_pdos, list) {
+        if (pdo->index == pdo_index) {
+            not_found = 0;
+            break;
         }
     }
 
-    EC_ERR("Slave %i (\"%s %s\") has no field \"%s\"[%i]!\n",
-           slave->ring_position, slave->type->vendor_name,
-           slave->type->product_name, field_name, field_index);
-    return -1;
-#endif
+    if (not_found) {
+        EC_ERR("Slave %u does not provide PDO 0x%04X!\n",
+                slave->ring_position, pdo_index);
+        return -1;
+    }
+
+    // check direction
+    if ((pdo->type == EC_TX_PDO && dir == EC_DIR_OUTPUT) ||
+            (pdo->type == EC_RX_PDO && dir == EC_DIR_INPUT)) {
+        EC_ERR("Invalid direction for PDO 0x%04X.\n", pdo_index);
+        return -1;
+    }
+
+
+    if (!(sync = ec_slave_get_pdo_sync(slave, dir))) {
+        EC_ERR("Failed to obtain sync manager for PDO mapping of slave %u!\n",
+                slave->ring_position);
+        return -1;
+    }
+
+    return ec_sync_add_pdo(sync, pdo);
 }
+
+/*****************************************************************************/
+
+int ecrt_slave_pdo_mapping(ec_slave_t *slave, /**< EtherCAT slave */
+        ec_direction_t dir, /**< input/output */
+        unsigned int num_args, /**< Number of following arguments */
+        ... /**< PDO indices to map */
+        )
+{
+    va_list ap;
+
+    ecrt_slave_pdo_mapping_clear(slave, dir);
+
+    va_start(ap, num_args);
+
+    for (; num_args; num_args--) {
+        if (ecrt_slave_pdo_mapping_add(
+                    slave, dir, (uint16_t) va_arg(ap, int))) {
+            return -1;
+        }
+    }
+
+    va_end(ap);
+    return 0;
+}
+
 
 /*****************************************************************************/
 
@@ -1290,7 +1363,9 @@ int ecrt_slave_pdo_size(ec_slave_t *slave, /**< EtherCAT slave */
 EXPORT_SYMBOL(ecrt_slave_conf_sdo8);
 EXPORT_SYMBOL(ecrt_slave_conf_sdo16);
 EXPORT_SYMBOL(ecrt_slave_conf_sdo32);
-EXPORT_SYMBOL(ecrt_slave_pdo_size);
+EXPORT_SYMBOL(ecrt_slave_pdo_mapping_clear);
+EXPORT_SYMBOL(ecrt_slave_pdo_mapping_add);
+EXPORT_SYMBOL(ecrt_slave_pdo_mapping);
 
 /** \endcond */
 

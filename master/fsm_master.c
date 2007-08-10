@@ -41,6 +41,7 @@
 #include "globals.h"
 #include "master.h"
 #include "mailbox.h"
+#include "ethernet.h"
 #include "fsm_master.h"
 
 /*****************************************************************************/
@@ -74,10 +75,12 @@ void ec_fsm_master_init(ec_fsm_master_t *fsm, /**< master state machine */
     fsm->master = master;
     fsm->datagram = datagram;
     fsm->state = ec_fsm_master_state_start;
+    fsm->idle = 0;
     fsm->slaves_responding = 0;
     fsm->topology_change_pending = 0;
     fsm->slave_states = EC_SLAVE_STATE_UNKNOWN;
     fsm->validate = 0;
+    fsm->tainted = 0;
 
     // init sub-state-machines
     ec_fsm_slave_init(&fsm->fsm_slave, fsm->datagram);
@@ -125,10 +128,12 @@ int ec_fsm_master_exec(ec_fsm_master_t *fsm /**< master state machine */)
 /*****************************************************************************/
 
 /**
-   \return false, if state machine has terminated
-*/
+ * \return false, if state machine has terminated
+ */
 
-int ec_fsm_master_running(ec_fsm_master_t *fsm /**< master state machine */)
+int ec_fsm_master_running(
+        const ec_fsm_master_t *fsm /**< master state machine */
+        )
 {
     return fsm->state != ec_fsm_master_state_end
         && fsm->state != ec_fsm_master_state_error;
@@ -137,16 +142,18 @@ int ec_fsm_master_running(ec_fsm_master_t *fsm /**< master state machine */)
 /*****************************************************************************/
 
 /**
-   \return true, if the master state machine terminated gracefully
-*/
+ * \return true, if the state machine is in an idle phase
+ */
 
-int ec_fsm_master_success(ec_fsm_master_t *fsm /**< master state machine */)
+int ec_fsm_master_idle(
+        const ec_fsm_master_t *fsm /**< master state machine */
+        )
 {
-    return fsm->state == ec_fsm_master_state_end;
+    return fsm->idle;
 }
 
 /******************************************************************************
- *  operation/idle state machine
+ *  master state machine
  *****************************************************************************/
 
 /**
@@ -156,8 +163,8 @@ int ec_fsm_master_success(ec_fsm_master_t *fsm /**< master state machine */)
 
 void ec_fsm_master_state_start(ec_fsm_master_t *fsm)
 {
+    fsm->idle = 1;
     ec_datagram_brd(fsm->datagram, 0x0130, 2);
-    ec_master_queue_datagram(fsm->master, fsm->datagram);
     fsm->state = ec_fsm_master_state_broadcast;
 }
 
@@ -175,17 +182,13 @@ void ec_fsm_master_state_broadcast(ec_fsm_master_t *fsm /**< master state machin
     ec_slave_t *slave;
     ec_master_t *master = fsm->master;
 
-    if (datagram->state == EC_DATAGRAM_TIMED_OUT) {
-        // always retry
-        ec_master_queue_datagram(fsm->master, fsm->datagram);
-        return;
-    }
+    if (datagram->state == EC_DATAGRAM_TIMED_OUT)
+        return; // always retry
 
-    if (datagram->state != EC_DATAGRAM_RECEIVED) { // EC_DATAGRAM_ERROR
-        // link is down
+    if (datagram->state != EC_DATAGRAM_RECEIVED) { // link is down
         fsm->slaves_responding = 0;
         list_for_each_entry(slave, &master->slaves, list) {
-            slave->online = 0;
+            ec_slave_set_online_state(slave, EC_SLAVE_OFFLINE);
         }
         fsm->state = ec_fsm_master_state_error;
         return;
@@ -206,6 +209,7 @@ void ec_fsm_master_state_broadcast(ec_fsm_master_t *fsm /**< master state machin
             }
             else {
                 EC_WARN("Invalid slave count. Bus in tainted state.\n");
+                fsm->tainted = 1;
             }
         }
     }
@@ -218,58 +222,239 @@ void ec_fsm_master_state_broadcast(ec_fsm_master_t *fsm /**< master state machin
         EC_INFO("Slave states: %s.\n", states);
     }
 
-    // topology change in idle mode: clear all slaves and scan the bus
-    if (fsm->topology_change_pending &&
-            master->mode == EC_MASTER_MODE_IDLE) {
-        fsm->topology_change_pending = 0;
+    if (fsm->topology_change_pending) {
+        down(&master->scan_sem);
+        if (!master->allow_scan) {
+            up(&master->scan_sem);
+        }
+        else {
+            master->scan_state = EC_REQUEST_IN_PROGRESS;
+            up(&master->scan_sem);
+            
+            // topology change when scan is allowed:
+            // clear all slaves and scan the bus
+            fsm->topology_change_pending = 0;
+            fsm->tainted = 0;
+            fsm->idle = 0;
+            fsm->scan_jiffies = jiffies;
 
-        ec_master_eoe_stop(master);
-        ec_master_destroy_slaves(master);
+            ec_master_eoe_stop(master);
+            ec_master_clear_eoe_handlers(master);
+            ec_master_destroy_slaves(master);
 
-        master->slave_count = datagram->working_counter;
+            master->slave_count = datagram->working_counter;
 
-        if (!master->slave_count) {
-            // no slaves present -> finish state machine.
-            fsm->state = ec_fsm_master_state_end;
+            if (!master->slave_count) {
+                // no slaves present -> finish state machine.
+                master->scan_state = EC_REQUEST_COMPLETE;
+                wake_up_interruptible(&master->scan_queue);
+                fsm->state = ec_fsm_master_state_end;
+                return;
+            }
+
+            // init slaves
+            for (i = 0; i < master->slave_count; i++) {
+                if (!(slave = (ec_slave_t *) kmalloc(sizeof(ec_slave_t),
+                                GFP_ATOMIC))) {
+                    EC_ERR("Failed to allocate slave %i!\n", i);
+                    ec_master_destroy_slaves(master);
+                    master->scan_state = EC_REQUEST_FAILURE;
+                    wake_up_interruptible(&master->scan_queue);
+                    fsm->state = ec_fsm_master_state_error;
+                    return;
+                }
+
+                if (ec_slave_init(slave, master, i, i + 1)) {
+                    // freeing of "slave" already done
+                    ec_master_destroy_slaves(master);
+                    master->scan_state = EC_REQUEST_FAILURE;
+                    wake_up_interruptible(&master->scan_queue);
+                    fsm->state = ec_fsm_master_state_error;
+                    return;
+                }
+
+                list_add_tail(&slave->list, &master->slaves);
+            }
+
+            EC_INFO("Scanning bus.\n");
+
+            // begin scanning of slaves
+            fsm->slave = list_entry(master->slaves.next, ec_slave_t, list);
+            fsm->state = ec_fsm_master_state_scan_slaves;
+            ec_fsm_slave_start_scan(&fsm->fsm_slave, fsm->slave);
+            ec_fsm_slave_exec(&fsm->fsm_slave); // execute immediately
             return;
         }
-
-        // init slaves
-        for (i = 0; i < master->slave_count; i++) {
-            if (!(slave = (ec_slave_t *) kmalloc(sizeof(ec_slave_t),
-                                                 GFP_ATOMIC))) {
-                EC_ERR("Failed to allocate slave %i!\n", i);
-                ec_master_destroy_slaves(master);
-                fsm->state = ec_fsm_master_state_error;
-                return;
-            }
-
-            if (ec_slave_init(slave, master, i, i + 1)) {
-                // freeing of "slave" already done
-                ec_master_destroy_slaves(master);
-                fsm->state = ec_fsm_master_state_error;
-                return;
-            }
-
-            list_add_tail(&slave->list, &master->slaves);
-        }
-
-        EC_INFO("Scanning bus.\n");
-
-        // begin scanning of slaves
-        fsm->slave = list_entry(master->slaves.next, ec_slave_t, list);
-        ec_fsm_slave_start_scan(&fsm->fsm_slave, fsm->slave);
-        ec_fsm_slave_exec(&fsm->fsm_slave); // execute immediately
-        fsm->state = ec_fsm_master_state_scan_slaves;
-        return;
     }
 
     // fetch state from each slave
     fsm->slave = list_entry(master->slaves.next, ec_slave_t, list);
     ec_datagram_nprd(fsm->datagram, fsm->slave->station_address, 0x0130, 2);
-    ec_master_queue_datagram(master, fsm->datagram);
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_master_state_read_states;
+}
+
+/*****************************************************************************/
+
+/**
+ * Check for pending EEPROM write requests and process one.
+ * \return non-zero, if an EEPROM write request is processed.
+ */
+
+int ec_fsm_master_action_process_eeprom(
+        ec_fsm_master_t *fsm /**< master state machine */
+        )
+{
+    ec_master_t *master = fsm->master;
+    ec_eeprom_write_request_t *request;
+    ec_slave_t *slave;
+
+    // search the first request to be processed
+    while (1) {
+        down(&master->eeprom_sem);
+        if (list_empty(&master->eeprom_requests)) {
+            up(&master->eeprom_sem);
+            break;
+        }
+        // get first request
+        request = list_entry(master->eeprom_requests.next,
+                ec_eeprom_write_request_t, list);
+        list_del_init(&request->list); // dequeue
+        request->state = EC_REQUEST_IN_PROGRESS;
+        up(&master->eeprom_sem);
+
+        slave = request->slave;
+        if (slave->online_state == EC_SLAVE_OFFLINE || slave->error_flag) {
+            EC_ERR("Discarding EEPROM data, slave %i not ready.\n",
+                    slave->ring_position);
+            request->state = EC_REQUEST_FAILURE;
+            wake_up(&master->eeprom_queue);
+            continue;
+        }
+
+        // found pending EEPROM write operation. execute it!
+        if (master->debug_level)
+            EC_DBG("Writing EEPROM data to slave %i...\n",
+                    slave->ring_position);
+        fsm->eeprom_request = request;
+        fsm->eeprom_index = 0;
+        ec_fsm_sii_write(&fsm->fsm_sii, request->slave, request->offset,
+                request->words, EC_FSM_SII_NODE);
+        fsm->state = ec_fsm_master_state_write_eeprom;
+        fsm->state(fsm); // execute immediately
+        return 1;
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
+
+/**
+ * Check for pending SDO requests and process one.
+ * \return non-zero, if an SDO request is processed.
+ */
+
+int ec_fsm_master_action_process_sdo(
+        ec_fsm_master_t *fsm /**< master state machine */
+        )
+{
+    ec_master_t *master = fsm->master;
+    ec_sdo_request_t *request;
+    ec_slave_t *slave;
+
+    // search the first request to be processed
+    while (1) {
+        down(&master->sdo_sem);
+        if (list_empty(&master->sdo_requests)) {
+            up(&master->sdo_sem);
+            break;
+        }
+        // get first request
+        request =
+            list_entry(master->sdo_requests.next, ec_sdo_request_t, list);
+        list_del_init(&request->list); // dequeue
+        request->state = EC_REQUEST_IN_PROGRESS;
+        up(&master->sdo_sem);
+
+        slave = request->sdo->slave;
+        if (slave->current_state == EC_SLAVE_STATE_INIT ||
+                slave->online_state == EC_SLAVE_OFFLINE ||
+                slave->error_flag) {
+            EC_ERR("Discarding SDO request, slave %i not ready.\n",
+                    slave->ring_position);
+            request->state = EC_REQUEST_FAILURE;
+            wake_up(&master->sdo_queue);
+            continue;
+        }
+
+        // found pending SDO request. execute it!
+        if (master->debug_level)
+            EC_DBG("Processing SDO request for slave %i...\n",
+                    slave->ring_position);
+
+        // start uploading SDO
+        fsm->idle = 0;
+        fsm->slave = slave;
+        fsm->sdo_request = request;
+        fsm->state = ec_fsm_master_state_sdo_request;
+        ec_fsm_coe_upload(&fsm->fsm_coe, slave, fsm->sdo_request);
+        ec_fsm_coe_exec(&fsm->fsm_coe); // execute immediately
+        return 1;
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
+
+/**
+ */
+
+int ec_fsm_master_action_configure(
+        ec_fsm_master_t *fsm /**< master state machine */
+        )
+{
+    ec_slave_t *slave;
+    ec_master_t *master = fsm->master;
+    char old_state[EC_STATE_STRING_SIZE], new_state[EC_STATE_STRING_SIZE];
+
+    // check if any slaves are not in the state, they're supposed to be
+    // FIXME do not check all slaves in every cycle...
+    list_for_each_entry(slave, &master->slaves, list) {
+        if (slave->error_flag
+                || slave->online_state == EC_SLAVE_OFFLINE
+                || slave->requested_state == EC_SLAVE_STATE_UNKNOWN
+                || (slave->current_state == slave->requested_state
+                    && slave->self_configured)) continue;
+
+        if (master->debug_level) {
+            ec_state_string(slave->current_state, old_state);
+            if (slave->current_state != slave->requested_state) {
+                ec_state_string(slave->requested_state, new_state);
+                EC_DBG("Changing state of slave %i (%s -> %s).\n",
+                        slave->ring_position, old_state, new_state);
+            }
+            else if (!slave->self_configured) {
+                EC_DBG("Reconfiguring slave %i (%s).\n",
+                        slave->ring_position, old_state);
+            }
+        }
+
+        fsm->idle = 0;
+        fsm->slave = slave;
+        fsm->state = ec_fsm_master_state_configure_slave;
+        ec_fsm_slave_start_conf(&fsm->fsm_slave, slave);
+        ec_fsm_slave_exec(&fsm->fsm_slave); // execute immediately
+        return 1;
+    }
+
+    if (fsm->config_error)
+        master->config_state = EC_REQUEST_FAILURE;
+    else
+        master->config_state = EC_REQUEST_COMPLETE;
+    wake_up_interruptible(&master->config_queue);
+    return 0;
 }
 
 /*****************************************************************************/
@@ -285,63 +470,26 @@ void ec_fsm_master_action_process_states(ec_fsm_master_t *fsm
 {
     ec_master_t *master = fsm->master;
     ec_slave_t *slave;
-    char old_state[EC_STATE_STRING_SIZE], new_state[EC_STATE_STRING_SIZE];
 
-    // check if any slaves are not in the state, they're supposed to be
-    list_for_each_entry(slave, &master->slaves, list) {
-        if (slave->error_flag
-            || !slave->online
-            || slave->requested_state == EC_SLAVE_STATE_UNKNOWN
-            || (slave->current_state == slave->requested_state
-                && slave->self_configured)) continue;
-
-        if (master->debug_level) {
-            ec_state_string(slave->current_state, old_state);
-            if (slave->current_state != slave->requested_state) {
-                ec_state_string(slave->requested_state, new_state);
-                EC_DBG("Changing state of slave %i (%s -> %s).\n",
-                       slave->ring_position, old_state, new_state);
-            }
-            else if (!slave->self_configured) {
-                EC_DBG("Reconfiguring slave %i (%s).\n",
-                       slave->ring_position, old_state);
-            }
-        }
-
-        fsm->slave = slave;
-        ec_fsm_slave_start_conf(&fsm->fsm_slave, slave);
-        ec_fsm_slave_exec(&fsm->fsm_slave); // execute immediately
-        fsm->state = ec_fsm_master_state_configure_slave;
-        return;
+    down(&master->config_sem);
+    if (!master->allow_config) {
+        up(&master->config_sem);
+    }
+    else {
+        master->config_state = EC_REQUEST_IN_PROGRESS;
+        fsm->config_error = 0;
+        up(&master->config_sem);
+        
+        // check for pending slave configurations
+        if (ec_fsm_master_action_configure(fsm))
+            return;
     }
 
-    // Check, if EoE processing has to be started
-    ec_master_eoe_start(master);
+    // Check for a pending SDO request
+    if (ec_fsm_master_action_process_sdo(fsm))
+        return;
 
     if (master->mode == EC_MASTER_MODE_IDLE) {
-
-        // Check for a pending SDO request
-        if (master->sdo_seq_master != master->sdo_seq_user) {
-            if (master->debug_level)
-                EC_DBG("Processing SDO request...\n");
-            slave = master->sdo_request->sdo->slave;
-            if (slave->current_state == EC_SLAVE_STATE_INIT
-                || !slave->online) {
-                EC_ERR("Failed to process SDO request, slave %i not ready.\n",
-                       slave->ring_position);
-                master->sdo_request->return_code = -1;
-                master->sdo_seq_master++;
-            }
-            else {
-                // start uploading SDO
-                fsm->slave = slave;
-                fsm->state = ec_fsm_master_state_sdo_request;
-                fsm->sdo_request = master->sdo_request;
-                ec_fsm_coe_upload(&fsm->fsm_coe, slave, fsm->sdo_request);
-                ec_fsm_coe_exec(&fsm->fsm_coe); // execute immediately
-                return;
-            }
-        }
 
         // check, if slaves have an SDO dictionary to read out.
         list_for_each_entry(slave, &master->slaves, list) {
@@ -349,7 +497,7 @@ void ec_fsm_master_action_process_states(ec_fsm_master_t *fsm
                 || slave->sdo_dictionary_fetched
                 || slave->current_state == EC_SLAVE_STATE_INIT
                 || jiffies - slave->jiffies_preop < EC_WAIT_SDO_DICT * HZ
-                || !slave->online
+                || slave->online_state == EC_SLAVE_OFFLINE
                 || slave->error_flag) continue;
 
             if (master->debug_level) {
@@ -360,6 +508,7 @@ void ec_fsm_master_action_process_states(ec_fsm_master_t *fsm
             slave->sdo_dictionary_fetched = 1;
 
             // start fetching SDO dictionary
+            fsm->idle = 0;
             fsm->slave = slave;
             fsm->state = ec_fsm_master_state_sdodict;
             ec_fsm_coe_dictionary(&fsm->fsm_coe, slave);
@@ -368,27 +517,8 @@ void ec_fsm_master_action_process_states(ec_fsm_master_t *fsm
         }
 
         // check for pending EEPROM write operations.
-        list_for_each_entry(slave, &master->slaves, list) {
-            if (!slave->new_eeprom_data) continue;
-
-            if (!slave->online || slave->error_flag) {
-                kfree(slave->new_eeprom_data);
-                slave->new_eeprom_data = NULL;
-                EC_ERR("Discarding EEPROM data, slave %i not ready.\n",
-                       slave->ring_position);
-                continue;
-            }
-
-            // found pending EEPROM write operation. execute it!
-            EC_INFO("Writing EEPROM of slave %i...\n", slave->ring_position);
-            fsm->slave = slave;
-            fsm->sii_offset = 0x0000;
-            ec_fsm_sii_write(&fsm->fsm_sii, slave, fsm->sii_offset,
-                             slave->new_eeprom_data, EC_FSM_SII_NODE);
-            fsm->state = ec_fsm_master_state_write_eeprom;
-            fsm->state(fsm); // execute immediately
-            return;
-        }
+        if (ec_fsm_master_action_process_eeprom(fsm))
+            return; // EEPROM write request found
     }
 
     fsm->state = ec_fsm_master_state_end;
@@ -409,10 +539,10 @@ void ec_fsm_master_action_next_slave_state(ec_fsm_master_t *fsm
     // is there another slave to query?
     if (slave->list.next != &master->slaves) {
         // process next slave
-        fsm->slave = list_entry(fsm->slave->list.next, ec_slave_t, list);
+        fsm->idle = 1;
+        fsm->slave = list_entry(slave->list.next, ec_slave_t, list);
         ec_datagram_nprd(fsm->datagram, fsm->slave->station_address,
                          0x0130, 2);
-        ec_master_queue_datagram(master, fsm->datagram);
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_master_state_read_states;
         return;
@@ -424,10 +554,11 @@ void ec_fsm_master_action_next_slave_state(ec_fsm_master_t *fsm
     if (fsm->validate) {
         fsm->validate = 0;
         list_for_each_entry(slave, &master->slaves, list) {
-            if (slave->online) continue;
+            if (slave->online_state == EC_SLAVE_ONLINE) continue;
 
             // At least one slave is offline. validate!
             EC_INFO("Validating bus.\n");
+            fsm->idle = 0;
             fsm->slave = list_entry(master->slaves.next, ec_slave_t, list);
             fsm->state = ec_fsm_master_state_validate_vendor;
             ec_fsm_sii_read(&fsm->fsm_sii, slave, 0x0008, EC_FSM_SII_POSITION);
@@ -450,61 +581,34 @@ void ec_fsm_master_state_read_states(ec_fsm_master_t *fsm /**< master state mach
 {
     ec_slave_t *slave = fsm->slave;
     ec_datagram_t *datagram = fsm->datagram;
-    uint8_t new_state;
 
-    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--) {
-        ec_master_queue_datagram(fsm->master, fsm->datagram);
+    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--)
         return;
-    }
 
     if (datagram->state != EC_DATAGRAM_RECEIVED) {
-        EC_ERR("Failed to receive AL state datagram for slave %i!\n",
-               slave->ring_position);
+        EC_ERR("Failed to receive AL state datagram for slave %i"
+                " (datagram state %i)\n", slave->ring_position, datagram->state);
         fsm->state = ec_fsm_master_state_error;
         return;
     }
 
     // did the slave not respond to its station address?
     if (datagram->working_counter != 1) {
-        if (slave->online) {
-            slave->online = 0;
-            if (slave->master->debug_level)
-                EC_DBG("Slave %i: offline.\n", slave->ring_position);
-        }
+        ec_slave_set_online_state(slave, EC_SLAVE_OFFLINE);
         ec_fsm_master_action_next_slave_state(fsm);
         return;
     }
 
     // slave responded
-    new_state = EC_READ_U8(datagram->data);
-    if (!slave->online) { // slave was offline before
-        slave->online = 1;
-        slave->error_flag = 0; // clear error flag
-        slave->current_state = new_state;
-        if (slave->master->debug_level) {
-            char cur_state[EC_STATE_STRING_SIZE];
-            ec_state_string(slave->current_state, cur_state);
-            EC_DBG("Slave %i: online (%s).\n",
-                   slave->ring_position, cur_state);
-        }
-    }
-    else if (new_state != slave->current_state) {
-        if (slave->master->debug_level) {
-            char old_state[EC_STATE_STRING_SIZE],
-                cur_state[EC_STATE_STRING_SIZE];
-            ec_state_string(slave->current_state, old_state);
-            ec_state_string(new_state, cur_state);
-            EC_DBG("Slave %i: %s -> %s.\n",
-                   slave->ring_position, old_state, cur_state);
-        }
-        slave->current_state = new_state;
-    }
+    ec_slave_set_state(slave, EC_READ_U8(datagram->data)); // set app state first
+    ec_slave_set_online_state(slave, EC_SLAVE_ONLINE);
 
     // check, if new slave state has to be acknowledged
     if (slave->current_state & EC_SLAVE_STATE_ACK_ERR && !slave->error_flag) {
+        fsm->idle = 0;
+        fsm->state = ec_fsm_master_state_acknowledge;
         ec_fsm_change_ack(&fsm->fsm_change, slave);
         ec_fsm_change_exec(&fsm->fsm_change);
-        fsm->state = ec_fsm_master_state_acknowledge;
         return;
     }
 
@@ -579,10 +683,9 @@ void ec_fsm_master_action_addresses(ec_fsm_master_t *fsm /**< master state machi
 {
     ec_datagram_t *datagram = fsm->datagram;
 
-    while (fsm->slave->online) {
+    while (fsm->slave->online_state == EC_SLAVE_ONLINE) {
         if (fsm->slave->list.next == &fsm->master->slaves) { // last slave?
-            fsm->state = ec_fsm_master_state_start;
-            fsm->state(fsm); // execute immediately
+            fsm->state = ec_fsm_master_state_end;
             return;
         }
         // check next slave
@@ -595,7 +698,6 @@ void ec_fsm_master_action_addresses(ec_fsm_master_t *fsm /**< master state machi
     // write station address
     ec_datagram_apwr(datagram, fsm->slave->ring_position, 0x0010, 2);
     EC_WRITE_U16(datagram->data, fsm->slave->station_address);
-    ec_master_queue_datagram(fsm->master, datagram);
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_master_state_rewrite_addresses;
 }
@@ -631,6 +733,8 @@ void ec_fsm_master_state_validate_product(ec_fsm_master_t *fsm /**< master state
 
     // have all states been validated?
     if (slave->list.next == &fsm->master->slaves) {
+        fsm->topology_change_pending = 0;
+        fsm->tainted = 0;
         fsm->slave = list_entry(fsm->master->slaves.next, ec_slave_t, list);
         // start writing addresses to offline slaves
         ec_fsm_master_action_addresses(fsm);
@@ -658,14 +762,13 @@ void ec_fsm_master_state_rewrite_addresses(ec_fsm_master_t *fsm
     ec_slave_t *slave = fsm->slave;
     ec_datagram_t *datagram = fsm->datagram;
 
-    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--) {
-        ec_master_queue_datagram(fsm->master, fsm->datagram);
+    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--)
         return;
-    }
 
     if (datagram->state != EC_DATAGRAM_RECEIVED) {
-        EC_ERR("Failed to receive address datagram for slave %i.\n",
-               slave->ring_position);
+        EC_ERR("Failed to receive address datagram for slave %i"
+                " (datagram state %i).\n",
+                slave->ring_position, datagram->state);
         fsm->state = ec_fsm_master_state_error;
         return;
     }
@@ -678,8 +781,7 @@ void ec_fsm_master_state_rewrite_addresses(ec_fsm_master_t *fsm
     }
 
     if (fsm->slave->list.next == &fsm->master->slaves) { // last slave?
-        fsm->state = ec_fsm_master_state_start;
-        fsm->state(fsm); // execute immediately
+        fsm->state = ec_fsm_master_state_end;
         return;
     }
 
@@ -692,35 +794,53 @@ void ec_fsm_master_state_rewrite_addresses(ec_fsm_master_t *fsm
 /*****************************************************************************/
 
 /**
-   Master state: SCAN SLAVES.
-   Executes the sub-statemachine for the scanning of a slave.
-*/
+ * Master state: SCAN SLAVES.
+ * Executes the sub-statemachine for the scanning of a slave.
+ */
 
-void ec_fsm_master_state_scan_slaves(ec_fsm_master_t *fsm /**< master state machine */)
+void ec_fsm_master_state_scan_slaves(
+        ec_fsm_master_t *fsm /**< master state machine */
+        )
 {
     ec_master_t *master = fsm->master;
-    ec_slave_t *slave;
+    ec_slave_t *slave = fsm->slave;
 
     if (ec_fsm_slave_exec(&fsm->fsm_slave)) // execute slave state machine
         return;
 
+    if (slave->sii_mailbox_protocols & EC_MBOX_EOE) {
+        // create EoE handler for this slave
+        ec_eoe_t *eoe;
+        if (!(eoe = kmalloc(sizeof(ec_eoe_t), GFP_KERNEL))) {
+            EC_ERR("Failed to allocate EoE handler memory for slave %u!\n",
+                    slave->ring_position);
+        }
+        else if (ec_eoe_init(eoe, slave)) {
+            EC_ERR("Failed to init EoE handler for slave %u!\n",
+                    slave->ring_position);
+            kfree(eoe);
+        }
+        else {
+            list_add_tail(&eoe->list, &master->eoe_handlers);
+        }
+    }
+
     // another slave to fetch?
-    if (fsm->slave->list.next != &master->slaves) {
-        fsm->slave = list_entry(fsm->slave->list.next, ec_slave_t, list);
+    if (slave->list.next != &master->slaves) {
+        fsm->slave = list_entry(slave->list.next, ec_slave_t, list);
         ec_fsm_slave_start_scan(&fsm->fsm_slave, fsm->slave);
         ec_fsm_slave_exec(&fsm->fsm_slave); // execute immediately
         return;
     }
 
-    EC_INFO("Bus scanning completed.\n");
+    EC_INFO("Bus scanning completed in %u ms.\n",
+            (u32) (jiffies - fsm->scan_jiffies) * 1000 / HZ);
 
-    ec_master_calc_addressing(master);
+    // check if EoE processing has to be started
+    ec_master_eoe_start(master);
 
-    // set initial states of all slaves to PREOP to make mailbox
-    // communication possible
-    list_for_each_entry(slave, &master->slaves, list) {
-        ec_slave_request_state(slave, EC_SLAVE_STATE_PREOP);
-    }
+    master->scan_state = EC_REQUEST_COMPLETE;
+    wake_up_interruptible(&master->scan_queue);
 
     fsm->state = ec_fsm_master_state_end;
 }
@@ -739,7 +859,14 @@ void ec_fsm_master_state_configure_slave(ec_fsm_master_t *fsm
     if (ec_fsm_slave_exec(&fsm->fsm_slave)) // execute slave's state machine
         return;
 
-    ec_fsm_master_action_process_states(fsm);
+    if (!ec_fsm_slave_success(&fsm->fsm_slave))
+        fsm->config_error = 1;
+
+    // configure next slave, if necessary
+    if (ec_fsm_master_action_configure(fsm))
+        return;
+
+    fsm->state = ec_fsm_master_state_end;
 }
 
 /*****************************************************************************/
@@ -748,41 +875,49 @@ void ec_fsm_master_state_configure_slave(ec_fsm_master_t *fsm
    Master state: WRITE EEPROM.
 */
 
-void ec_fsm_master_state_write_eeprom(ec_fsm_master_t *fsm /**< master state machine */)
+void ec_fsm_master_state_write_eeprom(
+        ec_fsm_master_t *fsm /**< master state machine */)
 {
-    ec_slave_t *slave = fsm->slave;
+    ec_master_t *master = fsm->master;
+    ec_eeprom_write_request_t *request = fsm->eeprom_request;
+    ec_slave_t *slave = request->slave;
 
     if (ec_fsm_sii_exec(&fsm->fsm_sii)) return;
 
     if (!ec_fsm_sii_success(&fsm->fsm_sii)) {
-        fsm->slave->error_flag = 1;
-        EC_ERR("Failed to write EEPROM contents to slave %i.\n",
-               slave->ring_position);
-        kfree(slave->new_eeprom_data);
-        slave->new_eeprom_data = NULL;
+        slave->error_flag = 1;
+        EC_ERR("Failed to write EEPROM data to slave %i.\n",
+                slave->ring_position);
+        request->state = EC_REQUEST_FAILURE;
+        wake_up(&master->eeprom_queue);
         fsm->state = ec_fsm_master_state_error;
         return;
     }
 
-    fsm->sii_offset++;
-    if (fsm->sii_offset < slave->new_eeprom_size) {
-        ec_fsm_sii_write(&fsm->fsm_sii, slave, fsm->sii_offset,
-                         slave->new_eeprom_data + fsm->sii_offset,
-                         EC_FSM_SII_NODE);
+    fsm->eeprom_index++;
+    if (fsm->eeprom_index < request->size) {
+        ec_fsm_sii_write(&fsm->fsm_sii, slave,
+                request->offset + fsm->eeprom_index,
+                request->words + fsm->eeprom_index,
+                EC_FSM_SII_NODE);
         ec_fsm_sii_exec(&fsm->fsm_sii); // execute immediately
         return;
     }
 
     // finished writing EEPROM
-    EC_INFO("Finished writing EEPROM of slave %i.\n", slave->ring_position);
-    kfree(slave->new_eeprom_data);
-    slave->new_eeprom_data = NULL;
+    if (master->debug_level)
+        EC_DBG("Finished writing EEPROM data to slave %i.\n",
+                slave->ring_position);
+    request->state = EC_REQUEST_COMPLETE;
+    wake_up(&master->eeprom_queue);
 
     // TODO: Evaluate new EEPROM contents!
 
-    // restart master state machine.
-    fsm->state = ec_fsm_master_state_start;
-    fsm->state(fsm); // execute immediately
+    // check for another EEPROM write request
+    if (ec_fsm_master_action_process_eeprom(fsm))
+        return; // processing another request
+
+    fsm->state = ec_fsm_master_state_end;
 }
 
 /*****************************************************************************/
@@ -812,9 +947,7 @@ void ec_fsm_master_state_sdodict(ec_fsm_master_t *fsm /**< master state machine 
                sdo_count, entry_count, slave->ring_position);
     }
 
-    // restart master state machine.
-    fsm->state = ec_fsm_master_state_start;
-    fsm->state(fsm); // execute immediately
+    fsm->state = ec_fsm_master_state_end;
 }
 
 /*****************************************************************************/
@@ -831,20 +964,27 @@ void ec_fsm_master_state_sdo_request(ec_fsm_master_t *fsm /**< master state mach
     if (ec_fsm_coe_exec(&fsm->fsm_coe)) return;
 
     if (!ec_fsm_coe_success(&fsm->fsm_coe)) {
-        request->return_code = -1;
-        master->sdo_seq_master++;
+        EC_DBG("Failed to process SDO request for slave %i.\n",
+                fsm->slave->ring_position);
+        request->state = EC_REQUEST_FAILURE;
+        wake_up(&master->sdo_queue);
         fsm->state = ec_fsm_master_state_error;
         return;
     }
 
-    // SDO dictionary fetching finished
+    // SDO request finished 
+    request->state = EC_REQUEST_COMPLETE;
+    wake_up(&master->sdo_queue);
 
-    request->return_code = 1;
-    master->sdo_seq_master++;
+    if (master->debug_level)
+        EC_DBG("Finished SDO request for slave %i.\n",
+                fsm->slave->ring_position);
 
-    // restart master state machine.
-    fsm->state = ec_fsm_master_state_start;
-    fsm->state(fsm); // execute immediately
+    // check for another SDO request
+    if (ec_fsm_master_action_process_sdo(fsm))
+        return; // processing another request
+
+    fsm->state = ec_fsm_master_state_end;
 }
 
 /*****************************************************************************/

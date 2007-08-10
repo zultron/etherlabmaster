@@ -3,7 +3,7 @@
 #------------------------------------------------------------------------------
 
 AC_PREREQ(2.59)
-AC_INIT([ethercat],[1.2.0],[fp@igh-essen.com])
+AC_INIT([ethercat],[1.3.0],[fp@igh-essen.com])
 AC_CONFIG_AUX_DIR([autoconf])
 AM_INIT_AUTOMAKE([-Wall -Werror dist-bzip2])
 AC_PREFIX_DEFAULT([/opt/etherlab])
@@ -77,8 +77,26 @@ AC_SUBST(LINUX_MOD_PATH,[/lib/modules/$kernelrelease/ethercat])
 AC_MSG_RESULT([$LINUX_SOURCE_DIR (Kernel $LINUX_KERNEL_RELEASE)])
 
 #------------------------------------------------------------------------------
-# 8139too Kernel
+# 8139too driver
 #------------------------------------------------------------------------------
+
+AC_ARG_ENABLE([8139too],
+    AS_HELP_STRING([--enable-8139too],
+                   [Enable 8139too driver]),
+    [
+        case "${enableval}" in
+            yes) enable8139too=1
+                ;;
+            no) enable8139too=0
+                ;;
+            *) AC_MSG_ERROR([Invalid value for --enable-8139too])
+                ;;
+        esac
+    ],
+    [enable8139too=1]
+)
+
+AM_CONDITIONAL(ENABLE_8139TOO, test "x$enable8139too" = "x1")
 
 AC_ARG_WITH([8139too-kernel],
     AC_HELP_STRING(
@@ -93,20 +111,178 @@ AC_ARG_WITH([8139too-kernel],
     ]
 )
 
-AC_MSG_CHECKING([for kernel for 8139too driver])
+if test "x${enable8139too}" = "x1"; then
+    AC_MSG_CHECKING([for kernel for 8139too driver])
 
-kernels=`ls -1 devices/ | grep -oE "^8139too-.*-" | cut -d "-" -f 2 | uniq`
-found=0
-for k in $kernels; do
-    if test "$kernel8139too" = "$k"; then
-        found=1
+    kernels=`ls -1 devices/ | grep -oE "^8139too-.*-" | cut -d "-" -f 2 | uniq`
+    found=0
+    for k in $kernels; do
+        if test "$kernel8139too" = "$k"; then
+            found=1
+        fi
+    done
+    if test $found -ne 1; then
+        AC_MSG_ERROR([kernel $kernel8139too not available for 8139too driver!])
     fi
-done
-if test $found -ne 1; then
-    AC_MSG_ERROR([kernel $kernel8139too not available for 8139too driver!])
+
+    AC_MSG_RESULT([$kernel8139too])
 fi
 
-AC_MSG_RESULT([$kernel8139too])
+#------------------------------------------------------------------------------
+# e100 driver
+#------------------------------------------------------------------------------
+
+AC_ARG_ENABLE([e100],
+    AS_HELP_STRING([--enable-e100],
+                   [Enable e100 driver]),
+    [
+        case "${enableval}" in
+            yes) enablee100=1
+                ;;
+            no) enablee100=0
+                ;;
+            *) AC_MSG_ERROR([Invalid value for --enable-e100])
+                ;;
+        esac
+    ],
+    [enablee100=0] # disabled by default
+)
+
+AM_CONDITIONAL(ENABLE_E100, test "x$enablee100" = "x1")
+
+AC_ARG_WITH([e100-kernel],
+    AC_HELP_STRING(
+        [--with-e100-kernel=<X.Y.Z>],
+        [e100 kernel (only if differing)]
+    ),
+    [
+        kernele100=[$withval]
+    ],
+    [
+        kernele100=$linuxversion
+    ]
+)
+
+if test "x${enablee100}" = "x1"; then
+    AC_MSG_CHECKING([for kernel for e100 driver])
+
+    kernels=`ls -1 devices/ | grep -oE "^e100-.*-" | cut -d "-" -f 2 | uniq`
+    found=0
+    for k in $kernels; do
+        if test "$kernele100" = "$k"; then
+            found=1
+        fi
+    done
+    if test $found -ne 1; then
+        AC_MSG_ERROR([kernel $kernele100 not available for e100 driver!])
+    fi
+
+    AC_MSG_RESULT([$kernele100])
+fi
+
+#------------------------------------------------------------------------------
+# forcedeth driver
+#------------------------------------------------------------------------------
+
+AC_ARG_ENABLE([forcedeth],
+    AS_HELP_STRING([--enable-forcedeth],
+                   [Enable forcedeth driver]),
+    [
+        case "${enableval}" in
+            yes) enableforcedeth=1
+                ;;
+            no) enableforcedeth=0
+                ;;
+            *) AC_MSG_ERROR([Invalid value for --enable-forcedeth])
+                ;;
+        esac
+    ],
+    [enableforcedeth=0] # disabled by default!
+)
+
+AM_CONDITIONAL(ENABLE_FORCEDETH, test "x$enableforcedeth" = "x1")
+
+AC_ARG_WITH([forcedeth-kernel],
+    AC_HELP_STRING(
+        [--with-forcedeth-kernel=<X.Y.Z>],
+        [forcedeth kernel (only if differing)]
+    ),
+    [
+        kernelforcedeth=[$withval]
+    ],
+    [
+        kernelforcedeth=$linuxversion
+    ]
+)
+
+if test "x${enableforcedeth}" = "x1"; then
+    AC_MSG_CHECKING([for kernel for forcedeth driver])
+
+    kernels=`ls -1 devices/ | grep -oE "^forcedeth-.*-" | cut -d "-" -f 2 | uniq`
+    found=0
+    for k in $kernels; do
+        if test "$kernelforcedeth" = "$k"; then
+            found=1
+        fi
+    done
+    if test $found -ne 1; then
+        AC_MSG_ERROR([kernel $kernelforcedeth not available for forcedeth driver!])
+    fi
+
+    AC_MSG_RESULT([$kernelforcedeth])
+fi
+
+#------------------------------------------------------------------------------
+# e1000 driver
+#------------------------------------------------------------------------------
+
+AC_ARG_ENABLE([e1000],
+    AS_HELP_STRING([--enable-e1000],
+                   [Enable e1000 driver]),
+    [
+        case "${enableval}" in
+            yes) enablee1000=1
+                ;;
+            no) enablee1000=0
+                ;;
+            *) AC_MSG_ERROR([Invalid value for --enable-e1000])
+                ;;
+        esac
+    ],
+    [enablee1000=0] # disabled by default
+)
+
+AM_CONDITIONAL(ENABLE_E1000, test "x$enablee1000" = "x1")
+
+AC_ARG_WITH([e1000-kernel],
+    AC_HELP_STRING(
+        [--with-e1000-kernel=<X.Y.Z>],
+        [e1000 kernel (only if differing)]
+    ),
+    [
+        kernele1000=[$withval]
+    ],
+    [
+        kernele1000=$linuxversion
+    ]
+)
+
+if test "x${enablee1000}" = "x1"; then
+    AC_MSG_CHECKING([for kernel for e1000 driver])
+
+    kernels=`ls -1 devices/e1000/ | grep -oE "^e1000_main-.*" | cut -d "-" -f 2 | uniq`
+    found=0
+    for k in $kernels; do
+        if test "$kernele1000" = "$k"; then
+            found=1
+        fi
+    done
+    if test $found -ne 1; then
+        AC_MSG_ERROR([kernel $kernele1000 not available for e1000 driver!])
+    fi
+
+    AC_MSG_RESULT([$kernele1000])
+fi
 
 #------------------------------------------------------------------------------
 # RTAI path (optional)
@@ -170,25 +346,72 @@ fi
 # Debug interface
 #------------------------------------------------------------------------------
 
-AC_ARG_ENABLE([dbg-if],
-    AS_HELP_STRING([--enable-dbg-if],
+AC_ARG_ENABLE([debug-if],
+    AS_HELP_STRING([--enable-debug-if],
                    [Create a debug interface for each master @<:@NO@:>@]),
     [
         case "${enableval}" in
             yes) dbg=1
-                AC_DEFINE([EC_DBG_IF], [1], [Debug interfaces enabled])
                 ;;
             no) dbg=0
                 ;;
-            *) AC_MSG_ERROR([Invalid value for --enable-dbg-if])
+            *) AC_MSG_ERROR([Invalid value for --enable-debug-if])
                 ;;
         esac
     ],
     [dbg=0]
 )
 
-AM_CONDITIONAL(EC_DBG_IF, test "x$dbg" = x1)
-AC_SUBST([EC_DBG_IF],${dbg})
+if test "x${dbg}" = "x1"; then
+    AC_DEFINE([EC_DEBUG_IF], [1], [Debug interfaces enabled])
+fi
+AM_CONDITIONAL(ENABLE_DEBUG_IF, test "x$dbg" = "x1")
+
+#------------------------------------------------------------------------------
+# Debug ring
+#------------------------------------------------------------------------------
+
+AC_ARG_ENABLE([debug-ring],
+    AS_HELP_STRING([--enable-debug-ring],
+                   [Create a debug ring to record frames @<:@NO@:>@]),
+    [
+        case "${enableval}" in
+            yes) debugring=1
+                ;;
+            no) debugring=0
+                ;;
+            *) AC_MSG_ERROR([Invalid value for --enable-debug-ring])
+                ;;
+        esac
+    ],
+    [debugring=0]
+)
+
+if test "x${debugring}" = "x1"; then
+    AC_DEFINE([EC_DEBUG_RING], [1], [Debug ring enabled])
+fi
+
+#------------------------------------------------------------------------------
+# Dummy master module
+#------------------------------------------------------------------------------
+
+AC_ARG_ENABLE([dummy],
+    AS_HELP_STRING([--enable-dummy],
+                   [Build the dummy master module @<:@NO@:>@]),
+    [
+        case "${enableval}" in
+            yes) dummy=1
+                ;;
+            no) dummy=0
+                ;;
+            *) AC_MSG_ERROR([Invalid value for --enable-dummy])
+                ;;
+        esac
+    ],
+    [dummy=0]
+)
+
+AM_CONDITIONAL(ENABLE_DUMMY, test "x$dummy" = "x1")
 
 #------------------------------------------------------------------------------
 
@@ -198,10 +421,18 @@ echo configure: creating config.kbuild...
 
 cat > config.kbuild <<EOF
 # config.kbuild - created by configure
-EC_DBG_IF := ${dbg}
-EC_8139TOO_KERNEL := ${kernel8139too}
-EC_RTAI_DIR := "${rtaidir}"
-EC_MSR_DIR := "${msrdir}"
+ENABLE_8139TOO := ${enable8139too}
+KERNEL_8139TOO := ${kernel8139too}
+ENABLE_E100 := ${enablee100}
+KERNEL_E100 := ${kernele100}
+ENABLE_FORCEDETH := ${enableforcedeth}
+KERNEL_FORCEDETH := ${kernelforcedeth}
+ENABLE_E1000 := ${enablee1000}
+KERNEL_E1000 := ${kernele1000}
+RTAI_DIR := "${rtaidir}"
+MSR_DIR := "${msrdir}"
+ENABLE_DEBUG_IF := ${dbg}
+ENABLE_DUMMY := ${dummy}
 EOF
 
 #------------------------------------------------------------------------------
@@ -210,6 +441,7 @@ AC_CONFIG_FILES([
         Makefile
         master/Makefile
         devices/Makefile
+        devices/e1000/Makefile
         script/Makefile
         script/init.d/Makefile
         script/sysconfig/Makefile
@@ -218,6 +450,7 @@ AC_CONFIG_FILES([
         examples/mini/Makefile
         examples/rtai/Makefile
         examples/msr/Makefile
+        dummy/Makefile
 ])
 AC_OUTPUT
 

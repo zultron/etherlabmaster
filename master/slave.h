@@ -48,12 +48,20 @@
 
 #include "globals.h"
 #include "datagram.h"
+#include "pdo.h"
+#include "sync.h"
+#include "fmmu.h"
+
+/*****************************************************************************/
+
+/** maximum number of FMMUs per slave */
+#define EC_MAX_FMMUS 16
 
 /*****************************************************************************/
 
 /**
-   State of an EtherCAT slave.
-*/
+ * State of an EtherCAT slave.
+ */
 
 typedef enum
 {
@@ -75,8 +83,19 @@ ec_slave_state_t;
 /*****************************************************************************/
 
 /**
-   Supported mailbox protocols.
-*/
+ */
+
+typedef enum {
+    EC_SLAVE_OFFLINE,
+    EC_SLAVE_ONLINE
+}
+ec_slave_online_state_t;
+
+/*****************************************************************************/
+
+/**
+ * Supported mailbox protocols.
+ */
 
 enum
 {
@@ -91,103 +110,8 @@ enum
 /*****************************************************************************/
 
 /**
-   String object (EEPROM).
-*/
-
-typedef struct
-{
-    struct list_head list; /**< list item */
-    size_t size; /**< size in bytes */
-    char *data; /**< string data */
-}
-ec_sii_string_t;
-
-/*****************************************************************************/
-
-/**
-   Sync manager configuration (EEPROM).
-*/
-
-typedef struct
-{
-    struct list_head list; /**< list item */
-    unsigned int index; /**< sync manager index */
-    uint16_t physical_start_address; /**< physical start address */
-    uint16_t length; /**< data length in bytes */
-    uint8_t control_register; /**< control register value */
-    uint8_t enable; /**< enable bit */
-    uint16_t est_length; /**< Estimated length. This is no field of the SII,
-                            but it is used to calculate the length via
-                            PDO ranges */
-}
-ec_sii_sync_t;
-
-/*****************************************************************************/
-
-/**
-   PDO type.
-*/
-
-typedef enum
-{
-    EC_RX_PDO, /**< Reveive PDO */
-    EC_TX_PDO /**< Transmit PDO */
-}
-ec_sii_pdo_type_t;
-
-/*****************************************************************************/
-
-/**
-   PDO description (EEPROM).
-*/
-
-typedef struct
-{
-    struct list_head list; /**< list item */
-    ec_sii_pdo_type_t type; /**< PDO type */
-    uint16_t index; /**< PDO index */
-    uint8_t sync_index; /**< assigned sync manager */
-    char *name; /**< PDO name */
-    struct list_head entries; /**< entry list */
-}
-ec_sii_pdo_t;
-
-/*****************************************************************************/
-
-/**
-   PDO entry description (EEPROM).
-*/
-
-typedef struct
-{
-    struct list_head list; /**< list item */
-    uint16_t index; /**< PDO index */
-    uint8_t subindex; /**< entry subindex */
-    char *name; /**< entry name */
-    uint8_t bit_length; /**< entry length in bit */
-}
-ec_sii_pdo_entry_t;
-
-/*****************************************************************************/
-
-/**
-   FMMU configuration.
-*/
-
-typedef struct
-{
-    unsigned int index; /**< FMMU index */
-    const ec_domain_t *domain; /**< domain */
-    const ec_sii_sync_t *sync; /**< sync manager */
-    uint32_t logical_start_address; /**< logical start address */
-}
-ec_fmmu_t;
-
-/*****************************************************************************/
-
-/**
-   EtherCAT slave.
-*/
+ * EtherCAT slave.
+ */
 
 struct ec_slave
 {
@@ -195,24 +119,22 @@ struct ec_slave
     struct kobject kobj; /**< kobject */
     ec_master_t *master; /**< master owning the slave */
 
-    ec_slave_state_t requested_state; /**< requested slave state */
-    ec_slave_state_t current_state; /**< current slave state */
+    ec_slave_state_t requested_state; /**< requested application state */
+    ec_slave_state_t current_state; /**< current application state */
+    ec_slave_online_state_t online_state; /**< online state */
     unsigned int self_configured; /**< slave was configured by this master */
     unsigned int error_flag; /**< stop processing after an error */
-    unsigned int online; /**< non-zero, if the slave responds. */
+    unsigned int pdos_registered; /**< non-zero, if PDOs were registered */
 
     // addresses
     uint16_t ring_position; /**< ring position */
     uint16_t station_address; /**< configured station address */
-    uint16_t coupler_index; /**< index of the last bus coupler */
-    uint16_t coupler_subindex; /**< index of this slave after last coupler */
 
     // base data
     uint8_t base_type; /**< slave type */
     uint8_t base_revision; /**< revision */
     uint16_t base_build; /**< build number */
     uint16_t base_fmmu_count; /**< number of supported FMMUs */
-    uint16_t base_sync_count; /**< number of supported sync managers */
 
     // data link status
     uint8_t dl_link[4]; /**< link detected */
@@ -221,9 +143,7 @@ struct ec_slave
 
     // EEPROM
     uint8_t *eeprom_data; /**< Complete EEPROM image */
-    uint16_t eeprom_size; /**< size of the EEPROM contents in byte */
-    uint16_t *new_eeprom_data; /**< new EEPROM data to write */
-    uint16_t new_eeprom_size; /**< size of new EEPROM data in words */
+    size_t eeprom_size; /**< size of the EEPROM contents in bytes */
 
     // slave information interface
     uint16_t sii_alias; /**< configured station alias */
@@ -237,8 +157,10 @@ struct ec_slave
     uint16_t sii_tx_mailbox_size; /**< mailbox size (slave to master) */
     uint16_t sii_mailbox_protocols; /**< supported mailbox protocols */
     uint8_t sii_physical_layer[4]; /**< port media */
-    struct list_head sii_strings; /**< EEPROM STRING categories */
-    struct list_head sii_syncs; /**< EEPROM SYNC MANAGER categories */
+    char **sii_strings; /**< strings in EEPROM categories */
+    unsigned int sii_string_count; /**< number of EEPROM strings */
+    ec_sync_t *sii_syncs; /**< EEPROM SYNC MANAGER categories */
+    unsigned int sii_sync_count; /**< number of sync managers in EEPROM */
     struct list_head sii_pdos; /**< EEPROM [RT]XPDO categories */
     char *sii_group; /**< slave group acc. to EEPROM */
     char *sii_image; /**< slave image name acc. to EEPROM */
@@ -265,31 +187,24 @@ void ec_slave_destroy(ec_slave_t *);
 void ec_slave_reset(ec_slave_t *);
 
 int ec_slave_prepare_fmmu(ec_slave_t *, const ec_domain_t *,
-                          const ec_sii_sync_t *);
+        const ec_sync_t *);
 
 void ec_slave_request_state(ec_slave_t *, ec_slave_state_t);
+void ec_slave_set_state(ec_slave_t *, ec_slave_state_t);
+void ec_slave_set_online_state(ec_slave_t *, ec_slave_online_state_t);
 
 // SII categories
-int ec_slave_fetch_strings(ec_slave_t *, const uint8_t *);
-void ec_slave_fetch_general(ec_slave_t *, const uint8_t *);
-int ec_slave_fetch_sync(ec_slave_t *, const uint8_t *, size_t);
-int ec_slave_fetch_pdo(ec_slave_t *, const uint8_t *, size_t,
-                       ec_sii_pdo_type_t);
-int ec_slave_locate_string(ec_slave_t *, unsigned int, char **);
+int ec_slave_fetch_sii_strings(ec_slave_t *, const uint8_t *);
+void ec_slave_fetch_sii_general(ec_slave_t *, const uint8_t *);
+int ec_slave_fetch_sii_syncs(ec_slave_t *, const uint8_t *, size_t);
+int ec_slave_fetch_sii_pdos(ec_slave_t *, const uint8_t *, size_t,
+        ec_pdo_type_t);
 
 // misc.
-void ec_slave_sync_config(const ec_slave_t *, const ec_sii_sync_t *,
-        uint8_t *);
-void ec_slave_fmmu_config(const ec_slave_t *, const ec_fmmu_t *, uint8_t *);
-uint16_t ec_slave_calc_sync_size(const ec_slave_t *, const ec_sii_sync_t *);
-
-int ec_slave_is_coupler(const ec_slave_t *);
-int ec_slave_has_subbus(const ec_slave_t *);
-
+ec_sync_t *ec_slave_get_pdo_sync(ec_slave_t *, ec_direction_t); 
 int ec_slave_validate(const ec_slave_t *, uint32_t, uint32_t);
-
 void ec_slave_sdo_dict_info(const ec_slave_t *,
-                            unsigned int *, unsigned int *);
+        unsigned int *, unsigned int *);
 
 /*****************************************************************************/
 

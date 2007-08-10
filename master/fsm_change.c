@@ -158,7 +158,6 @@ void ec_fsm_change_state_start(ec_fsm_change_t *fsm
     // write new state to slave
     ec_datagram_npwr(datagram, slave->station_address, 0x0120, 2);
     EC_WRITE_U16(datagram->data, fsm->requested_state);
-    ec_master_queue_datagram(fsm->slave->master, datagram);
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_change_state_check;
 }
@@ -175,15 +174,14 @@ void ec_fsm_change_state_check(ec_fsm_change_t *fsm
     ec_datagram_t *datagram = fsm->datagram;
     ec_slave_t *slave = fsm->slave;
 
-    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--) {
-        ec_master_queue_datagram(fsm->slave->master, datagram);
+    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--)
         return;
-    }
 
     if (datagram->state != EC_DATAGRAM_RECEIVED) {
         fsm->state = ec_fsm_change_state_error;
-        EC_ERR("Failed to receive state datagram from slave %i!\n",
-               fsm->slave->ring_position);
+        EC_ERR("Failed to receive state datagram from slave %i"
+                " (datagram state %i)!\n",
+               fsm->slave->ring_position, datagram->state);
         return;
     }
 
@@ -205,7 +203,6 @@ void ec_fsm_change_state_check(ec_fsm_change_t *fsm
         // repeat writing new state to slave
         ec_datagram_npwr(datagram, slave->station_address, 0x0120, 2);
         EC_WRITE_U16(datagram->data, fsm->requested_state);
-        ec_master_queue_datagram(fsm->slave->master, datagram);
         fsm->retries = EC_FSM_RETRIES;
         return;
     }
@@ -214,7 +211,6 @@ void ec_fsm_change_state_check(ec_fsm_change_t *fsm
 
     // read AL status from slave
     ec_datagram_nprd(datagram, slave->station_address, 0x0130, 2);
-    ec_master_queue_datagram(fsm->slave->master, datagram);
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_change_state_status;
 }
@@ -231,15 +227,14 @@ void ec_fsm_change_state_status(ec_fsm_change_t *fsm
     ec_datagram_t *datagram = fsm->datagram;
     ec_slave_t *slave = fsm->slave;
 
-    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--) {
-        ec_master_queue_datagram(fsm->slave->master, datagram);
+    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--)
         return;
-    }
 
     if (datagram->state != EC_DATAGRAM_RECEIVED) {
         fsm->state = ec_fsm_change_state_error;
-        EC_ERR("Failed to receive state checking datagram from slave %i.\n",
-               slave->ring_position);
+        EC_ERR("Failed to receive state checking datagram from slave %i"
+                " (datagram state %i).\n",
+               slave->ring_position, datagram->state);
         return;
     }
 
@@ -289,7 +284,6 @@ void ec_fsm_change_state_status(ec_fsm_change_t *fsm
                req_state, slave->ring_position, cur_state);
         // fetch AL status error code
         ec_datagram_nprd(datagram, slave->station_address, 0x0134, 2);
-        ec_master_queue_datagram(fsm->slave->master, datagram);
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_change_state_code;
         return;
@@ -310,7 +304,6 @@ void ec_fsm_change_state_status(ec_fsm_change_t *fsm
  again:
     // no timeout yet. check again
     ec_datagram_nprd(datagram, slave->station_address, 0x0130, 2);
-    ec_master_queue_datagram(fsm->slave->master, datagram);
     fsm->retries = EC_FSM_RETRIES;
 }
 
@@ -367,15 +360,14 @@ void ec_fsm_change_state_code(ec_fsm_change_t *fsm
     uint32_t code;
     const ec_code_msg_t *al_msg;
 
-    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--) {
-        ec_master_queue_datagram(fsm->slave->master, datagram);
+    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--)
         return;
-    }
 
     if (datagram->state != EC_DATAGRAM_RECEIVED) {
         fsm->state = ec_fsm_change_state_error;
-        EC_ERR("Failed to receive AL status code datagram from slave %i.\n",
-               fsm->slave->ring_position);
+        EC_ERR("Failed to receive AL status code datagram from slave %i"
+                " (datagram state %i).\n",
+               fsm->slave->ring_position, datagram->state);
         return;
     }
 
@@ -413,7 +405,6 @@ void ec_fsm_change_state_start_ack(ec_fsm_change_t *fsm
 
     ec_datagram_npwr(datagram, slave->station_address, 0x0120, 2);
     EC_WRITE_U16(datagram->data, slave->current_state);
-    ec_master_queue_datagram(fsm->slave->master, datagram);
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_change_state_ack;
 }
@@ -429,15 +420,14 @@ void ec_fsm_change_state_ack(ec_fsm_change_t *fsm /**< finite state machine */)
     ec_datagram_t *datagram = fsm->datagram;
     ec_slave_t *slave = fsm->slave;
 
-    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--) {
-        ec_master_queue_datagram(fsm->slave->master, datagram);
+    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--)
         return;
-    }
 
     if (datagram->state != EC_DATAGRAM_RECEIVED) {
         fsm->state = ec_fsm_change_state_error;
-        EC_ERR("Failed to receive state ack datagram for slave %i.\n",
-               slave->ring_position);
+        EC_ERR("Failed to receive state ack datagram for slave %i"
+                " (datagram state %i).\n",
+               slave->ring_position, datagram->state);
         return;
     }
 
@@ -452,7 +442,6 @@ void ec_fsm_change_state_ack(ec_fsm_change_t *fsm /**< finite state machine */)
 
     // read new AL status
     ec_datagram_nprd(datagram, slave->station_address, 0x0130, 2);
-    ec_master_queue_datagram(fsm->slave->master, datagram);
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_change_state_check_ack;
 }
@@ -469,15 +458,14 @@ void ec_fsm_change_state_check_ack(ec_fsm_change_t *fsm
     ec_datagram_t *datagram = fsm->datagram;
     ec_slave_t *slave = fsm->slave;
 
-    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--) {
-        ec_master_queue_datagram(fsm->slave->master, datagram);
+    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--)
         return;
-    }
 
     if (datagram->state != EC_DATAGRAM_RECEIVED) {
         fsm->state = ec_fsm_change_state_error;
-        EC_ERR("Failed to receive state ack check datagram from slave %i.\n",
-               slave->ring_position);
+        EC_ERR("Failed to receive state ack check datagram from slave %i"
+                " (datagram state %i).\n",
+               slave->ring_position, datagram->state);
         return;
     }
 
@@ -521,7 +509,6 @@ void ec_fsm_change_state_check_ack(ec_fsm_change_t *fsm
 
     // reread new AL status
     ec_datagram_nprd(datagram, slave->station_address, 0x0130, 2);
-    ec_master_queue_datagram(fsm->slave->master, datagram);
     fsm->retries = EC_FSM_RETRIES;
 }
 

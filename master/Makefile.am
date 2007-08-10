@@ -37,12 +37,16 @@ EXTRA_DIST = \
 	datagram.c datagram.h \
 	debug.c	debug.h \
 	device.c device.h \
+	pdo.c pdo.h \
+	sync.c sync.h \
+	fmmu.c fmmu.h \
 	domain.c domain.h \
 	doxygen.c \
 	ethernet.c ethernet.h \
 	fsm_sii.c fsm_sii.h \
 	fsm_change.c fsm_change.h \
 	fsm_coe.c fsm_coe.h \
+	fsm_mapping.c fsm_mapping.h \
 	fsm_slave.c fsm_slave.h \
 	fsm_master.c fsm_master.h \
 	globals.h \
@@ -52,7 +56,7 @@ EXTRA_DIST = \
 	slave.c slave.h
 
 modules:
-	$(MAKE) -C "$(LINUX_SOURCE_DIR)" M="@abs_top_srcdir@" modules
+	$(MAKE) -C "@abs_top_srcdir@" modules
 
 modules_install:
 	mkdir -p $(DESTDIR)$(LINUX_MOD_PATH)
