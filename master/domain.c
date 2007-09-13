@@ -269,6 +269,8 @@ int ec_domain_add_datagram(ec_domain_t *domain, /**< EtherCAT domain */
     }
 
     ec_datagram_init(datagram);
+    snprintf(datagram->name, EC_DATAGRAM_NAME_SIZE,
+            "domain%u-%u", domain->index, offset);
 
     if (ec_datagram_lrw(datagram, offset, data_size)) {
         kfree(datagram);
@@ -298,7 +300,7 @@ int ec_domain_alloc(ec_domain_t *domain, /**< EtherCAT domain */
     ec_fmmu_t *fmmu;
     unsigned int i, j, datagram_count;
     uint32_t pdo_off, pdo_off_datagram;
-    uint32_t datagram_offset;
+    uint32_t datagram_offset, log_addr;
     size_t datagram_data_size, sync_size;
     ec_datagram_t *datagram;
 
@@ -350,8 +352,9 @@ int ec_domain_alloc(ec_domain_t *domain, /**< EtherCAT domain */
                 pdo_off = fmmu->logical_start_address + data_reg->sync_offset;
                 // search datagram
                 list_for_each_entry(datagram, &domain->datagrams, list) {
-                    pdo_off_datagram = pdo_off - datagram->address.logical;
-                    if (pdo_off >= datagram->address.logical &&
+                    log_addr = EC_READ_U32(datagram->address);
+                    pdo_off_datagram = pdo_off - log_addr;
+                    if (pdo_off >= log_addr &&
                         pdo_off_datagram < datagram->mem_size) {
                         *data_reg->data_ptr = datagram->data +
                             pdo_off_datagram;
@@ -546,6 +549,7 @@ void ecrt_domain_process(ec_domain_t *domain /**< EtherCAT domain */)
     working_counter_sum = 0;
     domain->state = 0;
     list_for_each_entry(datagram, &domain->datagrams, list) {
+        ec_datagram_output_stats(datagram);
         if (datagram->state == EC_DATAGRAM_RECEIVED) {
             working_counter_sum += datagram->working_counter;
         }

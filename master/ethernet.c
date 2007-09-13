@@ -94,11 +94,12 @@ int ec_eoe_init(
 {
     ec_eoe_t **priv;
     int result, i;
-    char name[20];
+    char name[EC_DATAGRAM_NAME_SIZE];
 
     eoe->slave = slave;
 
     ec_datagram_init(&eoe->datagram);
+    eoe->queue_datagram = 0;
     eoe->state = ec_eoe_state_rx_start;
     eoe->opened = 0;
     eoe->rx_skb = NULL;
@@ -117,12 +118,20 @@ int ec_eoe_init(
     eoe->tx_rate = 0;
     eoe->rate_jiffies = 0;
 
-    /* device name eoe<MASTER>s<SLAVE>, because system tools don't like
-     * hyphens etc. in interface names. */
-    sprintf(name, "eoe%us%u", slave->master->index, slave->ring_position);
+    /* device name eoe<MASTER>[as]<SLAVE>, because networking scripts don't
+     * like hyphens etc. in interface names. */
+    if (slave->sii_alias) {
+        snprintf(name, EC_DATAGRAM_NAME_SIZE,
+                "eoe%ua%u", slave->master->index, slave->sii_alias);
+    } else {
+        snprintf(name, EC_DATAGRAM_NAME_SIZE,
+                "eoe%us%u", slave->master->index, slave->ring_position);
+    }
+
+    snprintf(eoe->datagram.name, EC_DATAGRAM_NAME_SIZE, name);
 
     if (!(eoe->dev = alloc_netdev(sizeof(ec_eoe_t *), name, ether_setup))) {
-        EC_ERR("Unable to allocate net_device for EoE handler!\n");
+        EC_ERR("Unable to allocate net_device %s for EoE handler!\n", name);
         goto out_return;
     }
 
@@ -275,7 +284,7 @@ int ec_eoe_send(ec_eoe_t *eoe /**< EoE handler */)
                             (eoe->tx_frame_number & 0x0F) << 12));
 
     memcpy(data + 4, eoe->tx_frame->skb->data + eoe->tx_offset, current_size);
-    ec_master_queue_datagram(eoe->slave->master, &eoe->datagram);
+    eoe->queue_datagram = 1;
 
     eoe->tx_offset += current_size;
     eoe->tx_fragment_number++;
@@ -292,6 +301,10 @@ void ec_eoe_run(ec_eoe_t *eoe /**< EoE handler */)
 {
     if (!eoe->opened) return;
 
+    // if the datagram was not sent, or is not yet received, skip this cycle
+    if (eoe->queue_datagram || eoe->datagram.state == EC_DATAGRAM_SENT)
+        return;
+
     // call state function
     eoe->state(eoe);
 
@@ -303,6 +316,22 @@ void ec_eoe_run(ec_eoe_t *eoe /**< EoE handler */)
         eoe->tx_counter = 0;
         eoe->rate_jiffies = jiffies;
     }
+
+    ec_datagram_output_stats(&eoe->datagram);
+}
+
+/*****************************************************************************/
+
+/**
+ * Queues the datagram, if necessary.
+ */
+
+void ec_eoe_queue(ec_eoe_t *eoe /**< EoE handler */)
+{
+   if (eoe->queue_datagram) {
+       ec_master_queue_datagram(eoe->slave->master, &eoe->datagram);
+       eoe->queue_datagram = 0;
+   }
 }
 
 /*****************************************************************************/
@@ -334,7 +363,7 @@ void ec_eoe_state_rx_start(ec_eoe_t *eoe /**< EoE handler */)
         return;
 
     ec_slave_mbox_prepare_check(eoe->slave, &eoe->datagram);
-    ec_master_queue_datagram(eoe->slave->master, &eoe->datagram);
+    eoe->queue_datagram = 1;
     eoe->state = ec_eoe_state_rx_check;
 }
 
@@ -360,7 +389,7 @@ void ec_eoe_state_rx_check(ec_eoe_t *eoe /**< EoE handler */)
     }
 
     ec_slave_mbox_prepare_fetch(eoe->slave, &eoe->datagram);
-    ec_master_queue_datagram(eoe->slave->master, &eoe->datagram);
+    eoe->queue_datagram = 1;
     eoe->state = ec_eoe_state_rx_fetch;
 }
 

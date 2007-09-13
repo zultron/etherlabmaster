@@ -71,7 +71,7 @@ void ec_datagram_init(ec_datagram_t *datagram /**< EtherCAT datagram */)
 {
     INIT_LIST_HEAD(&datagram->queue); // mark as unqueued
     datagram->type = EC_DATAGRAM_NONE;
-    datagram->address.logical = 0x00000000;
+    memset(datagram->address, 0x00, EC_ADDR_LEN);
     datagram->data = NULL;
     datagram->mem_size = 0;
     datagram->data_size = 0;
@@ -82,6 +82,9 @@ void ec_datagram_init(ec_datagram_t *datagram /**< EtherCAT datagram */)
     datagram->jiffies_sent = 0;
     datagram->cycles_received = 0;
     datagram->jiffies_received = 0;
+    datagram->skip_count = 0;
+    datagram->stats_output_jiffies = 0;
+    datagram->name[0] = 0x00;
 }
 
 /*****************************************************************************/
@@ -147,8 +150,8 @@ int ec_datagram_nprd(ec_datagram_t *datagram,
 
     EC_FUNC_HEADER;
     datagram->type = EC_DATAGRAM_NPRD;
-    datagram->address.physical.slave = node_address;
-    datagram->address.physical.mem = offset;
+    EC_WRITE_U16(datagram->address, node_address);
+    EC_WRITE_U16(datagram->address + 2, offset);
     EC_FUNC_FOOTER;
 }
 
@@ -175,8 +178,8 @@ int ec_datagram_npwr(ec_datagram_t *datagram,
 
     EC_FUNC_HEADER;
     datagram->type = EC_DATAGRAM_NPWR;
-    datagram->address.physical.slave = node_address;
-    datagram->address.physical.mem = offset;
+    EC_WRITE_U16(datagram->address, node_address);
+    EC_WRITE_U16(datagram->address + 2, offset);
     EC_FUNC_FOOTER;
 }
 
@@ -200,8 +203,8 @@ int ec_datagram_aprd(ec_datagram_t *datagram,
 {
     EC_FUNC_HEADER;
     datagram->type = EC_DATAGRAM_APRD;
-    datagram->address.physical.slave = (int16_t) ring_position * (-1);
-    datagram->address.physical.mem = offset;
+    EC_WRITE_S16(datagram->address, (int16_t) ring_position * (-1));
+    EC_WRITE_U16(datagram->address + 2, offset);
     EC_FUNC_FOOTER;
 }
 
@@ -225,8 +228,8 @@ int ec_datagram_apwr(ec_datagram_t *datagram,
 {
     EC_FUNC_HEADER;
     datagram->type = EC_DATAGRAM_APWR;
-    datagram->address.physical.slave = (int16_t) ring_position * (-1);
-    datagram->address.physical.mem = offset;
+    EC_WRITE_S16(datagram->address, (int16_t) ring_position * (-1));
+    EC_WRITE_U16(datagram->address + 2, offset);
     EC_FUNC_FOOTER;
 }
 
@@ -248,8 +251,8 @@ int ec_datagram_brd(ec_datagram_t *datagram,
 {
     EC_FUNC_HEADER;
     datagram->type = EC_DATAGRAM_BRD;
-    datagram->address.physical.slave = 0x0000;
-    datagram->address.physical.mem = offset;
+    EC_WRITE_U16(datagram->address, 0x0000);
+    EC_WRITE_U16(datagram->address + 2, offset);
     EC_FUNC_FOOTER;
 }
 
@@ -271,8 +274,8 @@ int ec_datagram_bwr(ec_datagram_t *datagram,
 {
     EC_FUNC_HEADER;
     datagram->type = EC_DATAGRAM_BWR;
-    datagram->address.physical.slave = 0x0000;
-    datagram->address.physical.mem = offset;
+    EC_WRITE_U16(datagram->address, 0x0000);
+    EC_WRITE_U16(datagram->address + 2, offset);
     EC_FUNC_FOOTER;
 }
 
@@ -294,8 +297,51 @@ int ec_datagram_lrw(ec_datagram_t *datagram,
 {
     EC_FUNC_HEADER;
     datagram->type = EC_DATAGRAM_LRW;
-    datagram->address.logical = offset;
+    EC_WRITE_U32(datagram->address, offset);
     EC_FUNC_FOOTER;
+}
+
+/*****************************************************************************/
+
+/**
+ * Evaluates the working counter of a single-cast datagram.
+ * Outputs an error message.
+ */
+
+void ec_datagram_print_wc_error(
+        const ec_datagram_t *datagram
+        )
+{
+    if (datagram->working_counter == 0)
+        printk("No response.");
+    else if (datagram->working_counter > 1)
+        printk("%u slaves responded!", datagram->working_counter);
+    else
+        printk("Success.");
+    printk("\n");
+}
+
+/*****************************************************************************/
+
+/**
+ * Outputs datagram statistics at most every second.
+ */
+
+void ec_datagram_output_stats(
+        ec_datagram_t *datagram
+        )
+{
+    if (jiffies - datagram->stats_output_jiffies < HZ) {
+        datagram->stats_output_jiffies = jiffies;
+    
+        if (unlikely(datagram->skip_count)) {
+            EC_WARN("Datagram %x (%s) was SKIPPED %u time%s.\n",
+                    (unsigned int) datagram, datagram->name,
+                    datagram->skip_count,
+                    datagram->skip_count == 1 ? "" : "s");
+            datagram->skip_count = 0;
+        }
+    }
 }
 
 /*****************************************************************************/
