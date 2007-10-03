@@ -168,7 +168,7 @@ void ec_device_attach(ec_device_t *device, /**< EtherCAT device */
 
     for (i = 0; i < EC_TX_RING_SIZE; i++) {
         device->tx_skb[i]->dev = net_dev;
-        eth = (struct ethhdr *) (device->tx_skb[i]->data + ETH_HLEN);
+        eth = (struct ethhdr *) (device->tx_skb[i]->data);
         memcpy(eth->h_source, net_dev->dev_addr, ETH_ALEN);
     }
 }
@@ -288,17 +288,17 @@ void ec_device_send(ec_device_t *device, /**< EtherCAT device */
         ec_print_data(skb->data + ETH_HLEN, size);
     }
 
+    // start sending
+    if (device->dev->hard_start_xmit(skb, device->dev) == NETDEV_TX_OK) {
+		device->tx_count++;
 #ifdef EC_DEBUG_IF
-    ec_debug_send(&device->dbg, skb->data, ETH_HLEN + size);
+		ec_debug_send(&device->dbg, skb->data, ETH_HLEN + size);
 #endif
 #ifdef EC_DEBUG_RING
-    ec_device_debug_ring_append(
-            device, TX, skb->data + ETH_HLEN, size);
+		ec_device_debug_ring_append(
+				device, TX, skb->data + ETH_HLEN, size);
 #endif
-
-    // start sending
-    device->dev->hard_start_xmit(skb, device->dev);
-    device->tx_count++;
+	}
 }
 
 /*****************************************************************************/

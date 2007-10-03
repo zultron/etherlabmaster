@@ -140,6 +140,8 @@ void ec_sync_config(
 /*****************************************************************************/
 
 /**
+ * Adds a PDO to the list of known mapped PDOs.
+ * \return 0 on success, else < 0
  */
 
 int ec_sync_add_pdo(
@@ -172,13 +174,13 @@ int ec_sync_add_pdo(
     mapped_pdo->sync_index = sync->index;
 
     list_add_tail(&mapped_pdo->list, &sync->pdos);
-    sync->alt_mapping = 1;
     return 0;
 }
 
 /*****************************************************************************/
 
 /**
+ * Clears the list of known mapped PDOs.
  */
 
 void ec_sync_clear_pdos(
@@ -193,8 +195,30 @@ void ec_sync_clear_pdos(
         ec_pdo_clear(pdo);
         kfree(pdo);
     }
+}
 
-    sync->alt_mapping = 1;
+/*****************************************************************************/
+
+/**
+ * \return Type of PDOs covered by the given sync manager.
+ */
+
+ec_pdo_type_t ec_sync_get_pdo_type(
+        const ec_sync_t *sync /**< EtherCAT sync manager */
+        )
+{
+    int index = sync->index;
+
+    if (sync->slave && sync->slave->sii_mailbox_protocols) {
+        index -= 2;
+    }
+
+    if (index < 0 || index > 1) {
+        EC_WARN("ec_sync_get_pdo_type(): invalid sync manager index.\n");
+        return EC_RX_PDO;
+    }
+
+    return (ec_pdo_type_t) index;
 }
 
 /*****************************************************************************/

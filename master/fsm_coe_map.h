@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- *  $Id$
+ *  $Id: fsm_coe.h 702 2006-12-18 18:10:52Z fp $
  *
  *  Copyright (C) 2006  Florian Pose, Ingenieurgemeinschaft IgH
  *
@@ -33,57 +33,55 @@
 
 /**
    \file
-   EtherCAT finite state machines.
+   EtherCAT CoE mapping state machines.
 */
 
 /*****************************************************************************/
 
-#ifndef __EC_FSM_SLAVE__
-#define __EC_FSM_SLAVE__
+#ifndef __EC_FSM_COE_MAP__
+#define __EC_FSM_COE_MAP__
 
 #include "globals.h"
-#include "../include/ecrt.h"
 #include "datagram.h"
 #include "slave.h"
-#include "fsm_sii.h"
-#include "fsm_change.h"
 #include "fsm_coe.h"
-#include "fsm_mapping.h"
 
 /*****************************************************************************/
 
-typedef struct ec_fsm_slave ec_fsm_slave_t; /**< \see ec_fsm_slave */
+typedef struct ec_fsm_coe_map ec_fsm_coe_map_t; /**< \see ec_fsm_coe_map */
 
 /**
-   Finite state machine of an EtherCAT slave.
-*/
+ */
 
-struct ec_fsm_slave
+struct ec_fsm_coe_map
 {
-    ec_slave_t *slave; /**< slave the FSM runs on */
-    ec_datagram_t *datagram; /**< datagram used in the state machine */
-    unsigned int retries; /**< retries on datagram timeout. */
+    void (*state)(ec_fsm_coe_map_t *); /**< CoE mapping state function */
+    ec_fsm_coe_t *fsm_coe; /**< CoE state machine to use */
 
-    void (*state)(ec_fsm_slave_t *); /**< state function */
-    ec_sdo_data_t *sdodata; /**< SDO configuration data */
-    uint16_t sii_offset; /**< SII offset in words */
+    ec_slave_t *slave; /**< EtherCAT slave */
+    ec_sdo_request_t request; /**< SDO request */
 
-    ec_fsm_sii_t fsm_sii; /**< SII state machine */
-    ec_fsm_change_t fsm_change; /**< State change state machine */
-    ec_fsm_coe_t fsm_coe; /**< CoE state machine */
-    ec_fsm_mapping_t fsm_map; /**< PDO mapping state machine */
+    unsigned int sync_index; /**< index of the current sync manager */
+    ec_sdo_t *sync_sdo; /**< pointer to the sync managers mapping SDO */
+    uint8_t sync_subindices; /**< number of mapped PDOs */
+    uint16_t sync_subindex; /**< current subindex in mapping SDO */
+
+    struct list_head pdos; /**< list of mapped PDOs */
+    ec_pdo_t *pdo; /**< current PDO */
+    ec_sdo_t *pdo_sdo; /**< current PDO SDO */
+    uint8_t pdo_subindices; /**< number of PDO entries */
+    uint16_t pdo_subindex; /**< current subindex in PDO SDO */
 };
 
 /*****************************************************************************/
 
-void ec_fsm_slave_init(ec_fsm_slave_t *, ec_datagram_t *);
-void ec_fsm_slave_clear(ec_fsm_slave_t *);
+void ec_fsm_coe_map_init(ec_fsm_coe_map_t *, ec_fsm_coe_t *);
+void ec_fsm_coe_map_clear(ec_fsm_coe_map_t *);
 
-void ec_fsm_slave_start_scan(ec_fsm_slave_t *, ec_slave_t *);
-void ec_fsm_slave_start_conf(ec_fsm_slave_t *, ec_slave_t *);
+void ec_fsm_coe_map_start(ec_fsm_coe_map_t *, ec_slave_t *);
 
-int ec_fsm_slave_exec(ec_fsm_slave_t *);
-int ec_fsm_slave_success(const ec_fsm_slave_t *);
+int ec_fsm_coe_map_exec(ec_fsm_coe_map_t *);
+int ec_fsm_coe_map_success(ec_fsm_coe_map_t *);
 
 /*****************************************************************************/
 

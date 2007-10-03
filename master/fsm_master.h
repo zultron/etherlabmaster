@@ -48,6 +48,7 @@
 #include "canopen.h"
 
 #include "fsm_slave.h"
+#include "fsm_coe_map.h"
 
 /*****************************************************************************/
 
@@ -57,12 +58,12 @@
 
 typedef struct
 {
-    struct list_head list;
-    ec_slave_t *slave;
-    off_t offset;
-    size_t size;
-    const uint16_t *words;
-    ec_request_state_t state;
+    struct list_head list; /**< list head */
+    ec_slave_t *slave; /**< EtherCAT slave */
+    off_t word_offset; /**< SII address in words */
+    size_t word_size; /**< data size in words */
+    const uint8_t *data; /**< pointer to the data */
+    ec_request_state_t state; /**< state of the request */
 }
 ec_eeprom_write_request_t;
 
@@ -99,6 +100,7 @@ struct ec_fsm_master
     ec_fsm_sii_t fsm_sii; /**< SII state machine */
     ec_fsm_change_t fsm_change; /**< State change state machine */
     ec_fsm_coe_t fsm_coe; /**< CoE state machine */
+    ec_fsm_coe_map_t fsm_coe_map; /**< CoE mapping state machine */
 };
 
 /*****************************************************************************/

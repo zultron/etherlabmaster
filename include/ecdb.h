@@ -35,8 +35,8 @@
    \file
    EtherCAT Slave Database.
 
-   \warn Please do not create any dependencies to this file! It may be changed
-   between releases. Provide a copy, if you want to use it in foreign
+   \attention Please do not create any dependencies to this file! It may be
+   changed between releases. Provide a copy, if you want to use it in foreign
    projects.
 */
 
@@ -48,6 +48,8 @@
 /*****************************************************************************/
 
 /** \cond */
+
+#define Beckhoff_EK1100 0x00000002, 0x044C2C52
 
 #define Beckhoff_BK1120 0x00000002, 0x04602C22
 

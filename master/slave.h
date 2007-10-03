@@ -83,6 +83,7 @@ ec_slave_state_t;
 /*****************************************************************************/
 
 /**
+ * EtherCAT slave online state.
  */
 
 typedef enum {
@@ -176,6 +177,8 @@ struct ec_slave
     struct list_head sdo_confs; /**< list of SDO configurations */
     uint8_t sdo_dictionary_fetched; /**< dictionary has been fetched */
     unsigned long jiffies_preop; /**< time, the slave went to PREOP */
+
+    uint8_t pdo_mapping_fetched; /**< PDO mapping has been fetched */
 };
 
 /*****************************************************************************/
@@ -194,8 +197,8 @@ void ec_slave_set_state(ec_slave_t *, ec_slave_state_t);
 void ec_slave_set_online_state(ec_slave_t *, ec_slave_online_state_t);
 
 // SII categories
-int ec_slave_fetch_sii_strings(ec_slave_t *, const uint8_t *);
-void ec_slave_fetch_sii_general(ec_slave_t *, const uint8_t *);
+int ec_slave_fetch_sii_strings(ec_slave_t *, const uint8_t *, size_t);
+int ec_slave_fetch_sii_general(ec_slave_t *, const uint8_t *, size_t);
 int ec_slave_fetch_sii_syncs(ec_slave_t *, const uint8_t *, size_t);
 int ec_slave_fetch_sii_pdos(ec_slave_t *, const uint8_t *, size_t,
         ec_pdo_type_t);
@@ -205,6 +208,7 @@ ec_sync_t *ec_slave_get_pdo_sync(ec_slave_t *, ec_direction_t);
 int ec_slave_validate(const ec_slave_t *, uint32_t, uint32_t);
 void ec_slave_sdo_dict_info(const ec_slave_t *,
         unsigned int *, unsigned int *);
+ec_sdo_t *ec_slave_get_sdo(ec_slave_t *, uint16_t);
 
 /*****************************************************************************/
 

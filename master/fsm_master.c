@@ -60,6 +60,7 @@ void ec_fsm_master_state_clear_addresses(ec_fsm_master_t *);
 void ec_fsm_master_state_scan_slaves(ec_fsm_master_t *);
 void ec_fsm_master_state_write_eeprom(ec_fsm_master_t *);
 void ec_fsm_master_state_sdodict(ec_fsm_master_t *);
+void ec_fsm_master_state_pdomap(ec_fsm_master_t *);
 void ec_fsm_master_state_sdo_request(ec_fsm_master_t *);
 void ec_fsm_master_state_end(ec_fsm_master_t *);
 void ec_fsm_master_state_error(ec_fsm_master_t *);
@@ -90,6 +91,7 @@ void ec_fsm_master_init(ec_fsm_master_t *fsm, /**< master state machine */
     ec_fsm_sii_init(&fsm->fsm_sii, fsm->datagram);
     ec_fsm_change_init(&fsm->fsm_change, fsm->datagram);
     ec_fsm_coe_init(&fsm->fsm_coe, fsm->datagram);
+    ec_fsm_coe_map_init(&fsm->fsm_coe_map, &fsm->fsm_coe);
 }
 
 /*****************************************************************************/
@@ -105,6 +107,7 @@ void ec_fsm_master_clear(ec_fsm_master_t *fsm /**< master state machine */)
     ec_fsm_sii_clear(&fsm->fsm_sii);
     ec_fsm_change_clear(&fsm->fsm_change);
     ec_fsm_coe_clear(&fsm->fsm_coe);
+    ec_fsm_coe_map_clear(&fsm->fsm_coe_map);
 }
 
 /*****************************************************************************/
@@ -329,8 +332,8 @@ int ec_fsm_master_action_process_eeprom(
         up(&master->eeprom_sem);
 
         slave = request->slave;
-        if (slave->online_state == EC_SLAVE_OFFLINE || slave->error_flag) {
-            EC_ERR("Discarding EEPROM data, slave %i not ready.\n",
+        if (slave->online_state == EC_SLAVE_OFFLINE) {
+            EC_ERR("Discarding EEPROM data, slave %i offline.\n",
                     slave->ring_position);
             request->state = EC_REQUEST_FAILURE;
             wake_up(&master->eeprom_queue);
@@ -343,8 +346,8 @@ int ec_fsm_master_action_process_eeprom(
                     slave->ring_position);
         fsm->eeprom_request = request;
         fsm->eeprom_index = 0;
-        ec_fsm_sii_write(&fsm->fsm_sii, request->slave, request->offset,
-                request->words, EC_FSM_SII_NODE);
+        ec_fsm_sii_write(&fsm->fsm_sii, request->slave, request->word_offset,
+                request->data, EC_FSM_SII_NODE);
         fsm->state = ec_fsm_master_state_write_eeprom;
         fsm->state(fsm); // execute immediately
         return 1;
@@ -382,7 +385,7 @@ int ec_fsm_master_action_process_sdo(
         request->state = EC_REQUEST_IN_PROGRESS;
         up(&master->sdo_sem);
 
-        slave = request->sdo->slave;
+        slave = request->entry->sdo->slave;
         if (slave->current_state == EC_SLAVE_STATE_INIT ||
                 slave->online_state == EC_SLAVE_OFFLINE ||
                 slave->error_flag) {
@@ -414,6 +417,7 @@ int ec_fsm_master_action_process_sdo(
 /*****************************************************************************/
 
 /**
+ * Check for slaves that are not configured and configure them.
  */
 
 int ec_fsm_master_action_configure(
@@ -518,6 +522,29 @@ void ec_fsm_master_action_process_states(ec_fsm_master_t *fsm
             fsm->state = ec_fsm_master_state_sdodict;
             ec_fsm_coe_dictionary(&fsm->fsm_coe, slave);
             ec_fsm_coe_exec(&fsm->fsm_coe); // execute immediately
+            return;
+        }
+
+        // check, if slaves have their PDO mapping to be read.
+        list_for_each_entry(slave, &master->slaves, list) {
+            if (!(slave->sii_mailbox_protocols & EC_MBOX_COE)
+                || slave->pdo_mapping_fetched
+                || !slave->sdo_dictionary_fetched
+                || slave->current_state == EC_SLAVE_STATE_INIT
+                || slave->online_state == EC_SLAVE_OFFLINE) continue;
+
+            if (master->debug_level) {
+                EC_DBG("Fetching PDO mapping from slave %i via CoE.\n",
+                       slave->ring_position);
+            }
+
+            slave->pdo_mapping_fetched = 1;
+
+            // start fetching PDO mapping
+            fsm->idle = 0;
+            fsm->state = ec_fsm_master_state_pdomap;
+            ec_fsm_coe_map_start(&fsm->fsm_coe_map, slave);
+            ec_fsm_coe_map_exec(&fsm->fsm_coe_map); // execute immediately
             return;
         }
 
@@ -945,10 +972,10 @@ void ec_fsm_master_state_write_eeprom(
     }
 
     fsm->eeprom_index++;
-    if (fsm->eeprom_index < request->size) {
+    if (fsm->eeprom_index < request->word_size) {
         ec_fsm_sii_write(&fsm->fsm_sii, slave,
-                request->offset + fsm->eeprom_index,
-                request->words + fsm->eeprom_index,
+                request->word_offset + fsm->eeprom_index,
+                request->data + fsm->eeprom_index * 2,
                 EC_FSM_SII_NODE);
         ec_fsm_sii_exec(&fsm->fsm_sii); // execute immediately
         return;
@@ -956,8 +983,8 @@ void ec_fsm_master_state_write_eeprom(
 
     // finished writing EEPROM
     if (master->debug_level)
-        EC_DBG("Finished writing EEPROM data to slave %i.\n",
-                slave->ring_position);
+        EC_DBG("Finished writing %u words of EEPROM data to slave %u.\n",
+                request->word_size, slave->ring_position);
     request->state = EC_REQUEST_COMPLETE;
     wake_up(&master->eeprom_queue);
 
@@ -997,6 +1024,27 @@ void ec_fsm_master_state_sdodict(ec_fsm_master_t *fsm /**< master state machine 
                sdo_count, entry_count, slave->ring_position);
     }
 
+    fsm->state = ec_fsm_master_state_end;
+}
+
+/*****************************************************************************/
+
+/**
+ * Scan the PDO mapping of a slave.
+ */
+
+void ec_fsm_master_state_pdomap(
+        ec_fsm_master_t *fsm /**< master state machine */
+        )
+{
+    if (ec_fsm_coe_map_exec(&fsm->fsm_coe_map)) return;
+
+    if (!ec_fsm_coe_map_success(&fsm->fsm_coe_map)) {
+        fsm->state = ec_fsm_master_state_error;
+        return;
+    }
+
+    // fetching of PDO mapping finished
     fsm->state = ec_fsm_master_state_end;
 }
 

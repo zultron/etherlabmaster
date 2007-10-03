@@ -403,14 +403,15 @@ void ec_fsm_slave_scan_state_eeprom_size(ec_fsm_slave_t *fsm /**< slave state ma
     cat_size = EC_READ_U16(fsm->fsm_sii.value + 2);
 
     if (cat_type != 0xFFFF) { // not the last category
-        fsm->sii_offset += cat_size + 2;
-        if (fsm->sii_offset >= EC_MAX_EEPROM_SIZE) {
+        off_t next_offset = 2UL + fsm->sii_offset + cat_size;
+        if (next_offset >= EC_MAX_EEPROM_SIZE) {
             EC_WARN("EEPROM size of slave %i exceeds"
-                    " %i words (0xffff limiter missing?).\n",
+                    " %u words (0xffff limiter missing?).\n",
                     slave->ring_position, EC_MAX_EEPROM_SIZE);
             slave->eeprom_size = EC_FIRST_EEPROM_CATEGORY_OFFSET * 2;
             goto alloc_eeprom;
         }
+        fsm->sii_offset = next_offset;
         ec_fsm_sii_read(&fsm->fsm_sii, slave, fsm->sii_offset,
                         EC_FSM_SII_NODE);
         ec_fsm_sii_exec(&fsm->fsm_sii); // execute state immediately
@@ -421,17 +422,18 @@ void ec_fsm_slave_scan_state_eeprom_size(ec_fsm_slave_t *fsm /**< slave state ma
 
 alloc_eeprom:
     if (slave->eeprom_data) {
-        EC_INFO("Freeing old EEPROM data on slave %i...\n",
+        EC_WARN("Freeing old EEPROM data on slave %i...\n",
                 slave->ring_position);
         kfree(slave->eeprom_data);
     }
 
     if (!(slave->eeprom_data =
-          (uint8_t *) kmalloc(slave->eeprom_size, GFP_ATOMIC))) {
-        fsm->slave->error_flag = 1;
+                (uint8_t *) kmalloc(slave->eeprom_size, GFP_ATOMIC))) {
+        EC_ERR("Failed to allocate %u bytes of EEPROM data for slave %u.\n",
+               slave->eeprom_size, slave->ring_position);
+        slave->eeprom_size = 0;
+        slave->error_flag = 1;
         fsm->state = ec_fsm_slave_state_error;
-        EC_ERR("Failed to allocate EEPROM data on slave %i.\n",
-               slave->ring_position);
         return;
     }
 
@@ -452,7 +454,7 @@ alloc_eeprom:
 void ec_fsm_slave_scan_state_eeprom_data(ec_fsm_slave_t *fsm /**< slave state machine */)
 {
     ec_slave_t *slave = fsm->slave;
-    uint16_t *cat_word, cat_type, cat_size;
+    uint16_t *cat_word, cat_type, cat_size, eeprom_word_size = slave->eeprom_size / 2;
 
     if (ec_fsm_sii_exec(&fsm->fsm_sii)) return;
 
@@ -466,7 +468,7 @@ void ec_fsm_slave_scan_state_eeprom_data(ec_fsm_slave_t *fsm /**< slave state ma
 
     // 2 words fetched
 
-    if (fsm->sii_offset + 2 <= slave->eeprom_size / 2) { // 2 words fit
+    if (fsm->sii_offset + 2 <= eeprom_word_size) { // 2 words fit
         memcpy(slave->eeprom_data + fsm->sii_offset * 2,
                fsm->fsm_sii.value, 4);
     }
@@ -475,7 +477,7 @@ void ec_fsm_slave_scan_state_eeprom_data(ec_fsm_slave_t *fsm /**< slave state ma
                fsm->fsm_sii.value, 2);
     }
 
-    if (fsm->sii_offset + 2 < slave->eeprom_size / 2) {
+    if (fsm->sii_offset + 2 < eeprom_word_size) {
         // fetch the next 2 words
         fsm->sii_offset += 2;
         ec_fsm_sii_read(&fsm->fsm_sii, slave, fsm->sii_offset,
@@ -507,39 +509,65 @@ void ec_fsm_slave_scan_state_eeprom_data(ec_fsm_slave_t *fsm /**< slave state ma
     slave->sii_mailbox_protocols =
         EC_READ_U16(slave->eeprom_data + 2 * 0x001C);
 
+    if (eeprom_word_size < EC_FIRST_EEPROM_CATEGORY_OFFSET + 1) {
+        EC_ERR("Unexpected end of EEPROM data in slave %u:"
+                " First category header missing.\n",
+                slave->ring_position);
+        goto end;
+    }
+
     // evaluate category data
-    cat_word = (uint16_t *) slave->eeprom_data + EC_FIRST_EEPROM_CATEGORY_OFFSET;
+    cat_word =
+        (uint16_t *) slave->eeprom_data + EC_FIRST_EEPROM_CATEGORY_OFFSET;
     while (EC_READ_U16(cat_word) != 0xFFFF) {
+
+        // type and size words must fit
+        if (cat_word + 2 - (uint16_t *) slave->eeprom_data
+                > eeprom_word_size) {
+            EC_ERR("Unexpected end of EEPROM data in slave %u:"
+                    " Category header incomplete.\n",
+                    slave->ring_position);
+            goto end;
+        }
+
         cat_type = EC_READ_U16(cat_word) & 0x7FFF;
         cat_size = EC_READ_U16(cat_word + 1);
+        cat_word += 2;
+
+        if (cat_word + cat_size - (uint16_t *) slave->eeprom_data
+                > eeprom_word_size) {
+            EC_WARN("Unexpected end of EEPROM data in slave %u:"
+                    " Category data incomplete.\n",
+                    slave->ring_position);
+            goto end;
+        }
 
         switch (cat_type) {
             case 0x000A:
-                if (ec_slave_fetch_sii_strings(
-                            slave, (uint8_t *) (cat_word + 2)))
+                if (ec_slave_fetch_sii_strings(slave, (uint8_t *) cat_word,
+                            cat_size * 2))
                     goto end;
                 break;
             case 0x001E:
-                ec_slave_fetch_sii_general(
-                        slave, (uint8_t *) (cat_word + 2));
+                if (ec_slave_fetch_sii_general(slave, (uint8_t *) cat_word,
+                            cat_size * 2))
+                    goto end;
                 break;
             case 0x0028:
                 break;
             case 0x0029:
-                if (ec_slave_fetch_sii_syncs(
-                            slave, (uint8_t *) (cat_word + 2), cat_size))
+                if (ec_slave_fetch_sii_syncs(slave, (uint8_t *) cat_word,
+                            cat_size * 2))
                     goto end;
                 break;
             case 0x0032:
-                if (ec_slave_fetch_sii_pdos(
-                            slave, (uint8_t *) (cat_word + 2),
-                            cat_size, EC_TX_PDO))
+                if (ec_slave_fetch_sii_pdos( slave, (uint8_t *) cat_word,
+                            cat_size * 2, EC_TX_PDO))
                     goto end;
                 break;
             case 0x0033:
-                if (ec_slave_fetch_sii_pdos(
-                            slave, (uint8_t *) (cat_word + 2),
-                            cat_size, EC_RX_PDO))
+                if (ec_slave_fetch_sii_pdos( slave, (uint8_t *) cat_word,
+                            cat_size * 2, EC_RX_PDO))
                     goto end;
                 break;
             default:
@@ -548,7 +576,13 @@ void ec_fsm_slave_scan_state_eeprom_data(ec_fsm_slave_t *fsm /**< slave state ma
                             cat_type, slave->ring_position);
         }
 
-        cat_word += cat_size + 2;
+        cat_word += cat_size;
+        if (cat_word - (uint16_t *) slave->eeprom_data >= eeprom_word_size) {
+            EC_WARN("Unexpected end of EEPROM data in slave %u:"
+                    " Next category header missing.\n",
+                    slave->ring_position);
+            goto end;
+        }
     }
 
     fsm->state = ec_fsm_slave_state_end;
@@ -594,7 +628,8 @@ void ec_fsm_slave_conf_state_init(ec_fsm_slave_t *fsm /**< slave state machine *
     if (ec_fsm_change_exec(&fsm->fsm_change)) return;
 
     if (!ec_fsm_change_success(&fsm->fsm_change)) {
-        slave->error_flag = 1;
+        if (!fsm->fsm_change.spontaneous_change)
+            slave->error_flag = 1;
         fsm->state = ec_fsm_slave_state_error;
         return;
     }
@@ -662,6 +697,7 @@ void ec_fsm_slave_conf_state_clear_fmmus(ec_fsm_slave_t *fsm
 /*****************************************************************************/
 
 /**
+ * Check for mailbox sync managers to be configured.
  */
 
 void ec_fsm_slave_conf_enter_mbox_sync(
@@ -683,8 +719,11 @@ void ec_fsm_slave_conf_enter_mbox_sync(
         return;
     }
 
-    if (!slave->sii_mailbox_protocols || slave->sii_sync_count < 2) {
-        // no mailbox sync managers to be configured
+    if (!slave->sii_mailbox_protocols) {
+        // no mailbox protocols supported
+        if (master->debug_level)
+            EC_DBG("Slave %i does not support mailbox communication.\n",
+                    slave->ring_position);
         ec_fsm_slave_conf_enter_preop(fsm);
         return;
     }
@@ -694,14 +733,41 @@ void ec_fsm_slave_conf_enter_mbox_sync(
                slave->ring_position);
     }
 
-    // configure sync managers
-    ec_datagram_npwr(datagram, slave->station_address, 0x0800,
-                     EC_SYNC_SIZE * slave->sii_sync_count);
-    memset(datagram->data, 0x00, EC_SYNC_SIZE * slave->sii_sync_count);
+    if (slave->sii_sync_count >= 2) {
+        // configure sync managers
+        ec_datagram_npwr(datagram, slave->station_address, 0x0800,
+                EC_SYNC_SIZE * slave->sii_sync_count);
+        memset(datagram->data, 0x00, EC_SYNC_SIZE * slave->sii_sync_count);
 
-    for (i = 0; i < 2; i++) {
-        ec_sync_config(&slave->sii_syncs[i],
-                datagram->data + EC_SYNC_SIZE * i);
+        for (i = 0; i < 2; i++) {
+            ec_sync_config(&slave->sii_syncs[i],
+                    datagram->data + EC_SYNC_SIZE * i);
+        }
+    } else { // no mailbox sync manager configurations provided
+        ec_sync_t sync;
+
+        if (master->debug_level)
+            EC_DBG("Slave %i does not provide"
+                    " mailbox sync manager configurations.\n",
+                    slave->ring_position);
+
+        ec_datagram_npwr(datagram, slave->station_address, 0x0800,
+                EC_SYNC_SIZE * 2);
+        memset(datagram->data, 0x00, EC_SYNC_SIZE * 2);
+
+        ec_sync_init(&sync, slave, 0);
+        sync.physical_start_address = slave->sii_rx_mailbox_offset;
+        sync.length = slave->sii_rx_mailbox_size;
+        sync.control_register = 0x26;
+        sync.enable = 1;
+        ec_sync_config(&sync, datagram->data + EC_SYNC_SIZE * sync.index);
+
+        ec_sync_init(&sync, slave, 1);
+        sync.physical_start_address = slave->sii_tx_mailbox_offset;
+        sync.length = slave->sii_tx_mailbox_size;
+        sync.control_register = 0x22;
+        sync.enable = 1;
+        ec_sync_config(&sync, datagram->data + EC_SYNC_SIZE * sync.index);
     }
 
     fsm->retries = EC_FSM_RETRIES;
@@ -745,6 +811,7 @@ void ec_fsm_slave_conf_state_mbox_sync(ec_fsm_slave_t *fsm /**< slave state mach
 /*****************************************************************************/
 
 /**
+ * Request PREOP state.
  */
 
 void ec_fsm_slave_conf_enter_preop(ec_fsm_slave_t *fsm /**< slave state machine */)
@@ -768,7 +835,8 @@ void ec_fsm_slave_conf_state_preop(ec_fsm_slave_t *fsm /**< slave state machine 
     if (ec_fsm_change_exec(&fsm->fsm_change)) return;
 
     if (!ec_fsm_change_success(&fsm->fsm_change)) {
-        slave->error_flag = 1;
+        if (!fsm->fsm_change.spontaneous_change)
+            slave->error_flag = 1;
         fsm->state = ec_fsm_slave_state_error;
         return;
     }
@@ -795,6 +863,7 @@ void ec_fsm_slave_conf_state_preop(ec_fsm_slave_t *fsm /**< slave state machine 
 /*****************************************************************************/
 
 /**
+ * Check for SDO configurations to be applied.
  */
 
 void ec_fsm_slave_conf_enter_sdoconf(ec_fsm_slave_t *fsm /**< slave state machine */)
@@ -850,6 +919,7 @@ void ec_fsm_slave_conf_state_sdoconf(
 /*****************************************************************************/
 
 /**
+ * Check for alternative PDO mappings to be applied.
  */
 
 void ec_fsm_slave_conf_enter_mapconf(
@@ -896,6 +966,7 @@ void ec_fsm_slave_conf_state_mapconf(
 /*****************************************************************************/
 
 /**
+ * Check for PDO sync managers to be configured.
  */
 
 void ec_fsm_slave_conf_enter_pdo_sync(
@@ -928,6 +999,7 @@ void ec_fsm_slave_conf_enter_pdo_sync(
 /*****************************************************************************/
 
 /**
+ * Configure PDO sync managers.
  */
 
 void ec_fsm_slave_conf_state_pdo_sync(ec_fsm_slave_t *fsm /**< slave state machine */)
@@ -961,7 +1033,8 @@ void ec_fsm_slave_conf_state_pdo_sync(ec_fsm_slave_t *fsm /**< slave state machi
 /*****************************************************************************/
 
 /**
-*/
+ * Check for FMMUs to be configured.
+ */
 
 void ec_fsm_slave_conf_enter_fmmu(ec_fsm_slave_t *fsm /**< slave state machine */)
 {
@@ -1023,6 +1096,7 @@ void ec_fsm_slave_conf_state_fmmu(ec_fsm_slave_t *fsm /**< slave state machine *
 /*****************************************************************************/
 
 /**
+ * Request SAVEOP state.
  */
 
 void ec_fsm_slave_conf_enter_saveop(ec_fsm_slave_t *fsm /**< slave state machine */)
@@ -1046,7 +1120,8 @@ void ec_fsm_slave_conf_state_saveop(ec_fsm_slave_t *fsm /**< slave state machine
     if (ec_fsm_change_exec(&fsm->fsm_change)) return;
 
     if (!ec_fsm_change_success(&fsm->fsm_change)) {
-        fsm->slave->error_flag = 1;
+        if (!fsm->fsm_change.spontaneous_change)
+            fsm->slave->error_flag = 1;
         fsm->state = ec_fsm_slave_state_error;
         return;
     }
@@ -1086,7 +1161,8 @@ void ec_fsm_slave_conf_state_op(ec_fsm_slave_t *fsm /**< slave state machine */)
     if (ec_fsm_change_exec(&fsm->fsm_change)) return;
 
     if (!ec_fsm_change_success(&fsm->fsm_change)) {
-        slave->error_flag = 1;
+        if (!fsm->fsm_change.spontaneous_change)
+            slave->error_flag = 1;
         fsm->state = ec_fsm_slave_state_error;
         return;
     }
