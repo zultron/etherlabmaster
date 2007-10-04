@@ -54,16 +54,13 @@ clean-local:
 	$(MAKE) -C "$(LINUX_SOURCE_DIR)" M="@abs_srcdir@" clean
 	@rm -f Modules.symvers
 
-mydist:
-	svn2cl svn://yak/vol/projekte/msr_messen_steuern_regeln/ethercat/rep
-	@SVNREV=`svnversion $(srcdir)` && \
-	  $(MAKE) dist-bzip2 \
-	  distdir=$(PACKAGE)-$(VERSION)-$(BRANCH)-r$${SVNREV}
-
 dist-hook:
 	if which svnversion >/dev/null 2>&1; then \
 		svnversion $(srcdir) 2>/dev/null >$(distdir)/svnrevision; \
 	fi
+	if which svn2cl >/dev/null 2>&1; then \
+        svn2cl svn://yak/vol/projekte/msr_messen_steuern_regeln/ethercat/rep; \
+    fi
 
 mrproper: clean cleandoc
 	rm -rf \
