@@ -70,10 +70,12 @@ ssize_t ec_show_domain_attribute(struct kobject *, struct attribute *, char *);
 
 /** \cond */
 
-EC_SYSFS_READ_ATTR(image_size);
+EC_SYSFS_READ_ATTR(size);
+EC_SYSFS_READ_ATTR(data);
 
 static struct attribute *def_attrs[] = {
-    &attr_image_size,
+    &attr_size,
+    &attr_data,
     NULL,
 };
 
@@ -380,6 +382,28 @@ int ec_domain_alloc(ec_domain_t *domain, /**< EtherCAT domain */
 
 /*****************************************************************************/
 
+/** Outputs domain data.
+ */
+size_t ec_domain_output_data(
+        const ec_domain_t *domain, /**< EtherCAT domain. */
+        char *buffer /**< Output buffer */
+        )
+{
+    off_t off = 0;
+    ec_datagram_t *datagram;
+
+    list_for_each_entry(datagram, &domain->datagrams, list) {
+        if (off + datagram->data_size > PAGE_SIZE)
+            return -EFBIG; // file too large
+        memcpy(buffer + off, datagram->data, datagram->data_size);
+        off += datagram->data_size;
+    }
+
+    return off;
+}
+
+/*****************************************************************************/
+
 /**
    Formats attribute data for SysFS reading.
    \return number of bytes to read
@@ -392,8 +416,10 @@ ssize_t ec_show_domain_attribute(struct kobject *kobj, /**< kobject */
 {
     ec_domain_t *domain = container_of(kobj, ec_domain_t, kobj);
 
-    if (attr == &attr_image_size) {
-        return sprintf(buffer, "%i\n", domain->data_size);
+    if (attr == &attr_size) {
+        return sprintf(buffer, "%u\n", domain->data_size);
+    } else if (attr == &attr_data) {
+	return ec_domain_output_data(domain, buffer);
     }
 
     return 0;
