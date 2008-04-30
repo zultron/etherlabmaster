@@ -93,9 +93,11 @@ uint16_t ec_sync_size(
     const ec_pdo_entry_t *pdo_entry;
     unsigned int bit_size, byte_size;
 
-    if (sync->length) return sync->length;
-    if (sync->est_length) return sync->est_length;
+    // if an estimated length is specified, return it
+    if (sync->est_length)
+        return sync->est_length;
 
+    // calculate total Pdo size in bit
     bit_size = 0;
     list_for_each_entry(pdo, &sync->pdos, list) {
         list_for_each_entry(pdo_entry, &pdo->entries, list) {
@@ -103,12 +105,21 @@ uint16_t ec_sync_size(
         }
     }
 
-    if (bit_size % 8) // round up to full bytes
+    // bits to bytes
+    if (bit_size % 8) {
+        // round up to full bytes
         byte_size = bit_size / 8 + 1;
-    else
+    } else {
         byte_size = bit_size / 8;
+    }
 
-    return byte_size;
+    if (byte_size) {
+        // return total Pdo size, if there are Pdos assigned
+        return byte_size;
+    } else {
+        // return sync manager default size, if no Pdos are assigned
+        return sync->length;
+    }
 }
 
 /*****************************************************************************/
@@ -126,7 +137,7 @@ void ec_sync_config(
     size_t sync_size = ec_sync_size(sync);
 
     if (sync->slave->master->debug_level) {
-        EC_DBG("SM%i: Addr 0x%04X, Size %3i, Ctrl 0x%02X, En %i\n",
+        EC_DBG("SM%u: Addr 0x%04X, Size %3u, Ctrl 0x%02X, En %u\n",
                sync->index, sync->physical_start_address,
                sync_size, sync->control_register, sync->enable);
     }
