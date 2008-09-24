@@ -10,6 +10,7 @@ Changes since 1.4.0-rc2:
   mailbox protocols.
 * The Sdo Information Service is only queried, if the slave has the
   corresponding SII bit set.
+* Added some missing header files in the command-line-tool code.
 
 Changes in version 1.4.0-rc2:
 
