@@ -4,6 +4,13 @@ $Id$
 
 -------------------------------------------------------------------------------
 
+Changes since 1.4.0-rc2:
+
+* Minor fix in 'slaves' command that fixed duplicate display of supported
+  mailbox protocols.
+* The Sdo Information Service is only queried, if the slave has the
+  corresponding SII bit set.
+
 Changes in version 1.4.0-rc2:
 
 * Fixed a deadlock causing race condition concerning thread signaling when the
