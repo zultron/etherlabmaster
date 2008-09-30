@@ -189,61 +189,6 @@ fi
 AC_SUBST(KERNEL_E100,[$kernele100])
 
 #------------------------------------------------------------------------------
-# forcedeth driver
-#------------------------------------------------------------------------------
-
-AC_ARG_ENABLE([forcedeth],
-    AS_HELP_STRING([--enable-forcedeth],
-                   [Enable forcedeth driver]),
-    [
-        case "${enableval}" in
-            yes) enableforcedeth=1
-                ;;
-            no) enableforcedeth=0
-                ;;
-            *) AC_MSG_ERROR([Invalid value for --enable-forcedeth])
-                ;;
-        esac
-    ],
-    [enableforcedeth=0] # disabled by default!
-)
-
-AM_CONDITIONAL(ENABLE_FORCEDETH, test "x$enableforcedeth" = "x1")
-AC_SUBST(ENABLE_FORCEDETH,[$enableforcedeth])
-
-AC_ARG_WITH([forcedeth-kernel],
-    AC_HELP_STRING(
-        [--with-forcedeth-kernel=<X.Y.Z>],
-        [forcedeth kernel (only if differing)]
-    ),
-    [
-        kernelforcedeth=[$withval]
-    ],
-    [
-        kernelforcedeth=$linuxversion
-    ]
-)
-
-if test "x${enableforcedeth}" = "x1"; then
-    AC_MSG_CHECKING([for kernel for forcedeth driver])
-
-    kernels=`ls -1 ${srcdir}/devices/ | grep -oE "^forcedeth-.*-" | cut -d "-" -f 2 | uniq`
-    found=0
-    for k in $kernels; do
-        if test "$kernelforcedeth" = "$k"; then
-            found=1
-        fi
-    done
-    if test $found -ne 1; then
-        AC_MSG_ERROR([kernel $kernelforcedeth not available for forcedeth driver!])
-    fi
-
-    AC_MSG_RESULT([$kernelforcedeth])
-fi
-
-AC_SUBST(KERNEL_FORCEDETH,[$kernelforcedeth])
-
-#------------------------------------------------------------------------------
 # e1000 driver
 #------------------------------------------------------------------------------
 
@@ -297,61 +242,6 @@ if test "x${enablee1000}" = "x1"; then
 fi
 
 AC_SUBST(KERNEL_E1000,[$kernele1000])
-
-#------------------------------------------------------------------------------
-# r8169 driver
-#------------------------------------------------------------------------------
-
-AC_ARG_ENABLE([r8169],
-    AS_HELP_STRING([--enable-r8169],
-                   [Enable r8169 driver]),
-    [
-        case "${enableval}" in
-            yes) enabler8169=1
-                ;;
-            no) enabler8169=0
-                ;;
-            *) AC_MSG_ERROR([Invalid value for --enable-r8169])
-                ;;
-        esac
-    ],
-    [enabler8169=0] # disabled by default
-)
-
-AM_CONDITIONAL(ENABLE_R8169, test "x$enabler8169" = "x1")
-AC_SUBST(ENABLE_R8169,[$enabler8169])
-
-AC_ARG_WITH([r8169-kernel],
-    AC_HELP_STRING(
-        [--with-r8169-kernel=<X.Y.Z>],
-        [r8169 kernel (only if differing)]
-    ),
-    [
-        kernelr8169=[$withval]
-    ],
-    [
-        kernelr8169=$linuxversion
-    ]
-)
-
-if test "x${enabler8169}" = "x1"; then
-    AC_MSG_CHECKING([for kernel for r8169 driver])
-
-    kernels=`ls -1 ${srcdir}/devices/ | grep -oE "^r8169-.*-" | cut -d "-" -f 2 | uniq`
-    found=0
-    for k in $kernels; do
-        if test "$kernelr8169" = "$k"; then
-            found=1
-        fi
-    done
-    if test $found -ne 1; then
-        AC_MSG_ERROR([kernel $kernelr8169 not available for r8169 driver!])
-    fi
-
-    AC_MSG_RESULT([$kernelr8169])
-fi
-
-AC_SUBST(KERNEL_R8169,[$kernelr8169])
 
 #------------------------------------------------------------------------------
 # RTAI path (optional)

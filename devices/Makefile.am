@@ -51,13 +51,7 @@ EXTRA_DIST = \
 	8139too-2.6.24-ethercat.c \
 	8139too-2.6.24-orig.c \
 	Kbuild.in \
-	e100-2.6.18-ethercat.c \
-	e100-2.6.18-orig.c \
-	ecdev.h \
-	forcedeth-2.6.17-ethercat.c \
-	forcedeth-2.6.17-orig.c \
-	forcedeth-2.6.19-ethercat.c \
-	forcedeth-2.6.19-orig.c
+	ecdev.h
 
 BUILT_SOURCES = \
 	Kbuild
@@ -75,12 +69,6 @@ if ENABLE_E100
 endif
 if ENABLE_E1000
 	$(MAKE) -C e1000 modules_install
-endif
-if ENABLE_FORCEDETH
-	cp $(srcdir)/ec_forcedeth.ko $(DESTDIR)$(LINUX_MOD_PATH)
-endif
-if ENABLE_R8169
-	cp $(srcdir)/ec_r8169.ko $(DESTDIR)$(LINUX_MOD_PATH)
 endif
 
 clean-local:
