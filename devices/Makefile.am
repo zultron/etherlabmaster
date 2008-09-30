@@ -64,9 +64,6 @@ modules_install:
 if ENABLE_8139TOO
 	cp $(srcdir)/ec_8139too.ko $(DESTDIR)$(LINUX_MOD_PATH)
 endif
-if ENABLE_E100
-	cp $(srcdir)/ec_e100.ko $(DESTDIR)$(LINUX_MOD_PATH)
-endif
 if ENABLE_E1000
 	$(MAKE) -C e1000 modules_install
 endif

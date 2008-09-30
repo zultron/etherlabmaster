@@ -134,61 +134,6 @@ fi
 AC_SUBST(KERNEL_8139TOO,[$kernel8139too])
 
 #------------------------------------------------------------------------------
-# e100 driver
-#------------------------------------------------------------------------------
-
-AC_ARG_ENABLE([e100],
-    AS_HELP_STRING([--enable-e100],
-                   [Enable e100 driver]),
-    [
-        case "${enableval}" in
-            yes) enablee100=1
-                ;;
-            no) enablee100=0
-                ;;
-            *) AC_MSG_ERROR([Invalid value for --enable-e100])
-                ;;
-        esac
-    ],
-    [enablee100=0] # disabled by default
-)
-
-AM_CONDITIONAL(ENABLE_E100, test "x$enablee100" = "x1")
-AC_SUBST(ENABLE_E100,[$enablee100])
-
-AC_ARG_WITH([e100-kernel],
-    AC_HELP_STRING(
-        [--with-e100-kernel=<X.Y.Z>],
-        [e100 kernel (only if differing)]
-    ),
-    [
-        kernele100=[$withval]
-    ],
-    [
-        kernele100=$linuxversion
-    ]
-)
-
-if test "x${enablee100}" = "x1"; then
-    AC_MSG_CHECKING([for kernel for e100 driver])
-
-    kernels=`ls -1 ${srcdir}/devices/ | grep -oE "^e100-.*-" | cut -d "-" -f 2 | uniq`
-    found=0
-    for k in $kernels; do
-        if test "$kernele100" = "$k"; then
-            found=1
-        fi
-    done
-    if test $found -ne 1; then
-        AC_MSG_ERROR([kernel $kernele100 not available for e100 driver!])
-    fi
-
-    AC_MSG_RESULT([$kernele100])
-fi
-
-AC_SUBST(KERNEL_E100,[$kernele100])
-
-#------------------------------------------------------------------------------
 # e1000 driver
 #------------------------------------------------------------------------------
 
