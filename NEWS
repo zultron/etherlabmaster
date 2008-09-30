@@ -13,6 +13,7 @@ Changes since 1.4.0-rc2:
 * The Sdo Information Service is only queried, if the slave has the
   corresponding SII bit set.
 * Added some missing header files in the command-line-tool code.
+* Removed unstable e100, forcedeth, and r8169 drivers.
 
 Changes in version 1.4.0-rc2:
 
