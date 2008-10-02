@@ -14,6 +14,7 @@ Changes in version 1.3.3:
   drivers from 2.6.20 to 2.6.24 (thanks to Olav Zarges).
 * Reduced watchdog function executions in e1000 drivers.
 * Fixed sync manager configuration problem for some slaves.
+* Removed unstable e100 and forcedeth drivers.
 
 -------------------------------------------------------------------------------
 
