@@ -4,7 +4,7 @@ $Id$
 
 -------------------------------------------------------------------------------
 
-Changes since 1.4.0-rc2:
+Changes in version 1.4.0-rc3:
 
 * Ported the master thread to the kthread interface.
 * Added missing semaphore up() in an ioctl(). In rare cases, the master
