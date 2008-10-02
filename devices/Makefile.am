@@ -45,7 +45,9 @@ EXTRA_DIST = \
 	8139too-2.6.18-ethercat.c \
 	8139too-2.6.18-orig.c \
 	8139too-2.6.19-ethercat.c \
-	8139too-2.6.19-orig.c
+	8139too-2.6.19-orig.c \
+	e100-2.6.20-ethercat.c \
+	e100-2.6.20-orig.c
 
 modules:
 	$(MAKE) -C "@abs_top_srcdir@" modules
