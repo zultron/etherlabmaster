@@ -59,7 +59,7 @@ dist-hook:
 		svnversion $(srcdir) 2>/dev/null >$(distdir)/svnrevision; \
 	fi
 	if which svn2cl >/dev/null 2>&1; then \
-        svn2cl svn://yak/vol/projekte/msr_messen_steuern_regeln/ethercat/rep; \
+        svn2cl svn://svn/vol/projekte/msr_messen_steuern_regeln/ethercat/rep; \
     fi
 
 mrproper: clean cleandoc
