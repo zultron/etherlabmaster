@@ -8,9 +8,9 @@ $Id$
 
 Version 1.4.0:
 
-* Update documentation.
 * Check for possible race condition in jiffy-based frame timeout calculation.
-* Remove unusable ethernet drivers.
+* Remove race condition concerning the operational-Flag.
+* Update documentation.
 
 Future issues:
 
