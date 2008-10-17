@@ -6,11 +6,6 @@ $Id$
 
 -------------------------------------------------------------------------------
 
-Version 1.4.0:
-
-* Check for possible race condition in jiffy-based frame timeout calculation.
-* Update documentation.
-
 Future issues:
 
 * Distributed clocks.
@@ -34,7 +29,6 @@ Future issues:
     - Add a -n (numeric) switch.
 	- Check for unwanted options.
 * Segmented Sdo downloads.
-* Get original driver for r8169.
 
 Smaller issues:
 
