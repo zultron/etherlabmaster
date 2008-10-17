@@ -46,10 +46,12 @@ DIST_SUBDIRS = \
     script \
     tool
 
+noinst_HEADERS = \
+	globals.h
+
 EXTRA_DIST = \
 	Doxyfile \
 	FEATURES \
-	globals.h \
 	Kbuild.in \
 	README.EoE
 
