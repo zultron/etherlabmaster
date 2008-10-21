@@ -50,7 +50,7 @@ noinst_HEADERS = \
 	globals.h
 
 EXTRA_DIST = \
-	Doxyfile \
+	Doxyfile.in \
 	FEATURES \
 	Kbuild.in \
 	README.EoE
