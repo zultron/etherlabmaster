@@ -357,48 +357,6 @@ over the master: It can provide a bus configuration and exchange process data.
 
 %------------------------------------------------------------------------------
 
-\section{Phases}
-\index{Master phases}
-
-The EtherCAT master runs through several phases (see fig.~\ref{fig:phases}):
-
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=.9\textwidth]{images/phases}
-  \caption{Master phases and transitions}
-  \label{fig:phases}
-\end{figure}
-
-\begin{description}
-
-\item[Orphaned phase]\index{Orphaned phase} This mode takes effect, when the
-master still waits for its Ethernet device to connect. No bus communication is
-possible until then.
-
-\item[Idle phase]\index{Idle phase} takes effect when the master has accepted
-an Ethernet device, but is not requested by any application yet. The master
-runs its state machine (see sec.~\ref{sec:fsm-master}), that automatically
-scans the bus for slaves and executes pending operations from the userspace
-interface (for example Sdo access). The command-line tool can be used to
-access the bus, but there is no process data exchange because of the missing
-bus configuration.
-
-\item[Operation phase]\index{Operation phase} The master is requested by an
-application that can provide a bus configuration and exchange process data.
-
-\end{description}
-
-%------------------------------------------------------------------------------
-
-\section{General Behavior}
-\index{Master behavior}
-
-\ldots
-
-% TODO Behavior (Scanning)
-
-%------------------------------------------------------------------------------
-
 \section{Master Module}
 \label{sec:mastermod}
 \index{Master module}
@@ -464,6 +422,41 @@ Jul  4 10:22:45 ethercat kernel: EtherCAT: 2 masters waiting
 
 All EtherCAT master output is prefixed with \lstinline+EtherCAT+ which makes
 searching the logs easier.
+
+%------------------------------------------------------------------------------
+
+\section{Master Phases}
+\index{Master phases}
+
+Every EtherCAT master provided by the master module (see
+sec.~\ref{sec:mastermod}) runs through several phases (see
+fig.~\ref{fig:phases}):
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=.9\textwidth]{images/phases}
+  \caption{Master phases and transitions}
+  \label{fig:phases}
+\end{figure}
+
+\begin{description}
+
+\item[Orphaned phase]\index{Orphaned phase} This mode takes effect, when the
+master still waits for its Ethernet device to connect. No bus communication is
+possible until then.
+
+\item[Idle phase]\index{Idle phase} takes effect when the master has accepted
+an Ethernet device, but is not requested by any application yet. The master
+runs its state machine (see sec.~\ref{sec:fsm-master}), that automatically
+scans the bus for slaves and executes pending operations from the userspace
+interface (for example Sdo access). The command-line tool can be used to
+access the bus, but there is no process data exchange because of the missing
+bus configuration.
+
+\item[Operation phase]\index{Operation phase} The master is requested by an
+application that can provide a bus configuration and exchange process data.
+
+\end{description}
 
 %------------------------------------------------------------------------------
 
