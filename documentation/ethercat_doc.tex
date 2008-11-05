@@ -1717,10 +1717,11 @@ protocols. See the below section for details.
 \label{sec:eoe}
 \index{EoE}
 
-The EtherCAT master implements the Ethernet-over-EtherCAT mailbox protocol to
-enable the tunneling of Ethernet frames to special slaves, that can either
-have physical Ethernet ports to forward the frames to, or have an own IP stack
-to receive the frames.
+The EtherCAT master implements the
+Ethernet-over-EtherCAT\nomenclature{EoE}{Ethernet-over-EtherCAT, Mailbox
+Protocol} mailbox protocol~\cite[sec.~5.7]{alspec} to enable the tunneling of
+Ethernet frames to special slaves, that can either have physical Ethernet
+ports to forward the frames to, or have an own IP stack to receive the frames.
 
 \paragraph{Virtual Network Interfaces}
 
@@ -1875,8 +1876,9 @@ application-layer state is automatically set to OP.
 \label{sec:coe}
 \index{CoE}
 
-The CANopen-over-EtherCAT protocol \cite[sec.~5.6]{alspec} is used to
-configure slaves and exchange data objects on application level.
+The CANopen-over-EtherCAT\nomenclature{CoE}{CANopen-over-EtherCAT, Mailbox
+Protocol} protocol~\cite[sec.~5.6]{alspec} is used to configure slaves and
+exchange data objects on application level.
 
 % TODO
 %

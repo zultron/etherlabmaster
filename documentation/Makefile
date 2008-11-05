@@ -48,14 +48,12 @@ pdf: $(EXT_FILES)
 
 index:
 	makeindex $(FILE)
-	makeindex $(FILE).glo -s nomencl.ist -o $(FILE).gls
+	makeindex $(FILE).nlo -s nomencl.ist -o $(FILE).nls
 
 clean:
 	@rm -f \
 		$(FILE).aux \
 		$(FILE).dvi \
-		$(FILE).glo \
-		$(FILE).gls \
 		$(FILE).idx \
 		$(FILE).ilg \
 		$(FILE).ind \
