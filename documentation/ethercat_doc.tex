@@ -2256,74 +2256,74 @@ are rare, there are a few aspects that can (and should be) dealt with.
 
 %------------------------------------------------------------------------------
 
-\subsection{Application Interface Profiling}
-\label{sec:timing-profile}
+\section{Application Interface Profiling}
+\label{sec:profiling}
 \index{Profiling}
-% FIXME
 
 One of the most important timing aspects are the execution times of the
 application interface functions, that are called in cyclic context. These
 functions make up an important part of the overall timing of the application.
-To measure the timing of the functions, the following code was used:
+To measure the timing of the functions, the below cyclic code was used:
 
-\begin{lstlisting}[gobble=2,language=C]
-  c0 = get_cycles();
-  ecrt_master_receive(master);
-  c1 = get_cycles();
-  ecrt_domain_process(domain1);
-  c2 = get_cycles();
-  ecrt_master_run(master);
-  c3 = get_cycles();
-  ecrt_master_send(master);
-  c4 = get_cycles();
+\begin{lstlisting}[language=C]
+c0 = get_cycles();
+ecrt_master_receive(master);
+c1 = get_cycles();
+ecrt_domain_process(domain1);
+c2 = get_cycles();
+ecrt_domain_queue(domain1);
+c3 = get_cycles();
+ecrt_master_send(master);
+c4 = get_cycles();
 \end{lstlisting}
 
 Between each call of an interface function, the CPU timestamp counter is read.
-The counter differences are converted to \micro\second\ with help of the
-\lstinline+cpu_khz+ variable, that contains the number of increments per
-\milli\second.
+The counter differences are converted to \micro\second\ via the
+\lstinline+cpu_khz+ variable, that contains the number of counts per
+\milli\second\ for the IA32 architecture's timestamp counter.
 
-For the actual measuring, a system with a \unit{2.0}{\giga\hertz} CPU was used,
-that ran the above code in an RTAI thread with a period of
-\unit{100}{\micro\second}. The measuring was repeated $n = 100$ times and the
-results were averaged. These can be seen in table~\ref{tab:profile}.
+For the actual measurement, a system with a \unit{2.0}{\giga\hertz} CPU was
+used, that ran the above code in an RTAI thread with a period of
+\unit{1}{\milli\second}. The measurement was repeated $n = 10000$ times and
+the results were averaged. These can be seen in table~\ref{tab:profile}.
 
 \begin{table}[htpb]
   \centering
-  \caption{Profiling of an Application Cycle on a \unit{2.0}{\giga\hertz}
-  Processor}
+  \caption{Application Cycle on a \unit{2.0}{\giga\hertz} Processor}
   \label{tab:profile}
   \vspace{2mm}
   \begin{tabular}{l|r|r}
-    Element & Mean Duration [\second] & Standard Deviancy [\micro\second] \\
+
+    Function &
+    $\mu(\Delta t)$ [\micro\second] &
+    $\sigma(\Delta t)$ [\micro\second] \\
     \hline
-    \textit{ecrt\_master\_receive()} & 8.04 & 0.48\\
-    \textit{ecrt\_domain\_process()} & 0.14 & 0.03\\
-    \textit{ecrt\_master\_run()} & 0.29 & 0.12\\
-    \textit{ecrt\_master\_send()} & 2.18 & 0.17\\ \hline
-    Complete Cycle & 10.65 & 0.69\\ \hline
+
+    \lstinline+ecrt_master_receive()+ & 6.13 & 1.11\\
+
+    \lstinline+ecrt_domain_process()+ & $<$ 0.01 & 0.07\\
+
+    \lstinline+ecrt_domain_queue()+ & $<$ 0.01 & 0.17\\
+
+    \lstinline+ecrt_master_send()+ & 1.15 & 0.65\\ \hline
+
+    Complete Cycle & 7.28 & 1.31\\ \hline
+
   \end{tabular}
 \end{table}
 
-It is obvious, that the functions accessing hardware make up the
-lion's share. The \textit{ec\_master\_receive()} executes the ISR of
-the Ethernet device, analyzes datagrams and copies their contents into
-the memory of the datagram objects. The \textit{ec\_master\_send()}
-assembles a frame out of different datagrams and copies it to the
-hardware buffers. Interestingly, this makes up only a quarter of the
-receiving time.
+It is obvious, that the functions accessing hardware make up the lion's share.
+The \lstinline+ec_master_receive()+ executes the ISR of the Ethernet device
+driver, dissects the received frame and copies the datagram contents into the
+memory of the corresponding datagram objects. The \lstinline+ec_master_send()+
+function assembles a frame from different datagrams and copies it to the
+hardware buffers. The functions that only operate on the masters internal data
+structures are very fast ($\Delta t < \unit{1}{\micro\second}$).
 
-The functions that only operate on the masters internal data structures are
-very fast ($\Delta t < \unit{1}{\micro\second}$). Interestingly the runtime of
-\textit{ec\_domain\_process()} has a small standard deviancy relative to the
-mean value, while this ratio is about twice as big for
-\textit{ec\_master\_run()}: This probably results from the latter function
-having to execute code depending on the current state and the different state
-functions are more or less complex.
-
-For a realtime cycle makes up about \unit{10}{\micro\second}, the theoretical
-frequency can be up to \unit{100}{\kilo\hertz}. For two reasons, this frequency
-keeps being theoretical:
+For a realtime cycle makes up about \unit{10}{\micro\second}, the resulting
+theoretical frequency could be up to $1 / \unit{10}{\micro\second} =
+\unit{100}{\kilo\hertz}$. For two reasons, this frequency keeps being
+theoretical:
 
 \begin{enumerate}
 
@@ -2338,11 +2338,11 @@ in sec.~\ref{sec:timing-bus}.
 
 %------------------------------------------------------------------------------
 
-\subsection{Bus Cycle Measuring}
+\section{Bus Cycle Measurement}
 \label{sec:timing-bus}
 \index{Bus cycle}
 
-For measuring the time, a frame is ``on the wire'', two timestamps must be
+For measurement the time, a frame is ``on the wire'', two timestamps must be
 taken:
 
 \begin{enumerate}
@@ -2357,35 +2357,32 @@ frame.
 Both times are difficult to determine. The first reason is, that the
 interrupts are disabled and the master is not notified, when a frame is sent
 or received (polling would distort the results). The second reason is, that
-even with interrupts enabled, the time from the event to the notification is
-unknown. Therefore the only way to confidently determine the bus cycle time is
-an electrical measuring.
+even with interrupts enabled, the interrupt latency (i.\,e.\ the time from the
+event to the notification) is unknown. Therefore the only way to confidently
+determine the bus cycle time is an electrical measurement.
 
 Anyway, the bus cycle time is an important factor when designing realtime
-code, because it limits the maximum frequency for the cyclic task of the
-application.  In practice, these timing parameters are highly dependent on the
-hardware and often a trial and error method must be used to determine the
-limits of the system.
+applications, because it limits the maximum frequency for the cyclic task. In
+practice, these timing parameters are highly dependent on the hardware and
+often a trial and error method must be used to determine the limits of the
+system.
 
-The central question is: What happens, if the cycle frequency is too high? The
-answer is, that the EtherCAT frames that have been sent at the end of the
-cycle are not yet received, when the next cycle starts.  First this is noticed
-by \textit{ecrt\_domain\_process()}, because the working counter of the
-process data datagrams were not increased. The function will notify the user
-via Syslog\footnote{To limit Syslog output, a mechanism has been implemented,
-that outputs a summarized notification at maximum once a second.}. In this
-case, the process data keeps being the same as in the last cycle, because it
-is not erased by the domain. When the domain datagrams are queued again, the
-master notices, that they are already queued (and marked as sent). The master
-will mark them as unsent again and output a warning, that datagrams were
+An essential question is: What happens, if the cycle frequency is too high?
+The EtherCAT frames that have been sent at the end of the cycle could have
+been not yet received when the next cycle starts. First this is noticed by the
+domain, because the working counters of the datagrams are zero. This can be
+queried in realtime context via the application interface and is output via
+Syslog\footnote{To limit Syslog output, a mechanism has been implemented, that
+outputs a summarized notification at maximum once a second.}. In this case,
+the process data keeps being the same as in the last cycle, because it is not
+erased by the domain. When the domain datagrams are queued again, the master
+notices, that they are already queued (and marked as sent). The master will
+mark them as unsent again and output a warning, that datagrams were
 ``skipped''.
 
 On the mentioned \unit{2.0}{\giga\hertz} system, the possible cycle frequency
-can be up to \unit{25}{\kilo\hertz} without skipped frames. This value can
-surely be increased by choosing faster hardware. Especially the RealTek
-network hardware could be replaced by a faster one. Besides, implementing a
-dedicated ISR for EtherCAT devices would also contribute to increasing the
-latency. These are two points on the author's to-do list.
+can be up to \unit{25}{\kilo\hertz} without skipped frames. This value is
+highly dependant on the chosen hardware. 
 
 %------------------------------------------------------------------------------
 
