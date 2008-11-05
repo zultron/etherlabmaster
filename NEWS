@@ -8,6 +8,8 @@ Changes since version 1.4.0-rc3:
 
 * Fixed race condition in jiffy-based frame timeout calculation.
 * Fixed race condition concerning the ec_slave_config_state->operational flag.
+* Fixed wrong calculation of the expected working counter if the process data
+  of a domain span several datagrams.
 
 Changes in version 1.4.0-rc3:
 
