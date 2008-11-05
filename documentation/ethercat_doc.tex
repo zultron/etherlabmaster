@@ -303,12 +303,12 @@ an early design decision, which has been made for several reasons:
 
 \begin{itemize}
 
-\item Kernel code has significantly better realtime characteristics,
-i.\,e.~less latency than userspace code. It was foreseeable, that a fieldbus
-master has a lot of cyclic work to do. Cyclic work is usually triggered by
-timer interrupts inside the kernel. The execution delay of a function that
-processes timer interrupts is less, when it resides in kernelspace, because
-there is no need of time-consuming context switches to a userspace process.
+\item Kernel code has significantly better realtime characteristics, i.\,e.\
+less latency than userspace code. It was foreseeable, that a fieldbus master
+has a lot of cyclic work to do. Cyclic work is usually triggered by timer
+interrupts inside the kernel. The execution delay of a function that processes
+timer interrupts is less, when it resides in kernelspace, because there is no
+need of time-consuming context switches to a userspace process.
 
 \item It was also foreseeable, that the master code has to directly
 communicate with the Ethernet hardware. This has to be done in the kernel
@@ -823,7 +823,7 @@ to be started, for example after a command \lstinline+ip link set ethX up+
 from userspace. Frame reception has to be enabled by the driver.
 
 \item[\usebox\boxstop] The purpose of this callback is to ``close'' the
-device, i.~e. make the hardware stop receiving frames.
+device, i.\,e.\ make the hardware stop receiving frames.
 
 \item[\usebox\boxxmit] This function is called for each frame that has to be
 transmitted. The network stack passes the frame as a pointer to an
@@ -1409,7 +1409,7 @@ The below sections describe every state machine used in the EtherCAT master.
 The textual descriptions of the state machines contain references to the
 transitions in the corresponding state transition diagrams, that are marked
 with an arrow followed by the name of the successive state. Transitions caused
-by trivial error cases (i.~e. no response from slave) are not described
+by trivial error cases (i.\,e.\ no response from slave) are not described
 explicitly. These transitions are drawn as dashed arrows in the diagrams.
 
 %------------------------------------------------------------------------------
@@ -1534,7 +1534,7 @@ apply all necessary Pdo configurations.
 configured.
 
 \item[FMMU Configuration] If there are FMMUs configurations supplied by the
-application (i.~e. if the application registered Pdo entries), they are
+application (i.\,e.\ if the application registered Pdo entries), they are
 applied. 
 
 \item[SAFEOP] The state change FSM is used to bring the slave to SAFEOP state.
@@ -1566,7 +1566,7 @@ in \cite[sec.~6.4.1]{alspec}.
 \begin{description}
 
 \item[Start] The new application-layer state is requested via the ``AL Control
-Request'' register (see ~\cite[sec. 5.3.1]{alspec}).
+Request'' register (see~\cite[sec. 5.3.1]{alspec}).
 
 \item[Check for Response] Some slave need some time to respond to an AL state
 change command, and do not respond for some time. For this case, the command
@@ -2154,10 +2154,10 @@ sec.~\ref{sec:installation}), before the master can be inserted as a service.
 Please note, that the init script depends on the sysconfig file described
 below.
 
-To provide service dependencies (i.~e. which services have to be started before
-others) inside the init script code, LSB defines a special comment block.
-System tools can extract this information to insert the EtherCAT init script at
-the correct place in the startup sequence:
+To provide service dependencies (i.\,e.\ which services have to be started
+before others) inside the init script code, LSB defines a special comment
+block. System tools can extract this information to insert the EtherCAT init
+script at the correct place in the startup sequence:
 
 \lstinputlisting[firstline=38,lastline=48]
     {../script/init.d/ethercat}
@@ -2599,15 +2599,15 @@ International Electrotechnical Commission (IEC), 2005.
 \url{http://www.gnu.org/licenses/gpl-2.0.html}. October~15, 2008.
 
 \bibitem{lsb} Linux Standard Base.
-\url{http://www.linuxfoundation.org/en/LSB}.  August~9, 2006.
+\url{http://www.linuxfoundation.org/en/LSB}. August~9, 2006.
 
 \bibitem{wireshark} Wireshark. \url{http://www.wireshark.org}. 2008.
 
-\bibitem{automata} {\it Hopcroft, J.~E. / Ullman, J.~D.}: Introduction to
+\bibitem{automata} {\it Hopcroft, J.\,E.\ / Ullman, J.\,D.}: Introduction to
 Automata Theory, Languages and Computation. Adison-Wesley, Reading,
 Mass.~1979.
 
-\bibitem{fsmmis} {\it Wagner, F. / Wolstenholme, P.}: State machine
+\bibitem{fsmmis} {\it Wagner, F.\ / Wolstenholme, P.}: State machine
 misunderstandings. In: IEE journal ``Computing and Control Engineering'',
 2004.
 
