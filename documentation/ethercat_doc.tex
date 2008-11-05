@@ -2604,6 +2604,13 @@ crw-rw-r--  1 root root 252, 0 2008-09-03 16:19 /dev/EtherCAT0
 Now, the \lstinline+ethercat+ tool can be used (see sec.~\ref{sec:tool}) even
 as a non-root user.
 
+If non-root users shall have writing access, the following udev rule can be
+used instead:
+
+\begin{lstlisting}
+KERNEL=="EtherCAT[0-9]*", MODE="0664", GROUP="users"
+\end{lstlisting}
+
 %------------------------------------------------------------------------------
 
 \begin{thebibliography}{99}
