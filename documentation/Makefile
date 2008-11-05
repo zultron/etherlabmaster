@@ -62,6 +62,7 @@ clean:
 		$(FILE).lol \
 		$(FILE).lot \
 		$(FILE).nlo \
+		$(FILE).nls \
 		$(FILE).out \
 		$(FILE).pdf \
 		$(FILE).toc \
