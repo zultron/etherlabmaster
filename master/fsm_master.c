@@ -833,6 +833,10 @@ void ec_fsm_master_state_sdo_request(
     ec_master_t *master = fsm->master;
     ec_sdo_request_t *request = fsm->sdo_request;
 
+    // FIXME
+    // Check if request is still existing (may have been deleted with a slave
+    // configuration).
+
     if (ec_fsm_coe_exec(&fsm->fsm_coe)) return;
 
     if (!ec_fsm_coe_success(&fsm->fsm_coe)) {

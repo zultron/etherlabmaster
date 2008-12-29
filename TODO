@@ -6,10 +6,6 @@ $Id$
 
 -------------------------------------------------------------------------------
 
-Release:
-
-* config race.
-
 Future issues:
 
 * Distributed clocks.
