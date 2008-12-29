@@ -47,7 +47,7 @@
 
 // Module parameters
 
-#define FREQUENCY 2000 // task frequency in Hz
+#define FREQUENCY 1000 // task frequency in Hz
 #define INHIBIT_TIME 20
 
 #define TIMERTICKS (1000000000 / FREQUENCY)
@@ -94,9 +94,6 @@ const static ec_pdo_entry_reg_t domain1_regs[] = {
     {DigOutSlavePos, Beckhoff_EL2004, 0x3001, 1, &off_dig_out},
     {}
 };
-
-static unsigned int counter = 0;
-static unsigned int blink = 0;
 
 /*****************************************************************************/
 
@@ -204,42 +201,35 @@ void check_slave_config_states(void)
 
 /*****************************************************************************/
 
+#define US(x) ((unsigned int) (x) * 1000 / cpu_khz)
+
 void run(long data)
 {
+    cycles_t c0, c1, c2, c3, c4;
+    unsigned int c = 10000;
+
     while (1) {
         t_last_cycle = get_cycles();
 
-        // receive process data
-        rt_sem_wait(&master_sem);
+        c0 = get_cycles();
         ecrt_master_receive(master);
+        c1 = get_cycles();
         ecrt_domain_process(domain1);
-        rt_sem_signal(&master_sem);
-
-        // check process data state (optional)
-        check_domain1_state();
-
-        if (counter) {
-            counter--;
-        } else { // do this at 1 Hz
-            counter = FREQUENCY;
-
-            // calculate new process data
-            blink = !blink;
-
-            // check for master state (optional)
-            check_master_state();
-
-            // check for islave configuration state(s) (optional)
-            check_slave_config_states();
-        }
-
-        // write process data
-        EC_WRITE_U8(domain1_pd + off_dig_out, blink ? 0x06 : 0x09);
-
-        rt_sem_wait(&master_sem);
+        c2 = get_cycles();
         ecrt_domain_queue(domain1);
+        c3 = get_cycles();
         ecrt_master_send(master);
-        rt_sem_signal(&master_sem);
+        c4 = get_cycles();
+
+        if (c) {
+            printk("TTTT4 %6u %4u %4u %4u %4u\n",
+                    c,
+                    US(c1 - c0),
+                    US(c2 - c1),
+                    US(c3 - c2),
+                    US(c4 - c3));
+            c--;
+        }
 		
         rt_task_wait_period();
     }

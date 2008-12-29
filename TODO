@@ -6,6 +6,12 @@ $Id$
 
 -------------------------------------------------------------------------------
 
+Release:
+
+* Licence headers.
+* e1000 Problem.
+* config race.
+
 Future issues:
 
 * Distributed clocks.
