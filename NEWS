@@ -22,6 +22,7 @@ Changes since version 1.4.0-rc3:
 * Restricted licence to GPLv2 only.
 * Fixed spelling of 'PDO', 'SDO' (all uppercase) and 'xx over EtherCAT'
   (without hyphens).
+* Made domain pointer parameter of ecrt_domain_size() const.
 
 Changes in version 1.4.0-rc3:
 

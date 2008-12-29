@@ -751,7 +751,7 @@ int ecrt_domain_reg_pdo_entry_list(
  * \return Size of the process data image.
  */
 size_t ecrt_domain_size(
-        ec_domain_t *domain /**< Domain. */
+        const ec_domain_t *domain /**< Domain. */
         );
 
 /** Provide external memory to store the domain's process data.
