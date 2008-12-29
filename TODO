@@ -8,9 +8,8 @@ $Id$
 
 Release:
 
-* Licence headers.
-* e1000 Problem.
 * config race.
+* Pdo -> PDO. Sdo -> SDO "-over-"
 
 Future issues:
 
