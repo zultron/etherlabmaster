@@ -58,12 +58,12 @@ typedef struct {
 
 /*****************************************************************************/
 
-/** Slave/Sdo request record for master's Sdo request list.
+/** Slave/SDO request record for master's SDO request list.
  */
 typedef struct {
     struct list_head list; /**< List element. */
     ec_slave_t *slave; /**< Slave. */
-    ec_sdo_request_t req; /**< Sdo request. */
+    ec_sdo_request_t req; /**< SDO request. */
 } ec_master_sdo_request_t;
 
 /*****************************************************************************/
@@ -86,10 +86,10 @@ struct ec_fsm_master {
     ec_slave_t *slave; /**< current slave */
     ec_sii_write_request_t *sii_request; /**< SII write request */
     off_t sii_index; /**< index to SII write request data */
-    ec_sdo_request_t *sdo_request; /**< Sdo request to process. */
+    ec_sdo_request_t *sdo_request; /**< SDO request to process. */
 
     ec_fsm_coe_t fsm_coe; /**< CoE state machine */
-    ec_fsm_pdo_t fsm_pdo; /**< Pdo configuration state machine. */
+    ec_fsm_pdo_t fsm_pdo; /**< PDO configuration state machine. */
     ec_fsm_change_t fsm_change; /**< State change state machine */
     ec_fsm_slave_config_t fsm_slave_config; /**< slave state machine */
     ec_fsm_slave_scan_t fsm_slave_scan; /**< slave state machine */

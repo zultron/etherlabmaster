@@ -942,7 +942,7 @@ schedule:
 /*****************************************************************************/
 
 #ifdef EC_EOE
-/** Starts Ethernet-over-EtherCAT processing on demand.
+/** Starts Ethernet over EtherCAT processing on demand.
  */
 void ec_master_eoe_start(ec_master_t *master /**< EtherCAT master */)
 {
@@ -969,7 +969,7 @@ void ec_master_eoe_start(ec_master_t *master /**< EtherCAT master */)
 
 /*****************************************************************************/
 
-/** Stops the Ethernet-over-EtherCAT processing.
+/** Stops the Ethernet over EtherCAT processing.
  */
 void ec_master_eoe_stop(ec_master_t *master /**< EtherCAT master */)
 {
@@ -983,7 +983,7 @@ void ec_master_eoe_stop(ec_master_t *master /**< EtherCAT master */)
 
 /*****************************************************************************/
 
-/** Does the Ethernet-over-EtherCAT processing.
+/** Does the Ethernet over EtherCAT processing.
  */
 void ec_master_eoe_run(unsigned long data /**< master pointer */)
 {

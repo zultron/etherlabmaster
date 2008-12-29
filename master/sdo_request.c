@@ -25,7 +25,7 @@
  *****************************************************************************/
 
 /** \file
- * Canopen-over-EtherCAT Sdo request functions.
+ * Canopen over EtherCAT SDO request functions.
  */
 
 /*****************************************************************************/
@@ -37,7 +37,7 @@
 
 /*****************************************************************************/
 
-/** Default timeout in ms to wait for Sdo transfer responses.
+/** Default timeout in ms to wait for SDO transfer responses.
  */
 #define EC_SDO_REQUEST_RESPONSE_TIMEOUT 3000
 
@@ -59,10 +59,10 @@ static const ec_sdo_request_state_t state_translation_table[] = {
 
 /*****************************************************************************/
 
-/** Sdo request constructor.
+/** SDO request constructor.
  */
 void ec_sdo_request_init(
-        ec_sdo_request_t *req /**< Sdo request. */
+        ec_sdo_request_t *req /**< SDO request. */
         )
 {
     req->data = NULL;
@@ -77,10 +77,10 @@ void ec_sdo_request_init(
 
 /*****************************************************************************/
 
-/** Sdo request destructor.
+/** SDO request destructor.
  */
 void ec_sdo_request_clear(
-        ec_sdo_request_t *req /**< Sdo request. */
+        ec_sdo_request_t *req /**< SDO request. */
         )
 {
     ec_sdo_request_clear_data(req);
@@ -88,7 +88,7 @@ void ec_sdo_request_clear(
 
 /*****************************************************************************/
 
-/** Copy another Sdo request.
+/** Copy another SDO request.
  *
  * \attention Only the index subindex and data are copied.
  */
@@ -104,10 +104,10 @@ int ec_sdo_request_copy(
 
 /*****************************************************************************/
 
-/** Sdo request destructor.
+/** SDO request destructor.
  */
 void ec_sdo_request_clear_data(
-        ec_sdo_request_t *req /**< Sdo request. */
+        ec_sdo_request_t *req /**< SDO request. */
         )
 {
     if (req->data) {
@@ -121,12 +121,12 @@ void ec_sdo_request_clear_data(
 
 /*****************************************************************************/
 
-/** Set the Sdo address.
+/** Set the SDO address.
  */
 void ec_sdo_request_address(
-        ec_sdo_request_t *req, /**< Sdo request. */
-        uint16_t index, /**< Sdo index. */
-        uint8_t subindex /**< Sdo subindex. */
+        ec_sdo_request_t *req, /**< SDO request. */
+        uint16_t index, /**< SDO index. */
+        uint8_t subindex /**< SDO subindex. */
         )
 {
     req->index = index;
@@ -140,7 +140,7 @@ void ec_sdo_request_address(
  * If the \a mem_size is already bigger than \a size, nothing is done.
  */
 int ec_sdo_request_alloc(
-        ec_sdo_request_t *req, /**< Sdo request. */
+        ec_sdo_request_t *req, /**< SDO request. */
         size_t size /**< Data size to allocate. */
         )
 {
@@ -150,7 +150,7 @@ int ec_sdo_request_alloc(
     ec_sdo_request_clear_data(req);
 
     if (!(req->data = (uint8_t *) kmalloc(size, GFP_KERNEL))) {
-        EC_ERR("Failed to allocate %u bytes of Sdo memory.\n", size);
+        EC_ERR("Failed to allocate %u bytes of SDO memory.\n", size);
         return -1;
     }
 
@@ -161,12 +161,12 @@ int ec_sdo_request_alloc(
 
 /*****************************************************************************/
 
-/** Copies Sdo data from an external source.
+/** Copies SDO data from an external source.
  *
  * If the \a mem_size is to small, new memory is allocated.
  */
 int ec_sdo_request_copy_data(
-        ec_sdo_request_t *req, /**< Sdo request. */
+        ec_sdo_request_t *req, /**< SDO request. */
         const uint8_t *source, /**< Source data. */
         size_t size /**< Number of bytes in \a source. */
         )
@@ -185,7 +185,7 @@ int ec_sdo_request_copy_data(
  *
  * \return non-zero if the timeout was exceeded, else zero.
  */
-int ec_sdo_request_timed_out(const ec_sdo_request_t *req /**< Sdo request. */)
+int ec_sdo_request_timed_out(const ec_sdo_request_t *req /**< SDO request. */)
 {
     return req->issue_timeout
         && jiffies - req->jiffies_start > HZ * req->issue_timeout / 1000;

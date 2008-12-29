@@ -9,7 +9,6 @@ $Id$
 Release:
 
 * config race.
-* Pdo -> PDO. Sdo -> SDO "-over-"
 
 Future issues:
 
@@ -33,7 +32,7 @@ Future issues:
     - Data type abbreviations.
     - Add a -n (numeric) switch.
 	- Check for unwanted options.
-* Segmented Sdo downloads.
+* Segmented SDO downloads.
 
 Smaller issues:
 
