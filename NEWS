@@ -6,6 +6,12 @@ vim: spelllang=en spell
 
 -------------------------------------------------------------------------------
 
+Changed since 1.4.0:
+
+* Fixed seg_size parameter when processing an CoE Upload Segment Response.
+* Added octet_string as an SDO data type.
+* Minor: Fixed datagram clean up.
+
 Changes in version 1.4.0:
 
 * Fixed race condition in jiffy-based frame timeout calculation.
