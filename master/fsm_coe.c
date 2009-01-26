@@ -1485,7 +1485,6 @@ void ec_fsm_coe_up_response(ec_fsm_coe_t *fsm /**< finite state machine */)
     uint8_t *data, mbox_prot;
     size_t rec_size, data_size;
     ec_sdo_request_t *request = fsm->request;
-    uint32_t complete_size;
     unsigned int expedited, size_specified;
 
     if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--)
@@ -1583,12 +1582,12 @@ void ec_fsm_coe_up_response(ec_fsm_coe_t *fsm /**< finite state machine */)
 
         size_specified = EC_READ_U8(data + 2) & 0x01;
         if (size_specified) {
-            complete_size = 4 - ((EC_READ_U8(data + 2) & 0x0C) >> 2);
+            fsm->complete_size = 4 - ((EC_READ_U8(data + 2) & 0x0C) >> 2);
         } else {
-            complete_size = 4;
+            fsm->complete_size = 4;
         }
 
-        if (rec_size < 6 + complete_size) {
+        if (rec_size < 6 + fsm->complete_size) {
             fsm->state = ec_fsm_coe_error;
             EC_ERR("Received currupted SDO expedited upload"
                     " response (only %u bytes)!\n", rec_size);
@@ -1596,7 +1595,7 @@ void ec_fsm_coe_up_response(ec_fsm_coe_t *fsm /**< finite state machine */)
             return;
         }
 
-        if (ec_sdo_request_copy_data(request, data + 6, complete_size)) {
+        if (ec_sdo_request_copy_data(request, data + 6, fsm->complete_size)) {
             fsm->state = ec_fsm_coe_error;
             return;
         }
@@ -1626,16 +1625,16 @@ void ec_fsm_coe_up_response(ec_fsm_coe_t *fsm /**< finite state machine */)
         }
 
         data_size = rec_size - 10;
-        complete_size = EC_READ_U32(data + 6);
+        fsm->complete_size = EC_READ_U32(data + 6);
 
-        if (!complete_size) {
+        if (!fsm->complete_size) {
             fsm->state = ec_fsm_coe_error;
             EC_ERR("No complete size supplied!\n");
             ec_print_data(data, rec_size);
             return;
         }
 
-        if (ec_sdo_request_alloc(request, complete_size)) {
+        if (ec_sdo_request_alloc(request, fsm->complete_size)) {
             fsm->state = ec_fsm_coe_error;
             return;
         }
@@ -1647,9 +1646,10 @@ void ec_fsm_coe_up_response(ec_fsm_coe_t *fsm /**< finite state machine */)
 
         fsm->toggle = 0;
 
-        if (data_size < complete_size) {
-            EC_WARN("SDO data incomplete (%u / %u).\n",
-                    data_size, complete_size);
+        if (data_size < fsm->complete_size) {
+            if (master->debug_level)
+                EC_DBG("SDO data incomplete (%u / %u). Segmenting...\n",
+                        data_size, fsm->complete_size);
 
             if (!(data = ec_slave_mbox_prepare_send(slave, datagram,
                                                     0x03, 3))) {
@@ -1774,7 +1774,6 @@ void ec_fsm_coe_up_seg_check(ec_fsm_coe_t *fsm /**< finite state machine */)
 /**
    CoE state: UP RESPONSE.
    \todo Timeout behavior
-   \todo Check for \a data_size exceeding \a complete_size.
 */
 
 void ec_fsm_coe_up_seg_response(ec_fsm_coe_t *fsm /**< finite state machine */)
@@ -1865,12 +1864,19 @@ void ec_fsm_coe_up_seg_response(ec_fsm_coe_t *fsm /**< finite state machine */)
 
     last_segment = EC_READ_U8(data + 2) & 0x01;
     seg_size = (EC_READ_U8(data + 2) & 0xE) >> 1;
-    data_size = rec_size - 10;
+    if (rec_size > 10) {
+        data_size = rec_size - 10;
+    } else { // == 10
+        /* seg_size contains the number of trailing bytes to ignore. */
+        data_size = rec_size - seg_size;
+    }
 
-    if (data_size != seg_size) {
-        EC_WARN("SDO segment data invalid (%u / %u)"
-                " - Fragmenting not implemented.\n",
-                data_size, seg_size);
+    if (request->data_size + data_size > fsm->complete_size) {
+        EC_ERR("SDO upload 0x%04X:%02X failed on slave %u: Fragment"
+                " exceeding complete size!\n",
+               request->index, request->subindex, slave->ring_position);
+        fsm->state = ec_fsm_coe_error;
+        return;
     }
 
     memcpy(request->data + request->data_size, data + 10, data_size);
@@ -1896,6 +1902,13 @@ void ec_fsm_coe_up_seg_response(ec_fsm_coe_t *fsm /**< finite state machine */)
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_coe_up_seg_request;
         return;
+    }
+
+    if (request->data_size != fsm->complete_size) {
+        EC_WARN("SDO upload 0x%04X:%02X on slave %u: Assembled data"
+                " size (%u) does not match complete size (%u)!\n",
+                request->index, request->subindex, slave->ring_position,
+                request->data_size, fsm->complete_size);
     }
 
     if (master->debug_level) {
