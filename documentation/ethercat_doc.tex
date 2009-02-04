@@ -167,11 +167,19 @@ The list below gives a short summary of the master features.
 
 \begin{itemize}
 
-\item Designed as a kernel module for Linux 2.6.
+\item EtherCAT master implementation conforming to IEC/PAS 62407 \cite{dlspec}
+\cite{alspec}.
 
-\item Implemented according to IEC 61158-12 \cite{dlspec} \cite{alspec}.
+  \begin{itemize}
 
-\item Comes with EtherCAT-capable drivers for several common Ethernet devices.
+  \item Runs as kernel module for Linux 2.6.
+
+  \item Multiple masters possible on one machine.
+
+  \end{itemize}
+
+\item EtherCAT-capable versions of standard Linux drivers for wide-spread
+Ethernet devices.
 
   \begin{itemize}
 
@@ -181,104 +189,124 @@ The list below gives a short summary of the master features.
   using the common device interface (see sec.~\ref{sec:ecdev}) provided by the
   master module.
 
-  \end{itemize}
+  \item Operation possible with any device supported by the standard drivers,
+  including PCMCIA devices.
 
-\item The master module supports multiple EtherCAT masters running in
-parallel.
+  \end{itemize}
 
 \item The master code supports any Linux realtime extension through its
 independent architecture.
 
   \begin{itemize}
 
-  \item RTAI\nomenclature{RTAI}{Realtime Application Interface},
-  ADEOS\nomenclature{ADEOS}{Adaptive Domain Environment for Operating
-  Systems}, etc.
+  \item RTAI\nomenclature{RTAI}{Realtime Application Interface}, Xenomai, etc.
 
-  \item It runs well even without realtime extensions.
+  \item Operation possible without any realtime extension at all.
 
   \end{itemize}
 
-\item Common ``Application Interface'' for applications, that want to use
-EtherCAT functionality (see chap.~\ref{chap:api}).
+\item Common ``Application Interface'' for kernel-space realtime applications
+(see chap.~\ref{chap:api}).
+
+  \begin{itemize}
+
+  \item Requesting and releasing masters.
+
+  \item Dynamic slave configuration, even for slaves that are offline.
+
+  \item Detailed configuration of the slaves' PDOs and SDOs.
+
+  \item Creation of process data domains (see below). Registration of PDO
+  entries for exchange within a domain.
+
+  \item Monitoring the states of masters, slave configurations and domains.
+
+  \item SDO handlers for application-triggered CoE transfers (see below).
+
+  \item Avoidance of unnecessary copy operations for process data.
+
+  \end{itemize}
 
 \item \textit{Domains} are introduced, to allow grouping of process
   data transfers with different slave groups and task periods.
 
   \begin{itemize}
 
-  \item Handling of multiple domains with different task periods.
+  \item Management of PDO groups with different sample rates.
 
   \item Automatic calculation of process data mapping, FMMU and sync manager
-  configuration within each domain.
+  configuration within the domains.
+
+  \item Process data exchange can be monitored via a per-domain mechanism.
 
   \end{itemize}
 
-\item Communication through several finite state machines.
+\item Master finite state machine (FSM).
 
   \begin{itemize}
 
-  \item Automatic bus scanning after topology changes.
+  \item The same state machine runs both in idle mode and in realtime
+  operation.
 
-  \item Bus monitoring during operation.
+  \item Bus monitoring: Slave states are read cyclically. Automatic scanning
+  of the bus after a topology change.
 
-  \item Automatic reconfiguration of slaves (for example after power failure)
-  during operation.
+  \item Automatic configuration of slaves, if a application-layer state change
+  is requested.
 
   \end{itemize}
 
-\item CANopen over EtherCAT (CoE)
+\item Implementation of the CANopen over EtherCAT (CoE) mailbox protocol.
 
   \begin{itemize}
 
-  \item SDO upload, download and information service.
+  \item Configuration of CoE-capable slaves.
 
-  \item Slave configuration via SDOs.
+  \item SDO information service (dictionary listing).
 
-  \item SDO access from userspace and from the application.
+  \item SDO transfers both via the application interface and the command-line tool.
 
   \end{itemize}
 
-\item Ethernet over EtherCAT (EoE)
+\item Implementation of the Ethernet over EtherCAT (EoE) mailbox protocol.
 
   \begin{itemize}
 
-  \item Transparent use of EoE slaves via virtual network interfaces.
+  \item Virtual network interface for any EoE-capable slave.
 
-  \item Natively supports either a switched or a routed EoE network
-  architecture.
+  \item Both a switched and a routed EoE network architecture is natively
+  supported and configurable with standard tools.
 
   \end{itemize}
 
-\item Userspace command-line-tool ``ethercat`` (see sec.~\ref{sec:tool})
+\item Userspace command-line-tool ``ethercat'' (see sec.~\ref{sec:tool})
 
   \begin{itemize}
 
-  \item Showing the current bus with slaves, PDOs and SDOs.
-  \item Showing the bus configuration.
-  \item Showing domains and process data.
-  \item Setting the master's debug level.
-  \item Writing alias addresses.
-  \item SDO uploading/downloading.
-  \item Reading/writing a slave's SII.
-  \item Setting slave states.
-  \item Generate slave description XML.
+  \item Detailed information about master, slaves, domains and bus
+  configuration.
+  \item Reading/Writing alias addresses.
+  \item Listing slave configurations.
+  \item Viewing process data.
+  \item SDO download/upload; listing SDO dictionaries.
+  \item Slave SII (EEPROM) access.
+  \item Controlling application-layer states.
+  \item Generation of slave description XML from existing slaves.
 
   \end{itemize}
 
-\item Seamless system integration though LSB\nomenclature{LSB}{Linux
-    Standard Base} compliance.
+\item Seamless integration in any GNU/Linux distribution.
 
   \begin{itemize}
 
-  \item Master and network device configuration via sysconfig files.
-
-  \item Init script for master control.
+  \item ``Linux Standard Base''-compatible init script for master control.
+  \item Master and Ethernet device configuration via sysconfig file.
 
   \end{itemize}
 
-\item Virtual read-only network interface for monitoring and debugging
-  purposes.
+\item Virtual read-only network interface for debugging and traffic monitoring
+purposes (using Wireshark \cite{wireshark}, etc.). No additional hardware
+necessary.
 
 \end{itemize}
 
@@ -2406,8 +2434,7 @@ follows the below commands:
 
 \begin{lstlisting}[gobble=2]
   $ `\textbf{./configure}`
-  $ `\textbf{make}`
-  $ `\textbf{make modules}`
+  $ `\textbf{make all modules}`
 \end{lstlisting}
 
 Table~\ref{tab:config} lists important configuration switches and options.
@@ -2477,16 +2504,17 @@ Interface''.
 
 \section{Installing the Software}
 
-The below commands have to be entered as \textit{root}: The first one will
-install the EtherCAT header, init script, sysconfig file and the userspace
-tool to the prefix path. The second one will install the kernel modules to the
+The below commands have to be entered as \textit{root}: The
+\lstinline+install+ target will install the EtherCAT header, init script,
+sysconfig file and the userspace tool to the prefix path. The
+\lstinline+modules_install+ target will install the kernel modules to the
 kernel's modules directory. The final \lstinline+depmod+ call is necessary to
 include the kernel modules into the \textit{modules.dep} file to make it
-available to the \lstinline+modprobe+ command, used in the init script. 
+available to the \lstinline+modprobe+ command, that is used in the init
+script. 
 
 \begin{lstlisting}
-# `\textbf{make install}`
-# `\textbf{make modules\_install}`
+# `\textbf{make install modules\_install}`
 # `\textbf{depmod}`
 \end{lstlisting}
 

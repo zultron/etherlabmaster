@@ -23,10 +23,10 @@ General Features:
     including PCMCIA devices.
 
 * Supports any realtime environment through independent architecture.
-  - RTAI, Xenomai, RT-Preempt, etc.
+  - RTAI, Xenomai, etc.
   - Operation possible without any realtime extension at all.
 
-* Common API for Realtime-Applications in kernel- and userspace.
+* Common API for Realtime-Applications in kernelspace.
   - Requesting and releasing masters.
   - Dynamic slave configuration, even for slaves that are offline.
   - Detailed configuration of the slaves' PDOs and SDOs.
