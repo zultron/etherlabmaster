@@ -11,6 +11,7 @@ Changed since 1.4.0:
 * Fixed seg_size parameter when processing an CoE Upload Segment Response.
 * Added octet_string as an SDO data type.
 * Minor: Fixed datagram clean up.
+* Added r8169 driver for kernel 2.6.24.
 
 Changes in version 1.4.0:
 
