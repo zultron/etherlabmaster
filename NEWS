@@ -12,6 +12,8 @@ Changed since 1.4.0:
 * Added octet_string as an SDO data type.
 * Minor: Fixed datagram clean up.
 * Added r8169 driver for kernel 2.6.24 and 2.6.28.
+* Module symbol versions file for ec_master.ko is installed to
+  prefix/modules/ec_master.symvers.
 
 Changes in version 1.4.0:
 
