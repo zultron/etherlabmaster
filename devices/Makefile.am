@@ -46,7 +46,9 @@ EXTRA_DIST = \
 	Kbuild.in \
 	ecdev.h \
 	r8169-2.6.24-ethercat.c \
-	r8169-2.6.24-orig.c
+	r8169-2.6.24-orig.c \
+	r8169-2.6.28-ethercat.c \
+	r8169-2.6.28-orig.c
 
 BUILT_SOURCES = \
 	Kbuild
