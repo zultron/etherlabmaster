@@ -6,7 +6,7 @@ vim: spelllang=en spell
 
 -------------------------------------------------------------------------------
 
-Changed since 1.4.0:
+Changes in version 1.4.1:
 
 * Fixed seg_size parameter when processing an CoE Upload Segment Response.
 * Added octet_string as an SDO data type.
