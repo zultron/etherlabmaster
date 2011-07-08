@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- *  $Id$
+ *  $Id: datagram.c,v 74e6ac2369f4 2010/02/23 14:13:56 fp $
  *
  *  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
  *
@@ -562,7 +562,7 @@ void ec_datagram_output_stats(
         ec_datagram_t *datagram
         )
 {
-    if (jiffies - datagram->stats_output_jiffies < HZ) {
+    if (jiffies - datagram->stats_output_jiffies > HZ) {
         datagram->stats_output_jiffies = jiffies;
     
         if (unlikely(datagram->skip_count)) {
