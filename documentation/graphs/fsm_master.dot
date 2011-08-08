@@ -51,6 +51,12 @@ digraph master {
     scan_slave -> write_system_times
 
     write_system_times -> start
+    write_system_times -> dc_read_offset
+
+    dc_read_offset -> write_system_times
+    dc_read_offset -> dc_write_offset
+
+    dc_write_offset -> write_system_times
 
     configure_slave -> action_next_slave_state
 
