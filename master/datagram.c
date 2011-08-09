@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- *  $Id: datagram.c,v 74e6ac2369f4 2010/02/23 14:13:56 fp $
+ *  $Id$
  *
  *  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
  *
