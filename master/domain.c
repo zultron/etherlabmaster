@@ -139,7 +139,7 @@ int ec_domain_add_datagram_pair(
         uint32_t logical_offset, /**< Logical offset. */
         size_t data_size, /**< Size of the data. */
         uint8_t *data, /**< Process data. */
-        const unsigned int used[] /**< Used by inputs/outputs. */
+        const unsigned int used[] /**< Slave config counter for in/out. */
         )
 {
     ec_datagram_pair_t *datagram_pair;
@@ -205,6 +205,35 @@ int ec_domain_add_datagram_pair(
 
 /*****************************************************************************/
 
+/** Domain finish helper function.
+ *
+ * Detects, if a slave configuration has already been taken into account for
+ * a datagram's expected working counter calculation.
+ *
+ * Walks through the list of all FMMU configurations for the current datagram
+ * and ends before the current datagram.
+ */
+int shall_count(
+        const ec_fmmu_config_t *cur_fmmu, /**< Current FMMU with direction to
+                                            search for. */
+        const ec_fmmu_config_t *first_fmmu /**< Datagram's first FMMU. */
+        )
+{
+    for (; first_fmmu != cur_fmmu;
+            first_fmmu = list_entry(first_fmmu->list.next,
+                ec_fmmu_config_t, list)) {
+
+        if (first_fmmu->sc == cur_fmmu->sc
+                && first_fmmu->dir == cur_fmmu->dir) {
+            return 0; // was already counted
+        }
+    }
+
+    return 1;
+}
+
+/*****************************************************************************/
+
 /** Finishes a domain.
  *
  * This allocates the necessary datagrams and writes the correct logical
@@ -225,7 +254,7 @@ int ec_domain_finish(
     unsigned int datagram_count;
     unsigned int datagram_used[EC_DIR_COUNT];
     ec_fmmu_config_t *fmmu;
-    ec_fmmu_config_t *fmmu_temp;
+    const ec_fmmu_config_t *datagram_first_fmmu = NULL;
     const ec_datagram_pair_t *datagram_pair;
     int ret;
 
@@ -241,31 +270,30 @@ int ec_domain_finish(
         }
     }
 
-    // Cycle through all domain FMMUS and
+    // Cycle through all domain FMMUs and
     // - correct the logical base addresses
     // - set up the datagrams to carry the process data
+    // - calculate the datagrams' expected working counters
     datagram_offset = 0;
     datagram_size = 0;
     datagram_count = 0;
     datagram_used[EC_DIR_OUTPUT] = 0;
     datagram_used[EC_DIR_INPUT] = 0;
 
-    list_for_each_entry(fmmu_temp, &domain->fmmu_configs, list) {
-        // we have to remove the constness, sorry FIXME
-        ec_slave_config_t *sc = (ec_slave_config_t *) fmmu_temp->sc;
-        sc->used_for_fmmu_datagram[fmmu_temp->dir] = 0;
+    if (!list_empty(&domain->fmmu_configs)) {
+        datagram_first_fmmu =
+            list_entry(domain->fmmu_configs.next, ec_fmmu_config_t, list);
     }
 
     list_for_each_entry(fmmu, &domain->fmmu_configs, list) {
+
         // Correct logical FMMU address
         fmmu->logical_start_address += base_address;
 
         // Increment Input/Output counter to determine datagram types
         // and calculate expected working counters
-        if (fmmu->sc->used_for_fmmu_datagram[fmmu->dir] == 0) {
-            ec_slave_config_t *sc = (ec_slave_config_t *)fmmu->sc;
+        if (shall_count(fmmu, datagram_first_fmmu)) {
             datagram_used[fmmu->dir]++;
-            sc->used_for_fmmu_datagram[fmmu->dir] = 1;
         }
 
         // If the current FMMU's data do not fit in the current datagram,
@@ -277,15 +305,13 @@ int ec_domain_finish(
                     datagram_used);
             if (ret < 0)
                 return ret;
+
             datagram_offset += datagram_size;
             datagram_size = 0;
             datagram_count++;
             datagram_used[EC_DIR_OUTPUT] = 0;
             datagram_used[EC_DIR_INPUT] = 0;
-            list_for_each_entry(fmmu_temp, &domain->fmmu_configs, list) {
-                ec_slave_config_t *sc = (ec_slave_config_t *)fmmu_temp->sc;
-               sc->used_for_fmmu_datagram[fmmu_temp->dir] = 0;
-            }
+            datagram_first_fmmu = fmmu;
         }
 
         datagram_size += fmmu->data_size;
