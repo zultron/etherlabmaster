@@ -838,89 +838,38 @@ int ec_cdev_ioctl_slave_sdo_upload(
         )
 {
     ec_ioctl_slave_sdo_upload_t data;
-    ec_master_sdo_request_t request;
-    int retval;
+    uint8_t *target;
+    int ret;
 
     if (copy_from_user(&data, (void __user *) arg, sizeof(data))) {
         return -EFAULT;
     }
 
-    ec_sdo_request_init(&request.req);
-    ec_sdo_request_address(&request.req,
-            data.sdo_index, data.sdo_entry_subindex);
-    ecrt_sdo_request_read(&request.req);
-
-    if (down_interruptible(&master->master_sem))
-        return -EINTR;
-
-    if (!(request.slave = ec_master_find_slave(
-                    master, 0, data.slave_position))) {
-        up(&master->master_sem);
-        ec_sdo_request_clear(&request.req);
-        EC_MASTER_ERR(master, "Slave %u does not exist!\n",
-                data.slave_position);
-        return -EINVAL;
+    if (!(target = kmalloc(data.target_size, GFP_KERNEL))) {
+        EC_MASTER_ERR(master, "Failed to allocate %u bytes"
+                " for SDO upload.\n", data.target_size);
+        return -ENOMEM;
     }
 
-    EC_SLAVE_DBG(request.slave, 1, "Schedule SDO upload request.\n");
+    ret = ecrt_master_sdo_upload(master, data.slave_position,
+            data.sdo_index, data.sdo_entry_subindex, target,
+            data.target_size, &data.data_size, &data.abort_code);
 
-    // schedule request.
-    list_add_tail(&request.list, &request.slave->slave_sdo_requests);
-
-    up(&master->master_sem);
-
-    // wait for processing through FSM
-    if (wait_event_interruptible(request.slave->sdo_queue,
-                request.req.state != EC_INT_REQUEST_QUEUED)) {
-        // interrupted by signal
-        down(&master->master_sem);
-        if (request.req.state == EC_INT_REQUEST_QUEUED) {
-            list_del(&request.list);
-            up(&master->master_sem);
-            ec_sdo_request_clear(&request.req);
-            return -EINTR;
-        }
-        // request already processing: interrupt not possible.
-        up(&master->master_sem);
-    }
-
-    // wait until master FSM has finished processing
-    wait_event(request.slave->sdo_queue,
-            request.req.state != EC_INT_REQUEST_BUSY);
-
-    EC_SLAVE_DBG(request.slave, 1, "Finished SDO upload request.\n");
-
-    data.abort_code = request.req.abort_code;
-
-    if (request.req.state != EC_INT_REQUEST_SUCCESS) {
-        data.data_size = 0;
-        if (request.req.errno) {
-            retval = -request.req.errno;
-        } else {
-            retval = -EIO;
-        }
-    } else {
-        if (request.req.data_size > data.target_size) {
-            EC_MASTER_ERR(master, "Buffer too small.\n");
-            ec_sdo_request_clear(&request.req);
-            return -EOVERFLOW;
-        }
-        data.data_size = request.req.data_size;
-
+    if (!ret) {
         if (copy_to_user((void __user *) data.target,
-                    request.req.data, data.data_size)) {
-            ec_sdo_request_clear(&request.req);
+                    target, data.data_size)) {
+            kfree(target);
             return -EFAULT;
         }
-        retval = 0;
     }
+
+    kfree(target);
 
     if (__copy_to_user((void __user *) arg, &data, sizeof(data))) {
-        retval = -EFAULT;
+        return -EFAULT;
     }
 
-    ec_sdo_request_clear(&request.req);
-    return retval;
+    return 0;
 }
 
 /*****************************************************************************/
@@ -933,89 +882,34 @@ int ec_cdev_ioctl_slave_sdo_download(
         )
 {
     ec_ioctl_slave_sdo_download_t data;
-    ec_master_sdo_request_t request;
+    uint8_t *sdo_data;
     int retval;
 
     if (copy_from_user(&data, (void __user *) arg, sizeof(data))) {
         return -EFAULT;
     }
 
-    // copy data to download
-    if (!data.data_size) {
-        EC_MASTER_ERR(master, "Zero data size!\n");
-        return -EINVAL;
-    }
-
-    ec_sdo_request_init(&request.req);
-    ec_sdo_request_address(&request.req,
-            data.sdo_index, data.sdo_entry_subindex);
-    if (ec_sdo_request_alloc(&request.req, data.data_size)) {
-        ec_sdo_request_clear(&request.req);
+    if (!(sdo_data = kmalloc(data.data_size, GFP_KERNEL))) {
+        EC_MASTER_ERR(master, "Failed to allocate %u bytes"
+                " for SDO download.\n", data.data_size);
         return -ENOMEM;
     }
-    if (copy_from_user(request.req.data,
-                (void __user *) data.data, data.data_size)) {
-        ec_sdo_request_clear(&request.req);
+
+    if (copy_from_user(sdo_data, (void __user *) data.data, data.data_size)) {
+        kfree(sdo_data);
         return -EFAULT;
     }
-    request.req.data_size = data.data_size;
-    ecrt_sdo_request_write(&request.req);
 
-    if (down_interruptible(&master->master_sem))
-        return -EINTR;
+    retval = ecrt_master_sdo_download(master, data.slave_position,
+            data.sdo_index, data.sdo_entry_subindex, sdo_data, data.data_size,
+            &data.abort_code);
 
-    if (!(request.slave = ec_master_find_slave(
-                    master, 0, data.slave_position))) {
-        up(&master->master_sem);
-        EC_MASTER_ERR(master, "Slave %u does not exist!\n",
-                data.slave_position);
-        ec_sdo_request_clear(&request.req);
-        return -EINVAL;
-    }
-    
-    EC_SLAVE_DBG(request.slave, 1, "Schedule SDO download request.\n");
-
-    // schedule request.
-    list_add_tail(&request.list, &request.slave->slave_sdo_requests);
-
-    up(&master->master_sem);
-
-    // wait for processing through FSM
-    if (wait_event_interruptible(request.slave->sdo_queue,
-                request.req.state != EC_INT_REQUEST_QUEUED)) {
-        // interrupted by signal
-        down(&master->master_sem);
-        if (request.req.state == EC_INT_REQUEST_QUEUED) {
-            list_del(&request.list);
-            up(&master->master_sem);
-            ec_sdo_request_clear(&request.req);
-            return -EINTR;
-        }
-        // request already processing: interrupt not possible.
-        up(&master->master_sem);
-    }
-
-    // wait until master FSM has finished processing
-    wait_event(request.slave->sdo_queue,
-            request.req.state != EC_INT_REQUEST_BUSY);
-
-    EC_SLAVE_DBG(request.slave, 1, "Finished SDO download request.\n");
-
-    data.abort_code = request.req.abort_code;
-
-    if (request.req.state == EC_INT_REQUEST_SUCCESS) {
-        retval = 0;
-    } else if (request.req.errno) {
-        retval = -request.req.errno;
-    } else {
-        retval = -EIO;
-    }
+    kfree(sdo_data);
 
     if (__copy_to_user((void __user *) arg, &data, sizeof(data))) {
         retval = -EFAULT;
     }
 
-    ec_sdo_request_clear(&request.req);
     return retval;
 }
 
