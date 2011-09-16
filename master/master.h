@@ -196,8 +196,6 @@ struct ec_master {
                                     slave scanning. */
 
     unsigned int config_busy; /**< State of slave configuration. */
-    unsigned int allow_config; /**< \a True, if slave configuration is
-                                 allowed. */
     struct semaphore config_sem; /**< Semaphore protecting the \a config_busy
                                    variable and the allow_config flag. */
     wait_queue_head_t config_queue; /**< Queue for processes that wait for

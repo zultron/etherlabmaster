@@ -583,30 +583,26 @@ void ec_fsm_master_action_configure(
     if ((slave->current_state != slave->requested_state
                 || slave->force_config) && !slave->error_flag) {
 
-        // Start slave configuration, if it is allowed.
+        // Start slave configuration
         down(&master->config_sem);
-        if (!master->allow_config) {
-            up(&master->config_sem);
-        } else {
-            master->config_busy = 1;
-            up(&master->config_sem);
+        master->config_busy = 1;
+        up(&master->config_sem);
 
-            if (master->debug_level) {
-                char old_state[EC_STATE_STRING_SIZE],
-                     new_state[EC_STATE_STRING_SIZE];
-                ec_state_string(slave->current_state, old_state, 0);
-                ec_state_string(slave->requested_state, new_state, 0);
-                EC_SLAVE_DBG(slave, 1, "Changing state from %s to %s%s.\n",
-                        old_state, new_state,
-                        slave->force_config ? " (forced)" : "");
-            }
-
-            fsm->idle = 0;
-            fsm->state = ec_fsm_master_state_configure_slave;
-            ec_fsm_slave_config_start(&fsm->fsm_slave_config, slave);
-            fsm->state(fsm); // execute immediately
-            return;
+        if (master->debug_level) {
+            char old_state[EC_STATE_STRING_SIZE],
+                 new_state[EC_STATE_STRING_SIZE];
+            ec_state_string(slave->current_state, old_state, 0);
+            ec_state_string(slave->requested_state, new_state, 0);
+            EC_SLAVE_DBG(slave, 1, "Changing state from %s to %s%s.\n",
+                    old_state, new_state,
+                    slave->force_config ? " (forced)" : "");
         }
+
+        fsm->idle = 0;
+        fsm->state = ec_fsm_master_state_configure_slave;
+        ec_fsm_slave_config_start(&fsm->fsm_slave_config, slave);
+        fsm->state(fsm); // execute immediately
+        return;
     }
 
     // slave has error flag set; process next one
@@ -899,6 +895,7 @@ void ec_fsm_master_enter_write_system_times(
         }
     }
 
+    // scanning and setting system times complete
     ec_master_request_op(master);
     ec_fsm_master_restart(fsm);
 }
