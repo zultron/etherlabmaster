@@ -567,6 +567,8 @@ void ec_fsm_master_action_configure(
     ec_slave_t *slave = fsm->slave;
 
     if (master->config_changed) {
+        master->config_changed = 0;
+
         // abort iterating through slaves,
         // first compensate DC system time offsets,
         // then begin configuring at slave 0
@@ -819,6 +821,8 @@ void ec_fsm_master_state_scan_slave(
 #endif
 
     if (master->slave_count) {
+        master->config_changed = 0;
+
         fsm->slave = master->slaves; // begin with first slave
         ec_fsm_master_enter_write_system_times(fsm);
     } else {
