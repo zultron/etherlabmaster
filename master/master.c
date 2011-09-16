@@ -1094,8 +1094,14 @@ void ec_master_receive_datagrams(ec_master_t *master, /**< EtherCAT master */
             continue;
         }
 
-        // copy received data into the datagram memory
-        memcpy(datagram->data, cur_data, data_size);
+        if (datagram->type != EC_DATAGRAM_APWR &&
+                datagram->type != EC_DATAGRAM_FPWR &&
+                datagram->type != EC_DATAGRAM_BWR &&
+                datagram->type != EC_DATAGRAM_LWR) {
+            // copy received data into the datagram memory,
+            // if something has been read
+            memcpy(datagram->data, cur_data, data_size);
+        }
         cur_data += data_size;
 
         // set the datagram's working counter
