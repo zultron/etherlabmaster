@@ -889,7 +889,7 @@ void ec_fsm_master_enter_write_system_times(
     } else {
         if (master->active) {
             EC_MASTER_WARN(master, "No app_time received up to now,"
-                    " but master already active).\n");
+                    " but master already active.\n");
         } else {
             EC_MASTER_DBG(master, 1, "No app_time received up to now.\n");
         }
