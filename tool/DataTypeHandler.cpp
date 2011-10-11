@@ -74,7 +74,7 @@ string DataTypeHandler::typeInfo()
 		<< "  bool," << endl
 		<< "  int8, int16, int32, int64," << endl
 		<< "  uint8, uint16, uint32, uint64," << endl
-		<< "  float, double" << endl
+		<< "  float, double," << endl
 		<< "  string, octet_string, unicode_string." << endl
         << "For sign-and-magnitude coding, use the following types:" << endl
         << "  sm8, sm16, sm32, sm64" << endl;
