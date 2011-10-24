@@ -900,9 +900,14 @@ int ec_cdev_ioctl_slave_sdo_download(
         return -EFAULT;
     }
 
-    retval = ecrt_master_sdo_download(master, data.slave_position,
-            data.sdo_index, data.sdo_entry_subindex, sdo_data, data.data_size,
-            &data.abort_code);
+    if (data.complete_access) {
+        retval = ecrt_master_sdo_download_complete(master, data.slave_position,
+                data.sdo_index, sdo_data, data.data_size, &data.abort_code);
+    } else {
+        retval = ecrt_master_sdo_download(master, data.slave_position,
+                data.sdo_index, data.sdo_entry_subindex, sdo_data,
+                data.data_size, &data.abort_code);
+    }
 
     kfree(sdo_data);
 
