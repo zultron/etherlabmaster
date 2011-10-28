@@ -289,7 +289,7 @@ int ec_mac_is_broadcast(
 
 /** Parse a MAC address from a string.
  *
- * The MAC address must follow the regexp
+ * The MAC address must match the regular expression
  * "([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}".
  *
  * \return 0 on success, else < 0
@@ -303,8 +303,7 @@ static int ec_mac_parse(uint8_t *mac, const char *src, int allow_empty)
     if (!strlen(src)) {
         if (allow_empty){
             return 0;
-        }
-        else {
+        } else {
             EC_ERR("MAC address may not be empty.\n");
             return -EINVAL;
         }
@@ -319,8 +318,9 @@ static int ec_mac_parse(uint8_t *mac, const char *src, int allow_empty)
             return -EINVAL;
         }
         mac[i] = value;
-        if (i < ETH_ALEN - 1)
+        if (i < ETH_ALEN - 1) {
             src = rem + 1; // skip colon
+        }
     }
 
     return 0;
@@ -502,7 +502,7 @@ ec_device_t *ecdev_offer(
 }
 
 /******************************************************************************
- *  Realtime interface
+ * Application interface
  *****************************************************************************/
 
 /** Request a master.
