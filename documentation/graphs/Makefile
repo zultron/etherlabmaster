@@ -33,7 +33,7 @@ ps: $(PS)
 	dot -Tps -o $@ $<
 
 %.pdf: %.ps
-	epstopdf $<
+	ps2pdf $<
 
 clean:
 	@rm -f *.ps *.pdf
