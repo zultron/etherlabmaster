@@ -4,10 +4,12 @@
 #
 #  $Id$
 #
+#  vim: spelllang=en spell tw=78
+#
 #------------------------------------------------------------------------------
 
 #
-# Master devices.
+# Main Ethernet devices.
 #
 # The MASTER<X>_DEVICE variable specifies the Ethernet device for a master
 # with index 'X'.
@@ -24,6 +26,15 @@
 #
 MASTER0_DEVICE=""
 #MASTER1_DEVICE=""
+
+#
+# Backup Ethernet devices
+#
+# The MASTER<X>_BACKUP variables specify the devices used for redundancy. They
+# behaves nearly the same as the MASTER<X>_DEVICE variable, except that it
+# does not interpret the ff:ff:ff:ff:ff:ff address.
+#
+#MASTER0_BACKUP=""
 
 #
 # Ethernet driver modules to use for EtherCAT operation.
