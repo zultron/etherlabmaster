@@ -2126,6 +2126,9 @@ void ecrt_master_receive(ec_master_t *master)
 
     // receive datagrams
     ec_device_poll(&master->main_device);
+    if (master->backup_device.dev) {
+        ec_device_poll(&master->backup_device);
+    }
 
     // dequeue all datagrams that timed out
     list_for_each_entry_safe(datagram, next, &master->datagram_queue, queue) {
