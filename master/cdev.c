@@ -213,13 +213,17 @@ int ec_cdev_ioctl_master(
     data.devices[0].tx_count = master->main_device.tx_count;
     data.devices[0].rx_count = master->main_device.rx_count;
     data.devices[0].tx_bytes = master->main_device.tx_bytes;
+    data.devices[0].rx_bytes = master->main_device.rx_bytes;
     data.devices[0].tx_errors = master->main_device.tx_errors;
     for (i = 0; i < EC_RATE_COUNT; i++) {
         data.devices[0].tx_frame_rates[i] =
             master->main_device.tx_frame_rates[i];
+        data.devices[0].rx_frame_rates[i] =
+            master->main_device.rx_frame_rates[i];
         data.devices[0].tx_byte_rates[i] =
             master->main_device.tx_byte_rates[i];
-        data.devices[0].loss_rates[i] = master->main_device.loss_rates[i];
+        data.devices[0].rx_byte_rates[i] =
+            master->main_device.rx_byte_rates[i];
     }
 
     if (master->backup_device.dev) {
@@ -233,13 +237,34 @@ int ec_cdev_ioctl_master(
     data.devices[1].tx_count = master->backup_device.tx_count;
     data.devices[1].rx_count = master->backup_device.rx_count;
     data.devices[1].tx_bytes = master->backup_device.tx_bytes;
+    data.devices[1].rx_bytes = master->backup_device.rx_bytes;
     data.devices[1].tx_errors = master->backup_device.tx_errors;
     for (i = 0; i < EC_RATE_COUNT; i++) {
         data.devices[1].tx_frame_rates[i] =
             master->backup_device.tx_frame_rates[i];
+        data.devices[1].rx_frame_rates[i] =
+            master->backup_device.rx_frame_rates[i];
         data.devices[1].tx_byte_rates[i] =
             master->backup_device.tx_byte_rates[i];
-        data.devices[1].loss_rates[i] = master->backup_device.loss_rates[i];
+        data.devices[1].rx_byte_rates[i] =
+            master->backup_device.rx_byte_rates[i];
+    }
+
+    data.tx_count = master->device_stats.tx_count;
+    data.rx_count = master->device_stats.rx_count;
+    data.tx_bytes = master->device_stats.tx_bytes;
+    data.rx_bytes = master->device_stats.rx_bytes;
+    for (i = 0; i < EC_RATE_COUNT; i++) {
+        data.tx_frame_rates[i] =
+            master->device_stats.tx_frame_rates[i];
+        data.rx_frame_rates[i] =
+            master->device_stats.rx_frame_rates[i];
+        data.tx_byte_rates[i] =
+            master->device_stats.tx_byte_rates[i];
+        data.rx_byte_rates[i] =
+            master->device_stats.rx_byte_rates[i];
+        data.loss_rates[i] =
+            master->device_stats.loss_rates[i];
     }
 
     up(&master->device_sem);

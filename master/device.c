@@ -54,12 +54,6 @@
     } while (0)
 #endif
 
-/** List of intervals for frame statistics [s].
- */
-static const unsigned int rate_intervals[] = {
-    1, 10, 60
-};
-
 /*****************************************************************************/
 
 /** Constructor.
@@ -309,30 +303,6 @@ void ec_device_send(
 {
     struct sk_buff *skb = device->tx_skb[device->tx_ring_index];
 
-    // frame statistics
-    if (unlikely(jiffies - device->stats_jiffies >= HZ)) {
-        unsigned int i;
-        u32 tx_frame_rate =
-            (u32) (device->tx_count - device->last_tx_count) * 1000;
-        u32 tx_byte_rate =
-            (device->tx_bytes - device->last_tx_bytes);
-        u64 loss = device->tx_count - device->rx_count;
-        s32 loss_rate = (s32) (loss - device->last_loss) * 1000;
-        for (i = 0; i < EC_RATE_COUNT; i++) {
-            unsigned int n = rate_intervals[i];
-            device->tx_frame_rates[i] =
-                (device->tx_frame_rates[i] * (n - 1) + tx_frame_rate) / n;
-            device->tx_byte_rates[i] =
-                (device->tx_byte_rates[i] * (n - 1) + tx_byte_rate) / n;
-            device->loss_rates[i] =
-                (device->loss_rates[i] * (n - 1) + loss_rate) / n;
-        }
-        device->last_tx_count = device->tx_count;
-        device->last_tx_bytes = device->tx_bytes;
-        device->last_loss = loss;
-        device->stats_jiffies = jiffies;
-    }
-
     // set the right length for the data
     skb->len = ETH_HLEN + size;
 
@@ -350,7 +320,9 @@ void ec_device_send(
 #endif
     {
         device->tx_count++;
+        device->master->device_stats.tx_count++;
         device->tx_bytes += ETH_HLEN + size;
+        device->master->device_stats.tx_bytes += ETH_HLEN + size;
 #ifdef EC_DEBUG_IF
         ec_debug_send(&device->dbg, skb->data, ETH_HLEN + size);
 #endif
@@ -375,16 +347,20 @@ void ec_device_clear_stats(
 
     // zero frame statistics
     device->tx_count = 0;
-    device->rx_count = 0;
-    device->tx_errors = 0;
-    device->tx_bytes = 0;
     device->last_tx_count = 0;
+    device->rx_count = 0;
+    device->last_rx_count = 0;
+    device->tx_bytes = 0;
     device->last_tx_bytes = 0;
-    device->last_loss = 0;
+    device->rx_bytes = 0;
+    device->last_rx_bytes = 0;
+    device->tx_errors = 0;
+
     for (i = 0; i < EC_RATE_COUNT; i++) {
         device->tx_frame_rates[i] = 0;
+        device->rx_frame_rates[i] = 0;
         device->tx_byte_rates[i] = 0;
-        device->loss_rates[i] = 0;
+        device->rx_byte_rates[i] = 0;
     }
 }
 
@@ -477,6 +453,43 @@ void ec_device_poll(
     do_gettimeofday(&device->timeval_poll);
 #endif
     device->poll(device->dev);
+}
+
+/*****************************************************************************/
+
+/** Update device statistics.
+ */
+void ec_device_update_stats(
+        ec_device_t *device /**< EtherCAT device */
+        )
+{
+    unsigned int i;
+
+    u32 tx_frame_rate =
+        (u32) (device->tx_count - device->last_tx_count) * 1000;
+    u32 rx_frame_rate =
+        (u32) (device->rx_count - device->last_rx_count) * 1000;
+    u32 tx_byte_rate =
+        (device->tx_bytes - device->last_tx_bytes);
+    u32 rx_byte_rate =
+        (device->rx_bytes - device->last_rx_bytes);
+
+    for (i = 0; i < EC_RATE_COUNT; i++) {
+        unsigned int n = rate_intervals[i];
+        device->tx_frame_rates[i] =
+            (device->tx_frame_rates[i] * (n - 1) + tx_frame_rate) / n;
+        device->rx_frame_rates[i] =
+            (device->rx_frame_rates[i] * (n - 1) + rx_frame_rate) / n;
+        device->tx_byte_rates[i] =
+            (device->tx_byte_rates[i] * (n - 1) + tx_byte_rate) / n;
+        device->rx_byte_rates[i] =
+            (device->rx_byte_rates[i] * (n - 1) + rx_byte_rate) / n;
+    }
+
+    device->last_tx_count = device->tx_count;
+    device->last_rx_count = device->rx_count;
+    device->last_tx_bytes = device->tx_bytes;
+    device->last_rx_bytes = device->rx_bytes;
 }
 
 /******************************************************************************
@@ -593,6 +606,9 @@ void ecdev_receive(
     }
 
     device->rx_count++;
+    device->master->device_stats.rx_count++;
+    device->rx_bytes += size;
+    device->master->device_stats.rx_bytes += size;
 
     if (unlikely(device->master->debug_level > 1)) {
         EC_MASTER_DBG(device->master, 2, "Received frame:\n");
