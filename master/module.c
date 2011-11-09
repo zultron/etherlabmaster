@@ -481,7 +481,7 @@ ec_device_t *ecdev_offer(
             ec_device_attach(&master->main_device, net_dev, poll, module);
             up(&master->device_sem);
 
-            snprintf(net_dev->name, IFNAMSIZ, "ec%u", master->index);
+            snprintf(net_dev->name, IFNAMSIZ, "ecm%u", master->index);
 
             return &master->main_device; // offer accepted
 
@@ -491,8 +491,7 @@ ec_device_t *ecdev_offer(
             EC_INFO("Accepting %s as backup device for master %u.\n",
                     str, master->index);
 
-            ec_device_attach(&master->backup_device, net_dev, poll,
-                    module);
+            ec_device_attach(&master->backup_device, net_dev, poll, module);
             up(&master->device_sem);
 
             snprintf(net_dev->name, IFNAMSIZ, "ecb%u", master->index);
