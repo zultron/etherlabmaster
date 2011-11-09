@@ -82,6 +82,12 @@ static unsigned long ext_injection_timeout_jiffies;
 
 #endif
 
+/** List of intervals for statistics [s].
+ */
+const unsigned int rate_intervals[] = {
+    1, 10, 60
+};
+
 /*****************************************************************************/
 
 void ec_master_clear_slave_configs(ec_master_t *);
@@ -92,6 +98,8 @@ static int ec_master_operation_thread(void *);
 static int ec_master_eoe_thread(void *);
 #endif
 void ec_master_find_dc_ref_clock(ec_master_t *);
+void ec_master_clear_device_stats(ec_master_t *);
+void ec_master_update_device_stats(ec_master_t *);
 
 /*****************************************************************************/
 
@@ -134,6 +142,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 
     master->main_mac = main_mac;
     master->backup_mac = backup_mac;
+    ec_master_clear_device_stats(master);
 
     sema_init(&master->device_sem, 1);
 
@@ -1148,6 +1157,84 @@ void ec_master_output_stats(ec_master_t *master /**< EtherCAT master */)
     }
 }
 
+/*****************************************************************************/
+
+/** Clears the common device statistics.
+ */
+void ec_master_clear_device_stats(
+        ec_master_t *master /**< EtherCAT master */
+        )
+{
+    unsigned int i;
+
+    // zero frame statistics
+    master->device_stats.tx_count = 0;
+    master->device_stats.last_tx_count = 0;
+    master->device_stats.rx_count = 0;
+    master->device_stats.last_rx_count = 0;
+    master->device_stats.tx_bytes = 0;
+    master->device_stats.last_tx_bytes = 0;
+    master->device_stats.rx_bytes = 0;
+    master->device_stats.last_rx_bytes = 0;
+    master->device_stats.last_loss = 0;
+
+    for (i = 0; i < EC_RATE_COUNT; i++) {
+        master->device_stats.tx_frame_rates[i] = 0;
+        master->device_stats.tx_byte_rates[i] = 0;
+        master->device_stats.loss_rates[i] = 0;
+    }
+}
+
+/*****************************************************************************/
+
+/** Updates the common device statistics.
+ */
+void ec_master_update_device_stats(
+        ec_master_t *master /**< EtherCAT master */
+        )
+{
+    ec_device_stats_t *s = &master->device_stats;
+    u32 tx_frame_rate, rx_frame_rate, tx_byte_rate, rx_byte_rate;
+    u64 loss;
+    s32 loss_rate;
+    unsigned int i;
+
+    // frame statistics
+    if (likely(jiffies - s->jiffies < HZ)) {
+        return;
+    }
+
+    tx_frame_rate = (u32) (s->tx_count - s->last_tx_count) * 1000;
+    rx_frame_rate = (u32) (s->rx_count - s->last_rx_count) * 1000;
+    tx_byte_rate = (s->tx_bytes - s->last_tx_bytes);
+    rx_byte_rate = (s->rx_bytes - s->last_rx_bytes);
+    loss = s->tx_count - s->rx_count;
+    loss_rate = (s32) (loss - s->last_loss) * 1000;
+
+    for (i = 0; i < EC_RATE_COUNT; i++) {
+        unsigned int n = rate_intervals[i];
+        s->tx_frame_rates[i] =
+            (s->tx_frame_rates[i] * (n - 1) + tx_frame_rate) / n;
+        s->rx_frame_rates[i] =
+            (s->rx_frame_rates[i] * (n - 1) + rx_frame_rate) / n;
+        s->tx_byte_rates[i] =
+            (s->tx_byte_rates[i] * (n - 1) + tx_byte_rate) / n;
+        s->rx_byte_rates[i] =
+            (s->rx_byte_rates[i] * (n - 1) + rx_byte_rate) / n;
+        s->loss_rates[i] =
+            (s->loss_rates[i] * (n - 1) + loss_rate) / n;
+
+    }
+    s->last_tx_count = s->tx_count;
+    s->last_rx_count = s->rx_count;
+    s->last_tx_bytes = s->tx_bytes;
+    s->last_rx_bytes = s->rx_bytes;
+
+    ec_device_update_stats(&master->main_device);
+    ec_device_update_stats(&master->backup_device);
+
+    s->jiffies = jiffies;
+}
 
 /*****************************************************************************/
 
@@ -2129,6 +2216,7 @@ void ecrt_master_receive(ec_master_t *master)
     if (master->backup_device.dev) {
         ec_device_poll(&master->backup_device);
     }
+    ec_master_update_device_stats(master);
 
     // dequeue all datagrams that timed out
     list_for_each_entry_safe(datagram, next, &master->datagram_queue, queue) {
