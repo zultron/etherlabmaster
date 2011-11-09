@@ -640,14 +640,15 @@ void ecdev_set_link(
         )
 {
     if (unlikely(!device)) {
-        EC_MASTER_WARN(device->master, "ecdev_set_link(): No device!\n");
+        EC_WARN("ecdev_set_link() called with null device!\n");
         return;
     }
 
     if (likely(state != device->link_state)) {
         device->link_state = state;
         EC_MASTER_INFO(device->master,
-                "Link state changed to %s.\n", (state ? "UP" : "DOWN"));
+                "Link state of %s changed to %s.\n",
+                device->dev->name, (state ? "UP" : "DOWN"));
     }
 }
 
@@ -662,7 +663,7 @@ uint8_t ecdev_get_link(
         )
 {
     if (unlikely(!device)) {
-        EC_MASTER_WARN(device->master, "ecdev_get_link(): No device!\n");
+        EC_WARN("ecdev_get_link() called with null device!\n");
         return 0;
     }
 
