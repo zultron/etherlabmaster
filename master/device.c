@@ -496,10 +496,21 @@ void ec_device_poll(
 void ecdev_withdraw(ec_device_t *device /**< EtherCAT device */)
 {
     ec_master_t *master = device->master;
-    char str[20];
+    char dev_str[20], mac_str[20];
 
-    ec_mac_print(device->dev->dev_addr, str);
-    EC_MASTER_INFO(master, "Releasing main device %s.\n", str);
+    ec_mac_print(device->dev->dev_addr, mac_str);
+
+    if (device == &master->main_device) {
+        sprintf(dev_str, "main");
+    } else if (device == &master->backup_device) {
+        sprintf(dev_str, "backup");
+    } else {
+        EC_MASTER_WARN(master, "%s() called with unknown device %s!\n",
+                __func__, mac_str);
+        sprintf(dev_str, "UNKNOWN");
+    }
+
+    EC_MASTER_INFO(master, "Releasing %s device %s.\n", dev_str, mac_str);
     
     down(&master->device_sem);
     ec_device_detach(device);
@@ -516,17 +527,22 @@ void ecdev_withdraw(ec_device_t *device /**< EtherCAT device */)
 int ecdev_open(ec_device_t *device /**< EtherCAT device */)
 {
     int ret;
+    ec_master_t *master = device->master;
 
     ret = ec_device_open(device);
     if (ret) {
-        EC_MASTER_ERR(device->master, "Failed to open device!\n");
+        EC_MASTER_ERR(master, "Failed to open device!\n");
         return ret;
     }
 
-    ret = ec_master_enter_idle_phase(device->master);
-    if (ret) {
-        EC_MASTER_ERR(device->master, "Failed to enter IDLE phase!\n");
-        return ret;
+    if (master->main_device.open &&
+            (ec_mac_is_zero(master->backup_mac) ||
+             master->backup_device.open)) {
+        ret = ec_master_enter_idle_phase(device->master);
+        if (ret) {
+            EC_MASTER_ERR(device->master, "Failed to enter IDLE phase!\n");
+            return ret;
+        }
     }
 
     return 0;
@@ -541,10 +557,15 @@ int ecdev_open(ec_device_t *device /**< EtherCAT device */)
  */
 void ecdev_close(ec_device_t *device /**< EtherCAT device */)
 {
-    ec_master_leave_idle_phase(device->master);
+    ec_master_t *master = device->master;
 
-    if (ec_device_close(device))
-        EC_MASTER_WARN(device->master, "Failed to close device!\n");
+    if (master->phase == EC_IDLE) {
+        ec_master_leave_idle_phase(master);
+    }
+
+    if (ec_device_close(device)) {
+        EC_MASTER_WARN(master, "Failed to close device!\n");
+    }
 }
 
 /*****************************************************************************/

@@ -93,7 +93,7 @@ void CommandMaster::execute(const StringVector &args)
             << "  Phase: ";
 
         switch (data.phase) {
-            case 0:  cout << "Waiting for device..."; break;
+            case 0:  cout << "Waiting for device(s)..."; break;
             case 1:  cout << "Idle"; break;
             case 2:  cout << "Operation"; break;
             default: cout << "???";

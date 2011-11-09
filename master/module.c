@@ -467,34 +467,43 @@ ec_device_t *ecdev_offer(
 
     for (i = 0; i < master_count; i++) {
         master = &masters[i];
+        ec_mac_print(net_dev->dev_addr, str);
 
         down(&master->device_sem);
-        if (master->main_device.dev) { // master already has a device
-            up(&master->device_sem);
-            continue;
-        }
-            
-        if (ec_mac_equal(master->main_mac, net_dev->dev_addr)
-                || ec_mac_is_broadcast(master->main_mac)) {
-            ec_mac_print(net_dev->dev_addr, str);
-            EC_INFO("Accepting device %s for master %u.\n",
+
+        if (!master->main_device.dev
+                && (ec_mac_equal(master->main_mac, net_dev->dev_addr)
+                    || ec_mac_is_broadcast(master->main_mac))) {
+
+            EC_INFO("Accepting %s as main device for master %u.\n",
                     str, master->index);
 
             ec_device_attach(&master->main_device, net_dev, poll, module);
             up(&master->device_sem);
-            
+
             snprintf(net_dev->name, IFNAMSIZ, "ec%u", master->index);
 
             return &master->main_device; // offer accepted
-        }
-        else {
+
+        } else if (!master->backup_device.dev
+                && ec_mac_equal(master->backup_mac, net_dev->dev_addr)) {
+
+            EC_INFO("Accepting %s as backup device for master %u.\n",
+                    str, master->index);
+
+            ec_device_attach(&master->backup_device, net_dev, poll,
+                    module);
             up(&master->device_sem);
 
-            if (master->debug_level) {
-                ec_mac_print(net_dev->dev_addr, str);
-                EC_MASTER_DBG(master, 0, "Master declined device %s.\n",
-                        str);
-            }
+            snprintf(net_dev->name, IFNAMSIZ, "ecb%u", master->index);
+
+            return &master->backup_device; // offer accepted
+
+        } else {
+
+            up(&master->device_sem);
+
+            EC_MASTER_DBG(master, 1, "Master declined device %s.\n", str);
         }
     }
 
