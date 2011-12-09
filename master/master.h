@@ -242,8 +242,8 @@ struct ec_master {
                                       ext_datagram_queue. */
 
     struct list_head external_datagram_queue; /**< External Datagram queue. */
-    unsigned int send_interval; /**< Interval between calls to
-                                  ecrt_master_send */
+    unsigned int send_interval; /**< Interval between two calls to
+                                  ecrt_master_send(). */
     size_t max_queue_size; /**< Maximum size of datagram queue */
 
     unsigned int debug_level; /**< Master debug level. */
