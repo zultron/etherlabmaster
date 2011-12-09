@@ -147,6 +147,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     master->slave_count = 0;
     
     INIT_LIST_HEAD(&master->configs);
+    INIT_LIST_HEAD(&master->domains);
 
     master->app_time = 0ULL;
     master->app_start_time = 0ULL;
@@ -171,8 +172,6 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     
     // send interval in IDLE phase
     ec_master_set_send_interval(master, 1000000 / HZ);
-
-    INIT_LIST_HEAD(&master->domains);
 
     master->debug_level = debug_level;
     master->stats.timeouts = 0;
