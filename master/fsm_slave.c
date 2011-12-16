@@ -203,7 +203,7 @@ int ec_fsm_slave_action_process_sdo(
         fsm->state = ec_fsm_slave_state_sdo_request;
         ec_fsm_coe_transfer(&fsm->fsm_coe, slave, &request->req);
         ec_fsm_coe_exec(&fsm->fsm_coe); // execute immediately
-        ec_master_queue_external_datagram(fsm->slave->master,fsm->datagram);
+        ec_master_queue_external_datagram(fsm->slave->master, fsm->datagram);
         return 1;
     }
     return 0;
@@ -220,9 +220,8 @@ void ec_fsm_slave_state_sdo_request(
     ec_slave_t *slave = fsm->slave;
     ec_sdo_request_t *request = fsm->sdo_request;
 
-    if (ec_fsm_coe_exec(&fsm->fsm_coe))
-    {
-        ec_master_queue_external_datagram(fsm->slave->master,fsm->datagram);
+    if (ec_fsm_coe_exec(&fsm->fsm_coe)) {
+        ec_master_queue_external_datagram(fsm->slave->master, fsm->datagram);
         return;
     }
     if (!ec_fsm_coe_success(&fsm->fsm_coe)) {
@@ -277,7 +276,7 @@ int ec_fsm_slave_action_process_foe(
         fsm->state = ec_fsm_slave_state_foe_request;
         ec_fsm_foe_transfer(&fsm->fsm_foe, slave, &request->req);
         ec_fsm_foe_exec(&fsm->fsm_foe);
-        ec_master_queue_external_datagram(fsm->slave->master,fsm->datagram);
+        ec_master_queue_external_datagram(fsm->slave->master, fsm->datagram);
         return 1;
     }
     return 0;
@@ -294,9 +293,8 @@ void ec_fsm_slave_state_foe_request(
     ec_slave_t *slave = fsm->slave;
     ec_foe_request_t *request = fsm->foe_request;
 
-    if (ec_fsm_foe_exec(&fsm->fsm_foe))
-    {
-        ec_master_queue_external_datagram(fsm->slave->master,fsm->datagram);
+    if (ec_fsm_foe_exec(&fsm->fsm_foe)) {
+        ec_master_queue_external_datagram(fsm->slave->master, fsm->datagram);
         return;
     }
 
