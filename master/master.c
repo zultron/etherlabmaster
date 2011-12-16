@@ -1386,7 +1386,6 @@ static int ec_master_idle_thread(void *priv_data)
             ec_master_queue_datagram(master, &master->fsm_datagram,
                     EC_DEVICE_MAIN);
         }
-        ec_master_inject_external_datagrams(master);
         ecrt_master_send(master);
         sent_bytes = master->devices[EC_DEVICE_MAIN].tx_skb[
             master->devices[EC_DEVICE_MAIN].tx_ring_index]->len;
@@ -2219,6 +2218,7 @@ void ecrt_master_send(ec_master_t *master)
                 EC_DEVICE_MAIN);
         master->injection_seq_rt = master->injection_seq_fsm;
     }
+
     ec_master_inject_external_datagrams(master);
 
     for (i = 0; i < EC_NUM_DEVICES; i++) {
