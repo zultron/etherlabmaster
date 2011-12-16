@@ -1270,7 +1270,6 @@ static int ec_master_idle_thread(void *priv_data)
         if (fsm_exec) {
             ec_master_queue_datagram(master, &master->fsm_datagram);
         }
-        ec_master_inject_external_datagrams(master);
         ecrt_master_send(master);
         sent_bytes = master->main_device.tx_skb[
             master->main_device.tx_ring_index]->len;
@@ -2100,6 +2099,7 @@ void ecrt_master_send(ec_master_t *master)
         ec_master_queue_datagram(master, &master->fsm_datagram);
         master->injection_seq_rt = master->injection_seq_fsm;
     }
+
     ec_master_inject_external_datagrams(master);
 
     if (unlikely(!master->main_device.link_state)) {
