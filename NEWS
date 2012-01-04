@@ -28,6 +28,7 @@ Changes in 1.5:
     - Added e100 driver for 2.6.31.
     - Added e100 driver for 2.6.32.
     - Added e100 driver for 2.6.33, thanks for J. Kunz.
+    - Added e100 driver for 2.6.37.
 * Added 8139too driver for kernels 2.6.25 (F. Pose), 2.6.26 (M. Luescher),
   2.6.27, 2.6.28, 2.6.29 (M. Goetze), 2.6.31 (F. Pose), 2.6.32 (F. Pose),
   2.6.33 (J. Kunz), 2.6.34 (Malcolm Lewis), 2.6.35 (B. Benner),
