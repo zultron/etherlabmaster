@@ -10,16 +10,15 @@ vim700: spelllang=en spell
 
 Version 1.5.0:
 
-* Ethernet drivers:
-    - Fix link detection in generic driver.
-    - Add native drivers from 2.6.24 up to 2.6.31.
+* Add native drivers e100 and r8169 for 2.6.37.
+* Add systemd unit files and scripts.
 
 Future issues:
 
+* Fix link detection in generic driver.
 * Remove allow_scanning flag.
 * Check for Enable SDO Complete Access flag.
 * Do not output 'SDO does not exist' when querying data type.
-* Read AL status code on spontaneous state change.
 * recompile tool/CommandVersion.cpp if revision changes.
 * Log SoE IDNs with real name ([SP]-x-yyyy).
 * Only output watchdog config if not default.
@@ -42,8 +41,6 @@ Future issues:
 * Mailbox protocol handlers.
 * Mailbox state machine using toggle bits.
 * External memory for SDO transfers.
-* C++ implementation of the library.
-* Bus simulator interface.
 * Move master threads, slave handlers and state machines into a user
   space daemon.
 * Allow master requesting when in ORPHANED phase
@@ -60,7 +57,6 @@ Future issues:
     - Fix number of digits in negative integer hex output.
     - Data type abbreviations.
     - Add -x switch for hex display.
-    - Implement CompleteAccess
     - Implement --output-file argument in foe_read.
     - Implement indent in 'ethercat ma'
     - Implement 0xXXXX:YY format for specifying SDOs.
@@ -68,8 +64,6 @@ Future issues:
     - Output error after usage.
 * Simplify master fsm by introducing a common request state to handle external
   requests (replace write_sii, sdo_request, etc).
-* Remove stdio uses in userspace library?
-* Fix casting away constness during expected WC calculation.
 * Fix bus scan hang when calling ecrt_master_deactivate().
 
 Smaller issues:
