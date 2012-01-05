@@ -268,7 +268,7 @@ int ec_fsm_coe_check_emergency(
         ec_print_data(data, size);
         return 1;
     }
-    
+
     EC_SLAVE_WARN(fsm->slave, "CoE Emergency Request received:\n"
             "Error code 0x%04X, Error register 0x%02X, data:\n",
             EC_READ_U16(data + 2), EC_READ_U8(data + 4));
@@ -422,6 +422,8 @@ void ec_fsm_coe_dict_response(ec_fsm_coe_t *fsm /**< finite state machine */)
     unsigned int sdo_count, i;
     uint16_t sdo_index, fragments_left;
     ec_sdo_t *sdo;
+    bool first_segment;
+    size_t index_list_offset;
 
     if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--)
         return; // FIXME: request again?
@@ -496,17 +498,20 @@ void ec_fsm_coe_dict_response(ec_fsm_coe_t *fsm /**< finite state machine */)
         return;
     }
 
-    if (rec_size < 8 || rec_size % 2) {
+    first_segment = list_empty(&slave->sdo_dictionary) ? true : false;
+    index_list_offset = first_segment ? 8 : 6;
+
+    if (rec_size < index_list_offset || rec_size % 2) {
         EC_SLAVE_ERR(slave, "Invalid data size %zu!\n", rec_size);
         ec_print_data(data, rec_size);
         fsm->state = ec_fsm_coe_error;
         return;
     }
 
-    sdo_count = (rec_size - 8) / 2;
+    sdo_count = (rec_size - index_list_offset) / 2;
 
     for (i = 0; i < sdo_count; i++) {
-        sdo_index = EC_READ_U16(data + 8 + i * 2);
+        sdo_index = EC_READ_U16(data + index_list_offset + i * 2);
         if (!sdo_index) {
             EC_SLAVE_DBG(slave, 1, "SDO dictionary contains index 0x0000.\n");
             continue;
@@ -1108,7 +1113,7 @@ void ec_fsm_coe_down_start(
         return;
     }
 
-    if (slave->configured_rx_mailbox_size < 
+    if (slave->configured_rx_mailbox_size <
             EC_MBOX_HEADER_SIZE + EC_COE_DOWN_REQ_HEADER_SIZE) {
         EC_SLAVE_ERR(slave, "Mailbox too small!\n");
         request->errno = EOVERFLOW;
@@ -1132,7 +1137,7 @@ void ec_fsm_coe_down_start(
         EC_WRITE_U16(data, 0x2 << 12); // SDO request
         EC_WRITE_U8 (data + 2, (0x3 // size specified, expedited
                     | data_set_size << 2
-                    | ((request->complete_access ? 1 : 0) << 4) 
+                    | ((request->complete_access ? 1 : 0) << 4)
                     | 0x1 << 5)); // Download request
         EC_WRITE_U16(data + 3, request->index);
         EC_WRITE_U8 (data + 5,
@@ -1173,7 +1178,7 @@ void ec_fsm_coe_down_start(
         EC_WRITE_U16(data, 0x2 << 12); // SDO request
         EC_WRITE_U8(data + 2,
                 0x1 // size indicator, normal
-                | ((request->complete_access ? 1 : 0) << 4) 
+                | ((request->complete_access ? 1 : 0) << 4)
                 | 0x1 << 5); // Download request
         EC_WRITE_U16(data + 3, request->index);
         EC_WRITE_U8 (data + 5,
@@ -1359,7 +1364,7 @@ void ec_fsm_coe_down_prepare_segment_request(
 
     EC_WRITE_U16(data, 0x2 << 12); // SDO request
     EC_WRITE_U8(data + 2, (last_segment ? 1 : 0)
-            | (seg_data_size << 1) 
+            | (seg_data_size << 1)
             | (fsm->toggle << 4)
             | (0x00 << 5)); // Download segment request
     memcpy(data + EC_COE_DOWN_SEG_REQ_HEADER_SIZE,
