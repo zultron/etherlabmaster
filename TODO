@@ -8,11 +8,6 @@ vim700: spelllang=en spell
 
 -------------------------------------------------------------------------------
 
-Version 1.5.0:
-
-* Add native drivers e100 and r8169 for 2.6.37.
-* Add systemd unit files and scripts.
-
 Future issues:
 
 * Fix link detection in generic driver.
