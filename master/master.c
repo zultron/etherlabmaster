@@ -1351,7 +1351,9 @@ static int ec_master_idle_thread(void *priv_data)
     ec_master_t *master = (ec_master_t *) priv_data;
     ec_slave_t *slave = NULL;
     int fsm_exec;
+#ifdef EC_USE_HRTIMER
     size_t sent_bytes;
+#endif
 
     // send interval in IDLE phase
     ec_master_set_send_interval(master, 1000000 / HZ); 
@@ -1387,8 +1389,10 @@ static int ec_master_idle_thread(void *priv_data)
                     EC_DEVICE_MAIN);
         }
         ecrt_master_send(master);
+#ifdef EC_USE_HRTIMER
         sent_bytes = master->devices[EC_DEVICE_MAIN].tx_skb[
             master->devices[EC_DEVICE_MAIN].tx_ring_index]->len;
+#endif
         up(&master->io_sem);
 
         if (ec_fsm_master_idle(&master->fsm)) {
