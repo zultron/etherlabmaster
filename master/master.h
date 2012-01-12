@@ -242,7 +242,8 @@ struct ec_master {
                                       ext_datagram_queue. */
 
     struct list_head external_datagram_queue; /**< External Datagram queue. */
-    unsigned int send_interval; /**< Interval between calls to ecrt_master_send */
+    unsigned int send_interval; /**< Interval between calls to
+                                  ecrt_master_send */
     size_t max_queue_size; /**< Maximum size of datagram queue */
 
     unsigned int debug_level; /**< Master debug level. */
@@ -298,9 +299,11 @@ void ec_master_eoe_stop(ec_master_t *);
 
 // datagram IO
 void ec_master_receive_datagrams(ec_master_t *, const uint8_t *, size_t);
-void ec_master_queue_datagram(ec_master_t *, ec_datagram_t *);
+void ec_master_queue_datagram(ec_master_t *, ec_datagram_t *,
+        ec_device_index_t);
 void ec_master_queue_datagram_ext(ec_master_t *, ec_datagram_t *);
-void ec_master_queue_external_datagram(ec_master_t *, ec_datagram_t *);
+void ec_master_queue_external_datagram(ec_master_t *, ec_datagram_t *,
+        ec_device_index_t);
 void ec_master_inject_external_datagrams(ec_master_t *);
 
 // misc.

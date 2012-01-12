@@ -744,7 +744,7 @@ void ec_fsm_slave_config_enter_soe_conf_preop(
             ec_fsm_soe_transfer(fsm_soe, fsm->slave, &fsm->soe_request_copy);
             ec_fsm_soe_exec(fsm_soe); // execute immediately
             ec_master_queue_external_datagram(slave->master,
-                    fsm_soe->datagram);
+                    fsm_soe->datagram, EC_DEVICE_MAIN);
             return;
         }
     }
@@ -765,7 +765,8 @@ void ec_fsm_slave_config_state_soe_conf_preop(
     ec_fsm_soe_t *fsm_soe = &slave->fsm.fsm_soe;
 
     if (ec_fsm_soe_exec(fsm_soe)) {
-        ec_master_queue_external_datagram(slave->master, fsm_soe->datagram);
+        ec_master_queue_external_datagram(slave->master, fsm_soe->datagram,
+                EC_DEVICE_MAIN);
         return;
     }
 
@@ -791,7 +792,7 @@ void ec_fsm_slave_config_state_soe_conf_preop(
             ec_fsm_soe_transfer(fsm_soe, fsm->slave, &fsm->soe_request_copy);
             ec_fsm_soe_exec(fsm_soe); // execute immediately
             ec_master_queue_external_datagram(slave->master,
-                    fsm_soe->datagram);
+                    fsm_soe->datagram, EC_DEVICE_MAIN);
             return;
         }
     }
@@ -1473,7 +1474,7 @@ void ec_fsm_slave_config_enter_soe_conf_safeop(
             ec_fsm_soe_transfer(fsm_soe, fsm->slave, &fsm->soe_request_copy);
             ec_fsm_soe_exec(fsm_soe); // execute immediately
             ec_master_queue_external_datagram(slave->master,
-                    fsm_soe->datagram);
+                    fsm_soe->datagram, EC_DEVICE_MAIN);
             return;
         }
     }
@@ -1494,7 +1495,8 @@ void ec_fsm_slave_config_state_soe_conf_safeop(
     ec_fsm_soe_t *fsm_soe = &slave->fsm.fsm_soe;
 
     if (ec_fsm_soe_exec(fsm_soe)) {
-        ec_master_queue_external_datagram(slave->master, fsm_soe->datagram);
+        ec_master_queue_external_datagram(slave->master, fsm_soe->datagram,
+                EC_DEVICE_MAIN);
         return;
     }
 
@@ -1520,7 +1522,7 @@ void ec_fsm_slave_config_state_soe_conf_safeop(
             ec_fsm_soe_transfer(fsm_soe, fsm->slave, &fsm->soe_request_copy);
             ec_fsm_soe_exec(fsm_soe); // execute immediately
             ec_master_queue_external_datagram(slave->master,
-                    fsm_soe->datagram);
+                    fsm_soe->datagram, EC_DEVICE_MAIN);
             return;
         }
     }

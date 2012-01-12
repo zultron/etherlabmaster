@@ -218,11 +218,11 @@ enum {
 
 /** Master devices.
  */
-enum {
+typedef enum {
     EC_DEVICE_MAIN, /**< Main device. */
     EC_DEVICE_BACKUP, /**< Backup device */
     EC_NUM_DEVICES /**< Number of devices. */
-};
+} ec_device_index_t;
 
 /*****************************************************************************/
 

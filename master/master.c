@@ -720,9 +720,9 @@ void ec_master_inject_external_datagrams(
             datagram->cycles_sent = 0;
 #endif
             datagram->jiffies_sent = 0;
-            ec_master_queue_datagram(master, datagram);
-        }
-        else {
+            ec_master_queue_datagram(master, datagram,
+                    datagram->device_index);
+        } else {
             if (datagram->data_size > master->max_queue_size) {
                 list_del_init(&datagram->queue);
                 datagram->state = EC_DATAGRAM_ERROR;
@@ -793,7 +793,8 @@ void ec_master_set_send_interval(
  */
 void ec_master_queue_external_datagram(
         ec_master_t *master, /**< EtherCAT master */
-        ec_datagram_t *datagram /**< datagram */
+        ec_datagram_t *datagram, /**< datagram */
+        ec_device_index_t device_index /**< Device index. */
         )
 {
     ec_datagram_t *queued_datagram;
@@ -816,6 +817,7 @@ void ec_master_queue_external_datagram(
 
     list_add_tail(&datagram->queue, &master->external_datagram_queue);
     datagram->state = EC_DATAGRAM_QUEUED;
+    datagram->device_index = device_index;
 #ifdef EC_HAVE_CYCLES
     datagram->cycles_sent = get_cycles();
 #endif
@@ -831,7 +833,8 @@ void ec_master_queue_external_datagram(
  */
 void ec_master_queue_datagram(
         ec_master_t *master, /**< EtherCAT master */
-        ec_datagram_t *datagram /**< datagram */
+        ec_datagram_t *datagram, /**< datagram */
+        ec_device_index_t device_index /**< Device index. */
         )
 {
     ec_datagram_t *queued_datagram;
@@ -871,6 +874,7 @@ void ec_master_queue_datagram(
 
     list_add_tail(&datagram->queue, &master->datagram_queue);
     datagram->state = EC_DATAGRAM_QUEUED;
+    datagram->device_index = device_index;
 }
 
 /*****************************************************************************/
@@ -889,14 +893,17 @@ void ec_master_queue_datagram_ext(
 
 /*****************************************************************************/
 
-/** Sends the datagrams in the queue.
+/** Sends the datagrams in the queue for a certain device.
  *
  */
-void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
+void ec_master_send_datagrams(
+        ec_master_t *master, /**< EtherCAT master */
+        ec_device_index_t device_index /**< Device index. */
+        )
 {
     ec_datagram_t *datagram, *next;
     size_t datagram_size;
-    uint8_t *frame_data, *cur_data;
+    uint8_t *frame_data, *cur_data = NULL;
     void *follows_word;
 #ifdef EC_HAVE_CYCLES
     cycles_t cycles_start, cycles_sent, cycles_end;
@@ -911,18 +918,27 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
     frame_count = 0;
     INIT_LIST_HEAD(&sent_datagrams);
 
-    EC_MASTER_DBG(master, 2, "ec_master_send_datagrams\n");
+    EC_MASTER_DBG(master, 2, "%s(device_index = %u)\n",
+            __func__, device_index);
 
     do {
-        // fetch pointer to transmit socket buffer
-        frame_data = ec_device_tx_data(&master->devices[EC_DEVICE_MAIN]);
-        cur_data = frame_data + EC_FRAME_HEADER_SIZE;
+        frame_data = NULL;
         follows_word = NULL;
         more_datagrams_waiting = 0;
 
         // fill current frame with datagrams
         list_for_each_entry(datagram, &master->datagram_queue, queue) {
-            if (datagram->state != EC_DATAGRAM_QUEUED) continue;
+            if (datagram->state != EC_DATAGRAM_QUEUED ||
+                    datagram->device_index != device_index) {
+                continue;
+            }
+
+            if (!frame_data) {
+                // fetch pointer to transmit socket buffer
+                frame_data =
+                    ec_device_tx_data(&master->devices[device_index]);
+                cur_data = frame_data + EC_FRAME_HEADER_SIZE;
+            }
 
             // does the current datagram fit in the frame?
             datagram_size = EC_DATAGRAM_HEADER_SIZE + datagram->data_size
@@ -935,16 +951,17 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
             list_add_tail(&datagram->sent, &sent_datagrams);
             datagram->index = master->datagram_index++;
 
-            EC_MASTER_DBG(master, 2, "adding datagram 0x%02X\n",
+            EC_MASTER_DBG(master, 2, "Adding datagram 0x%02X\n",
                     datagram->index);
 
-            // set "datagram following" flag in previous frame
-            if (follows_word)
+            // set "datagram following" flag in previous datagram
+            if (follows_word) {
                 EC_WRITE_U16(follows_word,
                         EC_READ_U16(follows_word) | 0x8000);
+            }
 
             // EtherCAT datagram header
-            EC_WRITE_U8 (cur_data,     datagram->type);
+            EC_WRITE_U8 (cur_data, datagram->type);
             EC_WRITE_U8 (cur_data + 1, datagram->index);
             memcpy(cur_data + 2, datagram->address, EC_ADDR_LEN);
             EC_WRITE_U16(cur_data + 6, datagram->data_size & 0x7FF);
@@ -977,7 +994,7 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
         EC_MASTER_DBG(master, 2, "frame size: %zu\n", cur_data - frame_data);
 
         // send frame
-        ec_device_send(&master->devices[EC_DEVICE_MAIN],
+        ec_device_send(&master->devices[device_index],
                 cur_data - frame_data);
 #ifdef EC_HAVE_CYCLES
         cycles_sent = get_cycles();
@@ -1001,8 +1018,8 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
 #ifdef EC_HAVE_CYCLES
     if (unlikely(master->debug_level > 1)) {
         cycles_end = get_cycles();
-        EC_MASTER_DBG(master, 0, "ec_master_send_datagrams"
-                " sent %u frames in %uus.\n", frame_count,
+        EC_MASTER_DBG(master, 0, "%s()"
+                " sent %u frames in %uus.\n", __func__, frame_count,
                (unsigned int) (cycles_end - cycles_start) * 1000 / cpu_khz);
     }
 #endif
@@ -1363,7 +1380,8 @@ static int ec_master_idle_thread(void *priv_data)
         // queue and send
         down(&master->io_sem);
         if (fsm_exec) {
-            ec_master_queue_datagram(master, &master->fsm_datagram);
+            ec_master_queue_datagram(master, &master->fsm_datagram,
+                    EC_DEVICE_MAIN);
         }
         ec_master_inject_external_datagrams(master);
         ecrt_master_send(master);
@@ -2190,10 +2208,12 @@ void ecrt_master_deactivate(ec_master_t *master)
 void ecrt_master_send(ec_master_t *master)
 {
     ec_datagram_t *datagram, *n;
+    unsigned int i;
 
     if (master->injection_seq_rt != master->injection_seq_fsm) {
         // inject datagrams produced by master & slave FSMs
-        ec_master_queue_datagram(master, &master->fsm_datagram);
+        ec_master_queue_datagram(master, &master->fsm_datagram,
+                EC_DEVICE_MAIN);
         master->injection_seq_rt = master->injection_seq_fsm;
     }
     ec_master_inject_external_datagrams(master);
@@ -2215,7 +2235,11 @@ void ecrt_master_send(ec_master_t *master)
     }
 
     // send frames
-    ec_master_send_datagrams(master);
+    for (i = 0; i < EC_NUM_DEVICES; i++) {
+        if (master->devices[i].dev) {
+            ec_master_send_datagrams(master, i);
+        }
+    }
 }
 
 /*****************************************************************************/
@@ -2275,7 +2299,7 @@ void ecrt_master_send_ext(ec_master_t *master)
     list_for_each_entry_safe(datagram, next, &master->ext_datagram_queue,
             queue) {
         list_del(&datagram->queue);
-        ec_master_queue_datagram(master, datagram);
+        ec_master_queue_datagram(master, datagram, EC_DEVICE_MAIN);
     }
 
     ecrt_master_send(master);
@@ -2441,7 +2465,8 @@ void ecrt_master_application_time(ec_master_t *master, uint64_t app_time)
 void ecrt_master_sync_reference_clock(ec_master_t *master)
 {
     EC_WRITE_U32(master->ref_sync_datagram.data, master->app_time);
-    ec_master_queue_datagram(master, &master->ref_sync_datagram);
+    ec_master_queue_datagram(master, &master->ref_sync_datagram,
+            EC_DEVICE_MAIN);
 }
 
 /*****************************************************************************/
@@ -2449,7 +2474,8 @@ void ecrt_master_sync_reference_clock(ec_master_t *master)
 void ecrt_master_sync_slave_clocks(ec_master_t *master)
 {
     ec_datagram_zero(&master->sync_datagram);
-    ec_master_queue_datagram(master, &master->sync_datagram);
+    ec_master_queue_datagram(master, &master->sync_datagram,
+            EC_DEVICE_MAIN);
 }
 
 /*****************************************************************************/
@@ -2457,7 +2483,8 @@ void ecrt_master_sync_slave_clocks(ec_master_t *master)
 void ecrt_master_sync_monitor_queue(ec_master_t *master)
 {
     ec_datagram_zero(&master->sync_mon_datagram);
-    ec_master_queue_datagram(master, &master->sync_mon_datagram);
+    ec_master_queue_datagram(master, &master->sync_mon_datagram,
+            EC_DEVICE_MAIN);
 }
 
 /*****************************************************************************/
