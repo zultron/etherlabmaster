@@ -2218,27 +2218,31 @@ void ecrt_master_send(ec_master_t *master)
     }
     ec_master_inject_external_datagrams(master);
 
-    if (unlikely(!master->devices[EC_DEVICE_MAIN].link_state)) {
-        // link is down, no datagram can be sent
-        list_for_each_entry_safe(datagram, n,
-                &master->datagram_queue, queue) {
-            datagram->state = EC_DATAGRAM_ERROR;
-            list_del_init(&datagram->queue);
-        }
-
-        // query link state
-        ec_device_poll(&master->devices[EC_DEVICE_MAIN]);
-
-        // clear frame statistics
-        ec_device_clear_stats(&master->devices[EC_DEVICE_MAIN]);
-        return;
-    }
-
-    // send frames
     for (i = 0; i < EC_NUM_DEVICES; i++) {
-        if (master->devices[i].dev) {
-            ec_master_send_datagrams(master, i);
+        if (unlikely(!master->devices[i].link_state)) {
+            // link is down, no datagram can be sent
+            list_for_each_entry_safe(datagram, n,
+                    &master->datagram_queue, queue) {
+                if (datagram->device_index == i) {
+                    datagram->state = EC_DATAGRAM_ERROR;
+                    list_del_init(&datagram->queue);
+                }
+            }
+
+            if (!master->devices[i].dev) {
+                continue;
+            }
+
+            // query link state
+            ec_device_poll(&master->devices[i]);
+
+            // clear frame statistics
+            ec_device_clear_stats(&master->devices[i]);
+            return;
         }
+
+        // send frames
+        ec_master_send_datagrams(master, i);
     }
 }
 

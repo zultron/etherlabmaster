@@ -63,7 +63,8 @@ struct ec_domain
     ec_origin_t data_origin; /**< Origin of the \a data memory. */
     uint32_t logical_base_address; /**< Logical offset address of the
                                      process data. */
-    struct list_head datagrams; /**< Datagrams for process data exchange. */
+    struct list_head datagram_pairs; /**< Datagrams pairs (main/backup) for
+                                       process data exchange. */
 
     uint16_t working_counter; /**< Last working counter value. */
     uint16_t expected_working_counter; /**< Expected working counter. */
