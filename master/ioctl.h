@@ -174,7 +174,7 @@ typedef struct {
         uint32_t rx_frame_rates[EC_RATE_COUNT];
         uint32_t tx_byte_rates[EC_RATE_COUNT];
         uint32_t rx_byte_rates[EC_RATE_COUNT];
-    } devices[2];
+    } devices[EC_NUM_DEVICES];
     uint64_t tx_count;
     uint64_t rx_count;
     uint64_t tx_bytes;

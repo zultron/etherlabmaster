@@ -207,7 +207,7 @@ void ec_fsm_master_state_broadcast(
                 fsm->slaves_responding);
     }
 
-    if (fsm->link_state && !master->main_device.link_state) {
+    if (fsm->link_state && !master->devices[EC_DEVICE_MAIN].link_state) {
         // link went down
         EC_MASTER_DBG(master, 1, "Master state machine detected "
                 "link down. Clearing slave list.\n");
@@ -219,7 +219,7 @@ void ec_fsm_master_state_broadcast(
         ec_master_clear_slaves(master);
         fsm->slave_states = 0x00;
     }
-    fsm->link_state = master->main_device.link_state;
+    fsm->link_state = master->devices[EC_DEVICE_MAIN].link_state;
 
     if (datagram->state != EC_DATAGRAM_RECEIVED) {
         ec_fsm_master_restart(fsm);

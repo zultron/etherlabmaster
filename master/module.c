@@ -229,13 +229,19 @@ int ec_mac_equal(
                 
 /*****************************************************************************/
 
+/** Maximum MAC string size.
+ */
+#define EC_MAX_MAC_STRING_SIZE (3 * ETH_ALEN)
+
 /** Print a MAC address to a buffer.
+ *
+ * The buffer size must be at least EC_MAX_MAC_STRING_SIZE.
  *
  * \return number of bytes written.
  */
 ssize_t ec_mac_print(
         const uint8_t *mac, /**< MAC address */
-        char *buffer /**< target buffer */
+        char *buffer /**< Target buffer. */
         )
 {
     off_t off = 0;
@@ -445,6 +451,13 @@ size_t ec_state_string(uint8_t states, /**< slave states */
  *  Device interface
  *****************************************************************************/
 
+/** Device names.
+ */
+static const char *ec_device_names[EC_NUM_DEVICES] = {
+    "main",
+    "backup"
+};
+
 /** Offers an EtherCAT device to a certain master.
  *
  * The master decides, if it wants to use the device for EtherCAT operation,
@@ -462,8 +475,8 @@ ec_device_t *ecdev_offer(
         )
 {
     ec_master_t *master;
-    char str[20];
-    unsigned int i;
+    char str[EC_MAX_MAC_STRING_SIZE];
+    unsigned int i, j;
 
     for (i = 0; i < master_count; i++) {
         master = &masters[i];
@@ -471,39 +484,27 @@ ec_device_t *ecdev_offer(
 
         down(&master->device_sem);
 
-        if (!master->main_device.dev
-                && (ec_mac_equal(master->main_mac, net_dev->dev_addr)
-                    || ec_mac_is_broadcast(master->main_mac))) {
+        for (j = 0; j < EC_NUM_DEVICES; j++) {
+            if (!master->devices[j].dev
+                && (ec_mac_equal(master->macs[j], net_dev->dev_addr)
+                    || ec_mac_is_broadcast(master->macs[j]))) {
 
-            EC_INFO("Accepting %s as main device for master %u.\n",
-                    str, master->index);
+                EC_INFO("Accepting %s as %s device for master %u.\n",
+                        str, ec_device_names[j], master->index);
 
-            ec_device_attach(&master->main_device, net_dev, poll, module);
-            up(&master->device_sem);
+                ec_device_attach(&master->devices[j], net_dev, poll, module);
+                up(&master->device_sem);
 
-            snprintf(net_dev->name, IFNAMSIZ, "ecm%u", master->index);
+                snprintf(net_dev->name, IFNAMSIZ, "ec%c%u",
+                        ec_device_names[j][0], master->index);
 
-            return &master->main_device; // offer accepted
-
-        } else if (!master->backup_device.dev
-                && ec_mac_equal(master->backup_mac, net_dev->dev_addr)) {
-
-            EC_INFO("Accepting %s as backup device for master %u.\n",
-                    str, master->index);
-
-            ec_device_attach(&master->backup_device, net_dev, poll, module);
-            up(&master->device_sem);
-
-            snprintf(net_dev->name, IFNAMSIZ, "ecb%u", master->index);
-
-            return &master->backup_device; // offer accepted
-
-        } else {
-
-            up(&master->device_sem);
-
-            EC_MASTER_DBG(master, 1, "Master declined device %s.\n", str);
+                return &master->devices[j]; // offer accepted
+            }
         }
+
+        up(&master->device_sem);
+
+        EC_MASTER_DBG(master, 1, "Master declined device %s.\n", str);
     }
 
     return NULL; // offer declined
@@ -522,6 +523,7 @@ ec_master_t *ecrt_request_master_err(
         )
 {
     ec_master_t *master, *errptr = NULL;
+    unsigned int i, got_modules = 0;
 
     EC_INFO("Requesting master %u...\n", master_index);
 
@@ -558,11 +560,17 @@ ec_master_t *ecrt_request_master_err(
         goto out_release;
     }
 
-    if (!try_module_get(master->main_device.module)) {
-        up(&master->device_sem);
-        EC_ERR("Device module is unloading!\n");
-        errptr = ERR_PTR(-ENODEV);
-        goto out_release;
+    for (i = 0; i < EC_NUM_DEVICES; i++) {
+        ec_device_t *device = &master->devices[i];
+        if (device->dev) {
+            if (!try_module_get(device->module)) {
+                up(&master->device_sem);
+                EC_MASTER_ERR(master, "Device module is unloading!\n");
+                errptr = ERR_PTR(-ENODEV);
+                goto out_module_put;
+            }
+        }
+        got_modules++;
     }
 
     up(&master->device_sem);
@@ -577,7 +585,12 @@ ec_master_t *ecrt_request_master_err(
     return master;
 
  out_module_put:
-    module_put(master->main_device.module);
+    for (; got_modules > 0; got_modules--) {
+        ec_device_t *device = &master->devices[i - 1];
+        if (device->dev) {
+            module_put(device->module);
+        }
+    }
  out_release:
     master->reserved = 0;
  out_return:
@@ -596,6 +609,8 @@ ec_master_t *ecrt_request_master(unsigned int master_index)
 
 void ecrt_release_master(ec_master_t *master)
 {
+    unsigned int i;
+
     EC_MASTER_INFO(master, "Releasing master...\n");
 
     if (!master->reserved) {
@@ -606,7 +621,12 @@ void ecrt_release_master(ec_master_t *master)
 
     ec_master_leave_operation_phase(master);
 
-    module_put(master->main_device.module);
+    for (i = 0; i < EC_NUM_DEVICES; i++) {
+        if (master->devices[i].dev) {
+            module_put(master->devices[i].module);
+        }
+    }
+
     master->reserved = 0;
 
     EC_MASTER_INFO(master, "Released.\n");

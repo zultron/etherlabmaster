@@ -109,11 +109,13 @@ void ec_master_init_static(void)
 {
 #ifdef EC_HAVE_CYCLES
     timeout_cycles = (cycles_t) EC_IO_TIMEOUT /* us */ * (cpu_khz / 1000);
-    ext_injection_timeout_cycles = (cycles_t) EC_SDO_INJECTION_TIMEOUT /* us */ * (cpu_khz / 1000);
+    ext_injection_timeout_cycles =
+        (cycles_t) EC_SDO_INJECTION_TIMEOUT /* us */ * (cpu_khz / 1000);
 #else
     // one jiffy may always elapse between time measurement
     timeout_jiffies = max(EC_IO_TIMEOUT * HZ / 1000000, 1);
-    ext_injection_timeout_jiffies = max(EC_SDO_INJECTION_TIMEOUT * HZ / 1000000, 1);
+    ext_injection_timeout_jiffies =
+        max(EC_SDO_INJECTION_TIMEOUT * HZ / 1000000, 1);
 #endif
 }
 
@@ -140,8 +142,8 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 
     sema_init(&master->master_sem, 1);
 
-    master->main_mac = main_mac;
-    master->backup_mac = backup_mac;
+    master->macs[EC_DEVICE_MAIN] = main_mac;
+    master->macs[EC_DEVICE_BACKUP] = backup_mac;
     ec_master_clear_device_stats(master);
 
     sema_init(&master->device_sem, 1);
@@ -211,11 +213,11 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     init_waitqueue_head(&master->reg_queue);
 
     // init devices
-    ret = ec_device_init(&master->main_device, master);
+    ret = ec_device_init(&master->devices[EC_DEVICE_MAIN], master);
     if (ret < 0)
         goto out_return;
 
-    ret = ec_device_init(&master->backup_device, master);
+    ret = ec_device_init(&master->devices[EC_DEVICE_BACKUP], master);
     if (ret < 0)
         goto out_clear_main;
 
@@ -234,7 +236,8 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 
     // init reference sync datagram
     ec_datagram_init(&master->ref_sync_datagram);
-    snprintf(master->ref_sync_datagram.name, EC_DATAGRAM_NAME_SIZE, "refsync");
+    snprintf(master->ref_sync_datagram.name, EC_DATAGRAM_NAME_SIZE,
+            "refsync");
     ret = ec_datagram_apwr(&master->ref_sync_datagram, 0, 0x0910, 8);
     if (ret < 0) {
         ec_datagram_clear(&master->ref_sync_datagram);
@@ -256,7 +259,8 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 
     // init sync monitor datagram
     ec_datagram_init(&master->sync_mon_datagram);
-    snprintf(master->sync_mon_datagram.name, EC_DATAGRAM_NAME_SIZE, "syncmon");
+    snprintf(master->sync_mon_datagram.name, EC_DATAGRAM_NAME_SIZE,
+            "syncmon");
     ret = ec_datagram_brd(&master->sync_mon_datagram, 0x092c, 4);
     if (ret < 0) {
         ec_datagram_clear(&master->sync_mon_datagram);
@@ -309,9 +313,9 @@ out_clear_fsm:
     ec_fsm_master_clear(&master->fsm);
     ec_datagram_clear(&master->fsm_datagram);
 out_clear_backup:
-    ec_device_clear(&master->backup_device);
+    ec_device_clear(&master->devices[EC_DEVICE_BACKUP]);
 out_clear_main:
-    ec_device_clear(&master->main_device);
+    ec_device_clear(&master->devices[EC_DEVICE_MAIN]);
 out_return:
     return ret;
 }
@@ -344,8 +348,8 @@ void ec_master_clear(
     ec_datagram_clear(&master->ref_sync_datagram);
     ec_fsm_master_clear(&master->fsm);
     ec_datagram_clear(&master->fsm_datagram);
-    ec_device_clear(&master->backup_device);
-    ec_device_clear(&master->main_device);
+    ec_device_clear(&master->devices[EC_DEVICE_BACKUP]);
+    ec_device_clear(&master->devices[EC_DEVICE_MAIN]);
 }
 
 /*****************************************************************************/
@@ -591,7 +595,9 @@ void ec_master_leave_idle_phase(ec_master_t *master /**< EtherCAT master */)
 
 /** Transition function from IDLE to OPERATION phase.
  */
-int ec_master_enter_operation_phase(ec_master_t *master /**< EtherCAT master */)
+int ec_master_enter_operation_phase(
+        ec_master_t *master /**< EtherCAT master */
+        )
 {
     int ret = 0;
     ec_slave_t *slave;
@@ -628,7 +634,8 @@ int ec_master_enter_operation_phase(ec_master_t *master /**< EtherCAT master */)
         up(&master->scan_sem);
 
         // wait for slave scan to complete
-        ret = wait_event_interruptible(master->scan_queue, !master->scan_busy);
+        ret = wait_event_interruptible(master->scan_queue,
+                !master->scan_busy);
         if (ret) {
             EC_MASTER_INFO(master, "Waiting for slave scan"
                     " interrupted by signal.\n");
@@ -908,7 +915,7 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
 
     do {
         // fetch pointer to transmit socket buffer
-        frame_data = ec_device_tx_data(&master->main_device);
+        frame_data = ec_device_tx_data(&master->devices[EC_DEVICE_MAIN]);
         cur_data = frame_data + EC_FRAME_HEADER_SIZE;
         follows_word = NULL;
         more_datagrams_waiting = 0;
@@ -933,7 +940,8 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
 
             // set "datagram following" flag in previous frame
             if (follows_word)
-                EC_WRITE_U16(follows_word, EC_READ_U16(follows_word) | 0x8000);
+                EC_WRITE_U16(follows_word,
+                        EC_READ_U16(follows_word) | 0x8000);
 
             // EtherCAT datagram header
             EC_WRITE_U8 (cur_data,     datagram->type);
@@ -960,7 +968,7 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
 
         // EtherCAT frame header
         EC_WRITE_U16(frame_data, ((cur_data - frame_data
-                                   - EC_FRAME_HEADER_SIZE) & 0x7FF) | 0x1000);
+                        - EC_FRAME_HEADER_SIZE) & 0x7FF) | 0x1000);
 
         // pad frame
         while (cur_data - frame_data < ETH_ZLEN - ETH_HLEN)
@@ -969,7 +977,8 @@ void ec_master_send_datagrams(ec_master_t *master /**< EtherCAT master */)
         EC_MASTER_DBG(master, 2, "frame size: %zu\n", cur_data - frame_data);
 
         // send frame
-        ec_device_send(&master->main_device, cur_data - frame_data);
+        ec_device_send(&master->devices[EC_DEVICE_MAIN],
+                cur_data - frame_data);
 #ifdef EC_HAVE_CYCLES
         cycles_sent = get_cycles();
 #endif
@@ -1092,7 +1101,7 @@ void ec_master_receive_datagrams(ec_master_t *master, /**< EtherCAT master */
                         EC_DATAGRAM_HEADER_SIZE + data_size
                         + EC_DATAGRAM_FOOTER_SIZE);
 #ifdef EC_DEBUG_RING
-                ec_device_debug_ring_print(&master->main_device);
+                ec_device_debug_ring_print(&master->devices[EC_DEVICE_MAIN]);
 #endif
             }
 
@@ -1117,9 +1126,11 @@ void ec_master_receive_datagrams(ec_master_t *master, /**< EtherCAT master */
         // dequeue the received datagram
         datagram->state = EC_DATAGRAM_RECEIVED;
 #ifdef EC_HAVE_CYCLES
-        datagram->cycles_received = master->main_device.cycles_poll;
+        datagram->cycles_received =
+            master->devices[EC_DEVICE_MAIN].cycles_poll;
 #endif
-        datagram->jiffies_received = master->main_device.jiffies_poll;
+        datagram->jiffies_received =
+            master->devices[EC_DEVICE_MAIN].jiffies_poll;
         list_del_init(&datagram->queue);
     }
 }
@@ -1230,8 +1241,8 @@ void ec_master_update_device_stats(
     s->last_tx_bytes = s->tx_bytes;
     s->last_rx_bytes = s->rx_bytes;
 
-    ec_device_update_stats(&master->main_device);
-    ec_device_update_stats(&master->backup_device);
+    ec_device_update_stats(&master->devices[EC_DEVICE_MAIN]);
+    ec_device_update_stats(&master->devices[EC_DEVICE_BACKUP]);
 
     s->jiffies = jiffies;
 }
@@ -1356,8 +1367,8 @@ static int ec_master_idle_thread(void *priv_data)
         }
         ec_master_inject_external_datagrams(master);
         ecrt_master_send(master);
-        sent_bytes = master->main_device.tx_skb[
-            master->main_device.tx_ring_index]->len;
+        sent_bytes = master->devices[EC_DEVICE_MAIN].tx_skb[
+            master->devices[EC_DEVICE_MAIN].tx_ring_index]->len;
         up(&master->io_sem);
 
         if (ec_fsm_master_idle(&master->fsm)) {
@@ -2000,7 +2011,8 @@ ec_domain_t *ecrt_master_create_domain_err(
     EC_MASTER_DBG(master, 1, "ecrt_master_create_domain(master = 0x%p)\n",
             master);
 
-    if (!(domain = (ec_domain_t *) kmalloc(sizeof(ec_domain_t), GFP_KERNEL))) {
+    if (!(domain =
+                (ec_domain_t *) kmalloc(sizeof(ec_domain_t), GFP_KERNEL))) {
         EC_MASTER_ERR(master, "Error allocating domain memory!\n");
         return ERR_PTR(-ENOMEM);
     }
@@ -2186,18 +2198,19 @@ void ecrt_master_send(ec_master_t *master)
     }
     ec_master_inject_external_datagrams(master);
 
-    if (unlikely(!master->main_device.link_state)) {
+    if (unlikely(!master->devices[EC_DEVICE_MAIN].link_state)) {
         // link is down, no datagram can be sent
-        list_for_each_entry_safe(datagram, n, &master->datagram_queue, queue) {
+        list_for_each_entry_safe(datagram, n,
+                &master->datagram_queue, queue) {
             datagram->state = EC_DATAGRAM_ERROR;
             list_del_init(&datagram->queue);
         }
 
         // query link state
-        ec_device_poll(&master->main_device);
+        ec_device_poll(&master->devices[EC_DEVICE_MAIN]);
 
         // clear frame statistics
-        ec_device_clear_stats(&master->main_device);
+        ec_device_clear_stats(&master->devices[EC_DEVICE_MAIN]);
         return;
     }
 
@@ -2212,9 +2225,9 @@ void ecrt_master_receive(ec_master_t *master)
     ec_datagram_t *datagram, *next;
 
     // receive datagrams
-    ec_device_poll(&master->main_device);
-    if (master->backup_device.dev) {
-        ec_device_poll(&master->backup_device);
+    ec_device_poll(&master->devices[EC_DEVICE_MAIN]);
+    if (master->devices[EC_DEVICE_BACKUP].dev) {
+        ec_device_poll(&master->devices[EC_DEVICE_BACKUP]);
     }
     ec_master_update_device_stats(master);
 
@@ -2223,11 +2236,11 @@ void ecrt_master_receive(ec_master_t *master)
         if (datagram->state != EC_DATAGRAM_SENT) continue;
 
 #ifdef EC_HAVE_CYCLES
-        if (master->main_device.cycles_poll - datagram->cycles_sent
-                > timeout_cycles) {
+        if (master->devices[EC_DEVICE_MAIN].cycles_poll -
+                datagram->cycles_sent > timeout_cycles) {
 #else
-        if (master->main_device.jiffies_poll - datagram->jiffies_sent
-                > timeout_jiffies) {
+        if (master->devices[EC_DEVICE_MAIN].jiffies_poll -
+                datagram->jiffies_sent > timeout_jiffies) {
 #endif
             list_del_init(&datagram->queue);
             datagram->state = EC_DATAGRAM_TIMED_OUT;
@@ -2237,10 +2250,12 @@ void ecrt_master_receive(ec_master_t *master)
             if (unlikely(master->debug_level > 0)) {
                 unsigned int time_us;
 #ifdef EC_HAVE_CYCLES
-                time_us = (unsigned int) (master->main_device.cycles_poll -
+                time_us = (unsigned int)
+                    (master->devices[EC_DEVICE_MAIN].cycles_poll -
                         datagram->cycles_sent) * 1000 / cpu_khz;
 #else
-                time_us = (unsigned int) ((master->main_device.jiffies_poll -
+                time_us = (unsigned int)
+                    ((master->devices[EC_DEVICE_MAIN].jiffies_poll -
                             datagram->jiffies_sent) * 1000000 / HZ);
 #endif
                 EC_MASTER_DBG(master, 0, "TIMED OUT datagram %p,"
@@ -2345,7 +2360,7 @@ int ecrt_master(ec_master_t *master, ec_master_info_t *master_info)
             " master_info = 0x%p)\n", master, master_info);
 
     master_info->slave_count = master->slave_count;
-    master_info->link_up = master->main_device.link_state;
+    master_info->link_up = master->devices[EC_DEVICE_MAIN].link_state;
     master_info->scan_busy = master->scan_busy;
     master_info->app_time = master->app_time;
     return 0;
@@ -2406,7 +2421,7 @@ void ecrt_master_state(const ec_master_t *master, ec_master_state_t *state)
 {
     state->slaves_responding = master->fsm.slaves_responding;
     state->al_states = master->fsm.slave_states;
-    state->link_up = master->main_device.link_state;
+    state->link_up = master->devices[EC_DEVICE_MAIN].link_state;
 }
 
 /*****************************************************************************/

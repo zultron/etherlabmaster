@@ -513,9 +513,9 @@ void ecdev_withdraw(ec_device_t *device /**< EtherCAT device */)
 
     ec_mac_print(device->dev->dev_addr, mac_str);
 
-    if (device == &master->main_device) {
+    if (device == &master->devices[EC_DEVICE_MAIN]) {
         sprintf(dev_str, "main");
-    } else if (device == &master->backup_device) {
+    } else if (device == &master->devices[EC_DEVICE_BACKUP]) {
         sprintf(dev_str, "backup");
     } else {
         EC_MASTER_WARN(master, "%s() called with unknown device %s!\n",
@@ -548,9 +548,9 @@ int ecdev_open(ec_device_t *device /**< EtherCAT device */)
         return ret;
     }
 
-    if (master->main_device.open &&
-            (ec_mac_is_zero(master->backup_mac) ||
-             master->backup_device.open)) {
+    if (master->devices[EC_DEVICE_MAIN].open &&
+            (ec_mac_is_zero(master->macs[EC_DEVICE_BACKUP]) ||
+             master->devices[EC_DEVICE_BACKUP].open)) {
         ret = ec_master_enter_idle_phase(device->master);
         if (ret) {
             EC_MASTER_ERR(device->master, "Failed to enter IDLE phase!\n");
