@@ -187,10 +187,8 @@ struct ec_master {
 
     struct semaphore master_sem; /**< Master semaphore. */
 
-    ec_device_t main_device; /**< EtherCAT main device. */
-    const uint8_t *main_mac; /**< MAC address of main device. */
-    ec_device_t backup_device; /**< EtherCAT backup device. */
-    const uint8_t *backup_mac; /**< MAC address of backup device. */
+    ec_device_t devices[EC_NUM_DEVICES]; /**< EtherCAT devices. */
+    const uint8_t *macs[EC_NUM_DEVICES]; /**< Device MAC addresses. */
     struct semaphore device_sem; /**< Device semaphore. */
     ec_device_stats_t device_stats; /**< Device statistics. */
 

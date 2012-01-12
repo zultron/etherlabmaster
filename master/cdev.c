@@ -184,10 +184,11 @@ int ec_cdev_ioctl_master(
         )
 {
     ec_ioctl_master_t data;
-    unsigned int i;
+    unsigned int i, j;
 
     if (down_interruptible(&master->master_sem))
         return -EINTR;
+
     data.slave_count = master->slave_count;
     data.config_count = ec_master_config_count(master);
     data.domain_count = ec_master_domain_count(master);
@@ -197,57 +198,38 @@ int ec_cdev_ioctl_master(
     data.phase = (uint8_t) master->phase;
     data.active = (uint8_t) master->active;
     data.scan_busy = master->scan_busy;
+
     up(&master->master_sem);
 
     if (down_interruptible(&master->device_sem))
         return -EINTR;
 
-    if (master->main_device.dev) {
-        memcpy(data.devices[0].address,
-                master->main_device.dev->dev_addr, ETH_ALEN);
-    } else {
-        memcpy(data.devices[0].address, master->main_mac, ETH_ALEN); 
-    }
-    data.devices[0].attached = master->main_device.dev ? 1 : 0;
-    data.devices[0].link_state = master->main_device.link_state ? 1 : 0;
-    data.devices[0].tx_count = master->main_device.tx_count;
-    data.devices[0].rx_count = master->main_device.rx_count;
-    data.devices[0].tx_bytes = master->main_device.tx_bytes;
-    data.devices[0].rx_bytes = master->main_device.rx_bytes;
-    data.devices[0].tx_errors = master->main_device.tx_errors;
-    for (i = 0; i < EC_RATE_COUNT; i++) {
-        data.devices[0].tx_frame_rates[i] =
-            master->main_device.tx_frame_rates[i];
-        data.devices[0].rx_frame_rates[i] =
-            master->main_device.rx_frame_rates[i];
-        data.devices[0].tx_byte_rates[i] =
-            master->main_device.tx_byte_rates[i];
-        data.devices[0].rx_byte_rates[i] =
-            master->main_device.rx_byte_rates[i];
-    }
+    for (i = 0; i < EC_NUM_DEVICES; i++) {
+        ec_device_t *device = &master->devices[i];
 
-    if (master->backup_device.dev) {
-        memcpy(data.devices[1].address,
-                master->backup_device.dev->dev_addr, ETH_ALEN); 
-    } else {
-        memcpy(data.devices[1].address, master->backup_mac, ETH_ALEN); 
-    }
-    data.devices[1].attached = master->backup_device.dev ? 1 : 0;
-    data.devices[1].link_state = master->backup_device.link_state ? 1 : 0;
-    data.devices[1].tx_count = master->backup_device.tx_count;
-    data.devices[1].rx_count = master->backup_device.rx_count;
-    data.devices[1].tx_bytes = master->backup_device.tx_bytes;
-    data.devices[1].rx_bytes = master->backup_device.rx_bytes;
-    data.devices[1].tx_errors = master->backup_device.tx_errors;
-    for (i = 0; i < EC_RATE_COUNT; i++) {
-        data.devices[1].tx_frame_rates[i] =
-            master->backup_device.tx_frame_rates[i];
-        data.devices[1].rx_frame_rates[i] =
-            master->backup_device.rx_frame_rates[i];
-        data.devices[1].tx_byte_rates[i] =
-            master->backup_device.tx_byte_rates[i];
-        data.devices[1].rx_byte_rates[i] =
-            master->backup_device.rx_byte_rates[i];
+        if (device->dev) {
+            memcpy(data.devices[i].address,
+                    device->dev->dev_addr, ETH_ALEN);
+        } else {
+            memcpy(data.devices[i].address, master->macs[i], ETH_ALEN);
+        }
+        data.devices[i].attached = device->dev ? 1 : 0;
+        data.devices[i].link_state = device->link_state ? 1 : 0;
+        data.devices[i].tx_count = device->tx_count;
+        data.devices[i].rx_count = device->rx_count;
+        data.devices[i].tx_bytes = device->tx_bytes;
+        data.devices[i].rx_bytes = device->rx_bytes;
+        data.devices[i].tx_errors = device->tx_errors;
+        for (j = 0; j < EC_RATE_COUNT; j++) {
+            data.devices[i].tx_frame_rates[j] =
+                device->tx_frame_rates[j];
+            data.devices[i].rx_frame_rates[j] =
+                device->rx_frame_rates[j];
+            data.devices[i].tx_byte_rates[j] =
+                device->tx_byte_rates[j];
+            data.devices[i].rx_byte_rates[j] =
+                device->rx_byte_rates[j];
+        }
     }
 
     data.tx_count = master->device_stats.tx_count;
