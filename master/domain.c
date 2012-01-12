@@ -438,7 +438,7 @@ void ecrt_domain_queue(ec_domain_t *domain)
     ec_datagram_t *datagram;
 
     list_for_each_entry(datagram, &domain->datagrams, list) {
-        ec_master_queue_datagram(domain->master, datagram);
+        ec_master_queue_datagram(domain->master, datagram, EC_DEVICE_MAIN);
     }
 }
 

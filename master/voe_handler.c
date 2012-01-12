@@ -191,7 +191,8 @@ ec_request_state_t ecrt_voe_handler_execute(ec_voe_handler_t *voe)
     if (voe->config->slave) { // FIXME locking?
         voe->state(voe);
         if (voe->request_state == EC_INT_REQUEST_BUSY)
-            ec_master_queue_datagram(voe->config->master, &voe->datagram);
+            ec_master_queue_datagram(voe->config->master, &voe->datagram,
+                    EC_DEVICE_MAIN);
     } else {
         voe->state = ec_voe_handler_state_error;
         voe->request_state = EC_INT_REQUEST_FAILURE;

@@ -88,6 +88,8 @@ typedef struct {
     struct list_head list; /**< Needed by domain datagram lists. */
     struct list_head queue; /**< Master datagram queue item. */
     struct list_head sent; /**< Master list item for sent datagrams. */
+    ec_device_index_t device_index; /**< Device via which the datagram shall
+                                      be / was sent. */
     ec_datagram_type_t type; /**< Datagram type (APRD, BWR, etc.). */
     uint8_t address[EC_ADDR_LEN]; /**< Recipient address. */
     uint8_t *data; /**< Datagram payload. */
