@@ -41,6 +41,7 @@
 #include "slave_config.h"
 
 #include "domain.h"
+#include "datagram_pair.h"
 
 /*****************************************************************************/
 
@@ -63,7 +64,7 @@ void ec_domain_init(
     domain->data = NULL;
     domain->data_origin = EC_ORIG_INTERNAL;
     domain->logical_base_address = 0x00000000;
-    INIT_LIST_HEAD(&domain->datagrams);
+    INIT_LIST_HEAD(&domain->datagram_pairs);
     domain->working_counter = 0x0000;
     domain->expected_working_counter = 0x0000;
     domain->working_counter_changes = 0;
@@ -76,12 +77,13 @@ void ec_domain_init(
  */
 void ec_domain_clear(ec_domain_t *domain /**< EtherCAT domain */)
 {
-    ec_datagram_t *datagram, *next;
+    ec_datagram_pair_t *datagram_pair, *next_pair;
 
     // dequeue and free datagrams
-    list_for_each_entry_safe(datagram, next, &domain->datagrams, list) {
-        ec_datagram_clear(datagram);
-        kfree(datagram);
+    list_for_each_entry_safe(datagram_pair, next_pair,
+            &domain->datagram_pairs, list) {
+        ec_datagram_pair_clear(datagram_pair);
+        kfree(datagram_pair);
     }
 
     ec_domain_clear_data(domain);
@@ -95,8 +97,10 @@ void ec_domain_clear_data(
         ec_domain_t *domain /**< EtherCAT domain. */
         )
 {
-    if (domain->data_origin == EC_ORIG_INTERNAL && domain->data)
+    if (domain->data_origin == EC_ORIG_INTERNAL && domain->data) {
         kfree(domain->data);
+    }
+
     domain->data = NULL;
     domain->data_origin = EC_ORIG_INTERNAL;
 }
@@ -122,15 +126,15 @@ void ec_domain_add_fmmu_config(
 
 /*****************************************************************************/
 
-/** Allocates a domain datagram and appends it to the list.
+/** Allocates a domain datagram pair and appends it to the list.
  *
- * The datagram type and expected working counters are determined by the
- * number of input and output fmmus that share the datagram.
+ * The datagrams' types and expected working counters are determined by the
+ * number of input and output fmmus that share the datagrams.
  *
  * \retval  0 Success.
  * \retval <0 Error code.
  */
-int ec_domain_add_datagram(
+int ec_domain_add_datagram_pair(
         ec_domain_t *domain, /**< EtherCAT domain. */
         uint32_t logical_offset, /**< Logical offset. */
         size_t data_size, /**< Size of the data. */
@@ -138,47 +142,64 @@ int ec_domain_add_datagram(
         const unsigned int used[] /**< Used by inputs/outputs. */
         )
 {
-    ec_datagram_t *datagram;
+    ec_datagram_pair_t *datagram_pair;
     int ret;
+    unsigned int i;
 
-    if (!(datagram = kmalloc(sizeof(ec_datagram_t), GFP_KERNEL))) {
+    if (!(datagram_pair = kmalloc(sizeof(ec_datagram_pair_t), GFP_KERNEL))) {
         EC_MASTER_ERR(domain->master,
-                "Failed to allocate domain datagram!\n");
+                "Failed to allocate domain datagram pair!\n");
         return -ENOMEM;
     }
 
-    ec_datagram_init(datagram);
-    snprintf(datagram->name, EC_DATAGRAM_NAME_SIZE,
-            "domain%u-%u", domain->index, logical_offset);
+    ec_datagram_pair_init(datagram_pair);
+
+    /* backup datagram has its own memory */
+    ret = ec_datagram_prealloc(&datagram_pair->datagrams[EC_DEVICE_BACKUP],
+            data_size);
+    if (ret) {
+        ec_datagram_pair_clear(datagram_pair);
+        kfree(datagram_pair);
+        return ret;
+    }
+
+    /* The ec_datagram_lxx() calls below can not fail, because either the
+     * datagram has external memory or it is preallocated. */
 
     if (used[EC_DIR_OUTPUT] && used[EC_DIR_INPUT]) { // inputs and outputs
-        ret = ec_datagram_lrw(datagram, logical_offset, data_size, data);
-        if (ret < 0) {
-            kfree(datagram);
-            return ret;
-        }
+        ec_datagram_lrw_ext(&datagram_pair->datagrams[EC_DEVICE_MAIN],
+                logical_offset, data_size, data);
+        ec_datagram_lrw(&datagram_pair->datagrams[EC_DEVICE_BACKUP],
+                logical_offset, data_size);
+
         // If LRW is used, output FMMUs increment the working counter by 2,
         // while input FMMUs increment it by 1.
         domain->expected_working_counter +=
             used[EC_DIR_OUTPUT] * 2 + used[EC_DIR_INPUT];
     } else if (used[EC_DIR_OUTPUT]) { // outputs only
-        ret = ec_datagram_lwr(datagram, logical_offset, data_size, data);
-        if (ret < 0) {
-            kfree(datagram);
-            return ret;
-        }
+        ec_datagram_lwr_ext(&datagram_pair->datagrams[EC_DEVICE_MAIN],
+                logical_offset, data_size, data);
+        ec_datagram_lwr(&datagram_pair->datagrams[EC_DEVICE_BACKUP],
+                logical_offset, data_size);
+
         domain->expected_working_counter += used[EC_DIR_OUTPUT];
     } else { // inputs only (or nothing)
-        ret = ec_datagram_lrd(datagram, logical_offset, data_size, data);
-        if (ret < 0) {
-            kfree(datagram);
-            return ret;
-        }
+        ec_datagram_lrd_ext(&datagram_pair->datagrams[EC_DEVICE_MAIN],
+                logical_offset, data_size, data);
+        ec_datagram_lrd(&datagram_pair->datagrams[EC_DEVICE_BACKUP],
+                logical_offset, data_size);
+
         domain->expected_working_counter += used[EC_DIR_INPUT];
     }
 
-    ec_datagram_zero(datagram);
-    list_add_tail(&datagram->list, &domain->datagrams);
+    for (i = 0; i < EC_NUM_DEVICES; i++) {
+        snprintf(datagram_pair->datagrams[i].name, EC_DATAGRAM_NAME_SIZE,
+                "domain%u-%u-%s", domain->index, logical_offset,
+                i ? "backup" : "main");
+        ec_datagram_zero(&datagram_pair->datagrams[i]);
+    }
+
+    list_add_tail(&datagram_pair->list, &domain->datagram_pairs);
     return 0;
 }
 
@@ -205,7 +226,7 @@ int ec_domain_finish(
     unsigned int datagram_used[EC_DIR_COUNT];
     ec_fmmu_config_t *fmmu;
     ec_fmmu_config_t *fmmu_temp;
-    const ec_datagram_t *datagram;
+    const ec_datagram_pair_t *datagram_pair;
     int ret;
 
     domain->logical_base_address = base_address;
@@ -250,7 +271,7 @@ int ec_domain_finish(
         // If the current FMMU's data do not fit in the current datagram,
         // allocate a new one.
         if (datagram_size + fmmu->data_size > EC_MAX_DATA_SIZE) {
-            ret = ec_domain_add_datagram(domain,
+            ret = ec_domain_add_datagram_pair(domain,
                     domain->logical_base_address + datagram_offset,
                     datagram_size, domain->data + datagram_offset,
                     datagram_used);
@@ -270,10 +291,10 @@ int ec_domain_finish(
         datagram_size += fmmu->data_size;
     }
 
-    // Allocate last datagram, if data are left (this is also the case if the
-    // process data fit into a single datagram)
+    /* Allocate last datagram pair, if data are left (this is also the case if
+     * the process data fit into a single datagram) */
     if (datagram_size) {
-        ret = ec_domain_add_datagram(domain,
+        ret = ec_domain_add_datagram_pair(domain,
                 domain->logical_base_address + datagram_offset,
                 datagram_size, domain->data + datagram_offset,
                 datagram_used);
@@ -286,13 +307,16 @@ int ec_domain_finish(
             " %zu byte, expected working counter %u.\n", domain->index,
             domain->logical_base_address, domain->data_size,
             domain->expected_working_counter);
-    list_for_each_entry(datagram, &domain->datagrams, list) {
+
+    list_for_each_entry(datagram_pair, &domain->datagram_pairs, list) {
+        const ec_datagram_t *datagram =
+            &datagram_pair->datagrams[EC_DEVICE_MAIN];
         EC_MASTER_INFO(domain->master, "  Datagram %s: Logical offset 0x%08x,"
                 " %zu byte, type %s.\n", datagram->name,
                 EC_READ_U32(datagram->address), datagram->data_size,
                 ec_datagram_type_string(datagram));
     }
-    
+
     return 0;
 }
 
@@ -333,7 +357,7 @@ const ec_fmmu_config_t *ec_domain_find_fmmu(
 }
 
 /******************************************************************************
- *  Realtime interface
+ *  Application interface
  *****************************************************************************/
 
 int ecrt_domain_reg_pdo_entry_list(ec_domain_t *domain,
@@ -342,7 +366,7 @@ int ecrt_domain_reg_pdo_entry_list(ec_domain_t *domain,
     const ec_pdo_entry_reg_t *reg;
     ec_slave_config_t *sc;
     int ret;
-    
+
     EC_MASTER_DBG(domain->master, 1, "ecrt_domain_reg_pdo_entry_list("
             "domain = 0x%p, regs = 0x%p)\n", domain, regs);
 
@@ -399,13 +423,17 @@ uint8_t *ecrt_domain_data(ec_domain_t *domain)
 void ecrt_domain_process(ec_domain_t *domain)
 {
     uint16_t working_counter_sum;
-    ec_datagram_t *datagram;
+    ec_datagram_pair_t *datagram_pair;
+    unsigned int i;
 
-    working_counter_sum = 0x0000;
-    list_for_each_entry(datagram, &domain->datagrams, list) {
-        ec_datagram_output_stats(datagram);
-        if (datagram->state == EC_DATAGRAM_RECEIVED) {
-            working_counter_sum += datagram->working_counter;
+    working_counter_sum = 0;
+    list_for_each_entry(datagram_pair, &domain->datagram_pairs, list) {
+        for (i = 0; i < EC_NUM_DEVICES; i++) {
+            ec_datagram_t *datagram = &datagram_pair->datagrams[i];
+            ec_datagram_output_stats(datagram);
+            if (datagram->state == EC_DATAGRAM_RECEIVED) {
+                working_counter_sum += datagram->working_counter;
+            }
         }
     }
 
@@ -435,10 +463,20 @@ void ecrt_domain_process(ec_domain_t *domain)
 
 void ecrt_domain_queue(ec_domain_t *domain)
 {
-    ec_datagram_t *datagram;
+    ec_datagram_pair_t *datagram_pair;
+    unsigned int i;
 
-    list_for_each_entry(datagram, &domain->datagrams, list) {
-        ec_master_queue_datagram(domain->master, datagram, EC_DEVICE_MAIN);
+    list_for_each_entry(datagram_pair, &domain->datagram_pairs, list) {
+
+        /* copy main data to backup datagram */
+        memcpy(datagram_pair->datagrams[EC_DEVICE_BACKUP].data,
+                datagram_pair->datagrams[EC_DEVICE_MAIN].data,
+                datagram_pair->datagrams[EC_DEVICE_MAIN].data_size);
+
+        for (i = 0; i < EC_NUM_DEVICES; i++) {
+            ec_master_queue_datagram(domain->master,
+                    &datagram_pair->datagrams[i], i);
+        }
     }
 }
 

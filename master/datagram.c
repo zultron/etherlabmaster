@@ -428,12 +428,69 @@ int ec_datagram_brw(
 
 /** Initializes an EtherCAT LRD datagram.
  *
+ * \return Return value of ec_datagram_prealloc().
+ */
+int ec_datagram_lrd(
+        ec_datagram_t *datagram, /**< EtherCAT datagram. */
+        uint32_t offset, /**< Logical address. */
+        size_t data_size /**< Number of bytes to read/write. */
+        )
+{
+    int ret;
+    EC_FUNC_HEADER;
+    datagram->type = EC_DATAGRAM_LRD;
+    EC_WRITE_U32(datagram->address, offset);
+    EC_FUNC_FOOTER;
+}
+
+/*****************************************************************************/
+
+/** Initializes an EtherCAT LWR datagram.
+ *
+ * \return Return value of ec_datagram_prealloc().
+ */
+int ec_datagram_lwr(
+        ec_datagram_t *datagram, /**< EtherCAT datagram. */
+        uint32_t offset, /**< Logical address. */
+        size_t data_size /**< Number of bytes to read/write. */
+        )
+{
+    int ret;
+    EC_FUNC_HEADER;
+    datagram->type = EC_DATAGRAM_LWR;
+    EC_WRITE_U32(datagram->address, offset);
+    EC_FUNC_FOOTER;
+}
+
+/*****************************************************************************/
+
+/** Initializes an EtherCAT LRW datagram.
+ *
+ * \return Return value of ec_datagram_prealloc().
+ */
+int ec_datagram_lrw(
+        ec_datagram_t *datagram, /**< EtherCAT datagram. */
+        uint32_t offset, /**< Logical address. */
+        size_t data_size /**< Number of bytes to read/write. */
+        )
+{
+    int ret;
+    EC_FUNC_HEADER;
+    datagram->type = EC_DATAGRAM_LRW;
+    EC_WRITE_U32(datagram->address, offset);
+    EC_FUNC_FOOTER;
+}
+
+/*****************************************************************************/
+
+/** Initializes an EtherCAT LRD datagram with external memory.
+ *
  * \attention It is assumed, that the external memory is at least \a data_size
  *            bytes large.
  *
  * \return Return value of ec_datagram_prealloc().
  */
-int ec_datagram_lrd(
+int ec_datagram_lrd_ext(
         ec_datagram_t *datagram, /**< EtherCAT datagram. */
         uint32_t offset, /**< Logical address. */
         size_t data_size, /**< Number of bytes to read/write. */
@@ -451,14 +508,14 @@ int ec_datagram_lrd(
 
 /*****************************************************************************/
 
-/** Initializes an EtherCAT LWR datagram.
+/** Initializes an EtherCAT LWR datagram with external memory.
  *
  * \attention It is assumed, that the external memory is at least \a data_size
  *            bytes large.
  *
  * \return Return value of ec_datagram_prealloc().
  */
-int ec_datagram_lwr(
+int ec_datagram_lwr_ext(
         ec_datagram_t *datagram, /**< EtherCAT datagram. */
         uint32_t offset, /**< Logical address. */
         size_t data_size, /**< Number of bytes to read/write. */
@@ -476,14 +533,14 @@ int ec_datagram_lwr(
 
 /*****************************************************************************/
 
-/** Initializes an EtherCAT LRW datagram.
+/** Initializes an EtherCAT LRW datagram with external memory.
  *
  * \attention It is assumed, that the external memory is at least \a data_size
  *            bytes large.
  *
  * \return Return value of ec_datagram_prealloc().
  */
-int ec_datagram_lrw(
+int ec_datagram_lrw_ext(
         ec_datagram_t *datagram, /**< EtherCAT datagram. */
         uint32_t offset, /**< Logical address. */
         size_t data_size, /**< Number of bytes to read/write. */
