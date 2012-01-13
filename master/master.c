@@ -620,7 +620,7 @@ int ec_master_enter_operation_phase(
         if (ret) {
             EC_MASTER_INFO(master, "Finishing slave configuration"
                     " interrupted by signal.\n");
-            goto out_allow;
+            goto out_return;
         }
 
         EC_MASTER_DBG(master, 1, "Waiting for pending slave"
@@ -672,6 +672,7 @@ int ec_master_enter_operation_phase(
     
 out_allow:
     master->allow_scan = 1;
+out_return:
     return ret;
 }
 
@@ -688,6 +689,9 @@ void ec_master_leave_operation_phase(
     } else {
         ec_master_clear_config(master);
     }
+
+    /* Re-allow scanning for IDLE phase. */
+    master->allow_scan = 1;
 
     EC_MASTER_DBG(master, 1, "OPERATION -> IDLE.\n");
 
@@ -2133,7 +2137,9 @@ int ecrt_master_activate(ec_master_t *master)
         return ret;
     }
 
-    master->allow_scan = 1; // allow re-scanning on topology change
+    /* Allow scanning after a topology change. */
+    master->allow_scan = 1;
+
     master->active = 1;
 
     // notify state machine, that the configuration shall now be applied
@@ -2205,7 +2211,10 @@ void ecrt_master_deactivate(ec_master_t *master)
                 "EtherCAT-IDLE"))
         EC_MASTER_WARN(master, "Failed to restart master thread!\n");
 
-    master->allow_scan = 1;
+    /* Disallow scanning to get into the same state like after a master
+     * request (after ec_master_enter_operation_phase() is called). */
+    master->allow_scan = 0;
+
     master->active = 0;
 }
 
