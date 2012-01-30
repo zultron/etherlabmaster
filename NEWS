@@ -10,7 +10,14 @@ Changes since 1.5:
 
 * Added e1000e driver for 2.3.32, 2.6.34 (thanks to Siwei Zhuang), 2.6.37.
 
-Changes in 1.5:
+Changes in 1.5.1:
+
+* Fixed reset of allow_scanning flag if ecrt_master_activate() was not called.
+* Fixed missing distribution for r8169 for 2.6.32 and e1000 driver for 2.6.31.
+* Added r8169, e100, e1000 and e1000e drivers for 2.6.35.
+* Added fix for ESC port order (DC delay calculation).
+
+Changes in 1.5.0:
 
 * Added a userspace library for accessing the application interface. This
   library is licensed under LGPLv2.
@@ -32,7 +39,6 @@ Changes in 1.5:
     - Added e100 driver for 2.6.31.
     - Added e100 driver for 2.6.32.
     - Added e100 driver for 2.6.33, thanks for J. Kunz.
-    - Added e100 driver for 2.6.35.
     - Added e100 driver for 2.6.37.
 * Added 8139too driver for kernels 2.6.25 (F. Pose), 2.6.26 (M. Luescher),
   2.6.27, 2.6.28, 2.6.29 (M. Goetze), 2.6.31 (F. Pose), 2.6.32 (F. Pose),
