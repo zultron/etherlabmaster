@@ -1797,24 +1797,33 @@ int ec_master_calc_topology_rec(
         )
 {
     ec_slave_t *slave = master->slaves + *slave_position;
-    unsigned int i;
+    unsigned int port_index;
     int ret;
+
+    static const unsigned int next_table[EC_MAX_PORTS] = {
+        3, 2, 0, 1
+    };
 
     slave->ports[0].next_slave = port0_slave;
 
-    for (i = 1; i < EC_MAX_PORTS; i++) {
-        if (!slave->ports[i].link.loop_closed) {
+    port_index = 3;
+    while (port_index != 0) {
+        if (!slave->ports[port_index].link.loop_closed) {
             *slave_position = *slave_position + 1;
             if (*slave_position < master->slave_count) {
-                slave->ports[i].next_slave = master->slaves + *slave_position;
+                slave->ports[port_index].next_slave =
+                    master->slaves + *slave_position;
                 ret = ec_master_calc_topology_rec(master,
                         slave, slave_position);
-                if (ret)
+                if (ret) {
                     return ret;
+                }
             } else {
                 return -1;
             }
         }
+
+        port_index = next_table[port_index];
     }
 
     return 0;
