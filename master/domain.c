@@ -144,7 +144,7 @@ int ec_domain_add_datagram_pair(
 {
     ec_datagram_pair_t *datagram_pair;
     int ret;
-    unsigned int i;
+    unsigned int dev_idx;
 
     if (!(datagram_pair = kmalloc(sizeof(ec_datagram_pair_t), GFP_KERNEL))) {
         EC_MASTER_ERR(domain->master,
@@ -192,11 +192,11 @@ int ec_domain_add_datagram_pair(
         domain->expected_working_counter += used[EC_DIR_INPUT];
     }
 
-    for (i = 0; i < EC_NUM_DEVICES; i++) {
-        snprintf(datagram_pair->datagrams[i].name, EC_DATAGRAM_NAME_SIZE,
-                "domain%u-%u-%s", domain->index, logical_offset,
-                i ? "backup" : "main");
-        ec_datagram_zero(&datagram_pair->datagrams[i]);
+    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        snprintf(datagram_pair->datagrams[dev_idx].name,
+                EC_DATAGRAM_NAME_SIZE, "domain%u-%u-%s", domain->index,
+                logical_offset, dev_idx ? "backup" : "main");
+        ec_datagram_zero(&datagram_pair->datagrams[dev_idx]);
     }
 
     list_add_tail(&datagram_pair->list, &domain->datagram_pairs);
@@ -424,12 +424,12 @@ void ecrt_domain_process(ec_domain_t *domain)
 {
     uint16_t working_counter_sum;
     ec_datagram_pair_t *datagram_pair;
-    unsigned int i;
+    unsigned int dev_idx;
 
     working_counter_sum = 0;
     list_for_each_entry(datagram_pair, &domain->datagram_pairs, list) {
-        for (i = 0; i < EC_NUM_DEVICES; i++) {
-            ec_datagram_t *datagram = &datagram_pair->datagrams[i];
+        for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+            ec_datagram_t *datagram = &datagram_pair->datagrams[dev_idx];
             ec_datagram_output_stats(datagram);
             if (datagram->state == EC_DATAGRAM_RECEIVED) {
                 working_counter_sum += datagram->working_counter;
@@ -448,7 +448,8 @@ void ecrt_domain_process(ec_domain_t *domain)
         if (domain->working_counter_changes == 1) {
             EC_MASTER_INFO(domain->master, "Domain %u: Working counter"
                     " changed to %u/%u.\n", domain->index,
-                    domain->working_counter, domain->expected_working_counter);
+                    domain->working_counter,
+                    domain->expected_working_counter);
         } else {
             EC_MASTER_INFO(domain->master, "Domain %u: %u working counter"
                     " changes - now %u/%u.\n", domain->index,
@@ -464,7 +465,7 @@ void ecrt_domain_process(ec_domain_t *domain)
 void ecrt_domain_queue(ec_domain_t *domain)
 {
     ec_datagram_pair_t *datagram_pair;
-    unsigned int i;
+    unsigned int dev_idx;
 
     list_for_each_entry(datagram_pair, &domain->datagram_pairs, list) {
 
@@ -473,9 +474,9 @@ void ecrt_domain_queue(ec_domain_t *domain)
                 datagram_pair->datagrams[EC_DEVICE_MAIN].data,
                 datagram_pair->datagrams[EC_DEVICE_MAIN].data_size);
 
-        for (i = 0; i < EC_NUM_DEVICES; i++) {
+        for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
             ec_master_queue_datagram(domain->master,
-                    &datagram_pair->datagrams[i], i);
+                    &datagram_pair->datagrams[dev_idx], dev_idx);
         }
     }
 }
