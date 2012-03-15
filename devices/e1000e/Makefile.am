@@ -30,6 +30,8 @@
 EXTRA_DIST = \
 	82571-2.6.32-ethercat.c \
 	82571-2.6.32-orig.c \
+	82571-2.6.33-ethercat.c \
+	82571-2.6.33-orig.c \
 	82571-2.6.34-ethercat.c \
 	82571-2.6.34-orig.c \
 	82571-2.6.35-ethercat.c \
@@ -39,6 +41,8 @@ EXTRA_DIST = \
 	Kbuild.in \
 	defines-2.6.32-ethercat.h \
 	defines-2.6.32-orig.h \
+	defines-2.6.33-ethercat.h \
+	defines-2.6.33-orig.h \
 	defines-2.6.34-ethercat.h \
 	defines-2.6.34-orig.h \
 	defines-2.6.35-ethercat.h \
@@ -47,6 +51,8 @@ EXTRA_DIST = \
 	defines-2.6.37-orig.h \
 	e1000-2.6.32-ethercat.h \
 	e1000-2.6.32-orig.h \
+	e1000-2.6.33-ethercat.h \
+	e1000-2.6.33-orig.h \
 	e1000-2.6.34-ethercat.h \
 	e1000-2.6.34-orig.h \
 	e1000-2.6.35-ethercat.h \
@@ -55,6 +61,8 @@ EXTRA_DIST = \
 	e1000-2.6.37-orig.h \
 	es2lan-2.6.32-ethercat.c \
 	es2lan-2.6.32-orig.c \
+	es2lan-2.6.33-ethercat.c \
+	es2lan-2.6.33-orig.c \
 	es2lan-2.6.34-ethercat.c \
 	es2lan-2.6.34-orig.c \
 	es2lan-2.6.35-ethercat.c \
@@ -63,6 +71,8 @@ EXTRA_DIST = \
 	es2lan-2.6.37-orig.c \
 	ethtool-2.6.32-ethercat.c \
 	ethtool-2.6.32-orig.c \
+	ethtool-2.6.33-ethercat.c \
+	ethtool-2.6.33-orig.c \
 	ethtool-2.6.34-ethercat.c \
 	ethtool-2.6.34-orig.c \
 	ethtool-2.6.35-ethercat.c \
@@ -71,6 +81,8 @@ EXTRA_DIST = \
 	ethtool-2.6.37-orig.c \
 	hw-2.6.32-ethercat.h \
 	hw-2.6.32-orig.h \
+	hw-2.6.33-ethercat.h \
+	hw-2.6.33-orig.h \
 	hw-2.6.34-ethercat.h \
 	hw-2.6.34-orig.h \
 	hw-2.6.35-ethercat.h \
@@ -79,6 +91,8 @@ EXTRA_DIST = \
 	hw-2.6.37-orig.h \
 	ich8lan-2.6.32-ethercat.c \
 	ich8lan-2.6.32-orig.c \
+	ich8lan-2.6.33-ethercat.c \
+	ich8lan-2.6.33-orig.c \
 	ich8lan-2.6.34-ethercat.c \
 	ich8lan-2.6.34-orig.c \
 	ich8lan-2.6.35-ethercat.c \
@@ -87,6 +101,8 @@ EXTRA_DIST = \
 	ich8lan-2.6.37-orig.c \
 	lib-2.6.32-ethercat.c \
 	lib-2.6.32-orig.c \
+	lib-2.6.33-ethercat.c \
+	lib-2.6.33-orig.c \
 	lib-2.6.34-ethercat.c \
 	lib-2.6.34-orig.c \
 	lib-2.6.35-ethercat.c \
@@ -95,6 +111,8 @@ EXTRA_DIST = \
 	lib-2.6.37-orig.c \
 	netdev-2.6.32-ethercat.c \
 	netdev-2.6.32-orig.c \
+	netdev-2.6.33-ethercat.c \
+	netdev-2.6.33-orig.c \
 	netdev-2.6.34-ethercat.c \
 	netdev-2.6.34-orig.c \
 	netdev-2.6.35-ethercat.c \
@@ -103,6 +121,8 @@ EXTRA_DIST = \
 	netdev-2.6.37-orig.c \
 	param-2.6.32-ethercat.c \
 	param-2.6.32-orig.c \
+	param-2.6.33-ethercat.c \
+	param-2.6.33-orig.c \
 	param-2.6.34-ethercat.c \
 	param-2.6.34-orig.c \
 	param-2.6.35-ethercat.c \
@@ -111,6 +131,8 @@ EXTRA_DIST = \
 	param-2.6.37-orig.c \
 	phy-2.6.32-ethercat.c \
 	phy-2.6.32-orig.c \
+	phy-2.6.33-ethercat.c \
+	phy-2.6.33-orig.c \
 	phy-2.6.34-ethercat.c \
 	phy-2.6.34-orig.c \
 	phy-2.6.35-ethercat.c \
