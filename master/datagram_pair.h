@@ -61,9 +61,8 @@ int ec_datagram_pair_init(ec_datagram_pair_t *, ec_domain_t *, uint32_t,
         uint8_t *, size_t, const unsigned int []);
 void ec_datagram_pair_clear(ec_datagram_pair_t *);
 
-unsigned int ec_datagram_pair_process(ec_datagram_pair_t *);
-int ec_datagram_pair_data_changed(const ec_datagram_pair_t *,
-                    size_t, size_t, ec_device_index_t);
+uint16_t ec_datagram_pair_process(ec_datagram_pair_t *,
+        uint16_t[EC_NUM_DEVICES]);
 
 /*****************************************************************************/
 

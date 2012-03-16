@@ -147,11 +147,13 @@ void ec_datagram_pair_clear(
 
 /** Process received data.
  */
-unsigned int ec_datagram_pair_process(
-        ec_datagram_pair_t *pair /**< Datagram pair. */
+uint16_t ec_datagram_pair_process(
+        ec_datagram_pair_t *pair, /**< Datagram pair. */
+        uint16_t wc_sum[EC_NUM_DEVICES] /**< Working counter sums. */
         )
 {
-    unsigned int dev_idx, wc_sum = 0;
+    unsigned int dev_idx;
+    uint16_t pair_wc = 0;
 
     for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
         ec_datagram_t *datagram = &pair->datagrams[dev_idx];
@@ -159,35 +161,12 @@ unsigned int ec_datagram_pair_process(
         ec_datagram_output_stats(datagram);
 
         if (datagram->state == EC_DATAGRAM_RECEIVED) {
-            wc_sum += datagram->working_counter;
+            pair_wc += datagram->working_counter;
+            wc_sum[dev_idx] += datagram->working_counter;
         }
     }
 
-    return wc_sum;
-}
-
-/*****************************************************************************/
-
-/** Process received data.
- */
-int ec_datagram_pair_data_changed(
-        const ec_datagram_pair_t *pair,
-        size_t offset,
-        size_t size,
-        ec_device_index_t dev_idx
-        )
-{
-    uint8_t *sent = pair->send_buffer + offset;
-    uint8_t *recv = pair->datagrams[dev_idx].data + offset;
-    size_t i;
-
-    for (i = 0; i < size; i++) {
-        if (recv[i] != sent[i]) {
-            return 1;
-        }
-    }
-
-    return 0;
+    return pair_wc;
 }
 
 /*****************************************************************************/

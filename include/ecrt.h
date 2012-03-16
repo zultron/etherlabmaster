@@ -38,6 +38,10 @@
  * for realtime modules that want to use EtherCAT. There are functions to
  * request a master, to map process data, to communicate with slaves via CoE
  * and to configure and activate the bus.
+ * 
+ * Changed since 1.5:
+ *
+ * - Added redundancy_active flag to ec_domain_state_t.
  *
  * Changes in version 1.5:
  *
@@ -304,6 +308,7 @@ typedef enum {
 typedef struct {
     unsigned int working_counter; /**< Value of the last working counter. */
     ec_wc_state_t wc_state; /**< Working counter interpretation. */
+    unsigned int redundancy_active; /**< Redundant link is in use. */
 } ec_domain_state_t;
 
 /*****************************************************************************/
