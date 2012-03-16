@@ -48,14 +48,22 @@
  */
 typedef struct {
     struct list_head list; /**< List header. */
+    ec_domain_t *domain;
     ec_datagram_t datagrams[EC_NUM_DEVICES]; /**< Main and backup datagram.
                                                */
+    uint8_t *send_buffer;
+    unsigned int expected_working_counter; /**< Expectord working conter. */
 } ec_datagram_pair_t;
 
 /*****************************************************************************/
 
-void ec_datagram_pair_init(ec_datagram_pair_t *);
+int ec_datagram_pair_init(ec_datagram_pair_t *, ec_domain_t *, uint32_t,
+        uint8_t *, size_t, const unsigned int []);
 void ec_datagram_pair_clear(ec_datagram_pair_t *);
+
+unsigned int ec_datagram_pair_process(ec_datagram_pair_t *);
+int ec_datagram_pair_data_changed(const ec_datagram_pair_t *,
+                    size_t, size_t, ec_device_index_t);
 
 /*****************************************************************************/
 
