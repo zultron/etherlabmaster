@@ -537,6 +537,7 @@ int ec_cdev_ioctl_domain(
 {
     ec_ioctl_domain_t data;
     const ec_domain_t *domain;
+    unsigned int dev_idx;
 
     if (copy_from_user(&data, (void __user *) arg, sizeof(data))) {
         return -EFAULT;
@@ -553,9 +554,9 @@ int ec_cdev_ioctl_domain(
 
     data.data_size = domain->data_size;
     data.logical_base_address = domain->logical_base_address;
-    data.working_counter =
-        domain->working_counter[EC_DEVICE_MAIN]
-        + domain->working_counter[EC_DEVICE_BACKUP];
+    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        data.working_counter[dev_idx] = domain->working_counter[dev_idx];
+    }
     data.expected_working_counter = domain->expected_working_counter;
     data.fmmu_count = ec_domain_fmmu_count(domain);
 
