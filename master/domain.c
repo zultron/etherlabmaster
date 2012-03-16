@@ -43,6 +43,8 @@
 #include "domain.h"
 #include "datagram_pair.h"
 
+#define DEBUG_REDUNDANCY 0
+
 /*****************************************************************************/
 
 void ec_domain_clear_data(ec_domain_t *);
@@ -144,7 +146,6 @@ int ec_domain_add_datagram_pair(
 {
     ec_datagram_pair_t *datagram_pair;
     int ret;
-    unsigned int dev_idx;
 
     if (!(datagram_pair = kmalloc(sizeof(ec_datagram_pair_t), GFP_KERNEL))) {
         EC_MASTER_ERR(domain->master,
@@ -152,52 +153,20 @@ int ec_domain_add_datagram_pair(
         return -ENOMEM;
     }
 
-    ec_datagram_pair_init(datagram_pair);
-
-    /* backup datagram has its own memory */
-    ret = ec_datagram_prealloc(&datagram_pair->datagrams[EC_DEVICE_BACKUP],
-            data_size);
+    ret = ec_datagram_pair_init(datagram_pair, domain, logical_offset, data,
+            data_size, used);
     if (ret) {
-        ec_datagram_pair_clear(datagram_pair);
         kfree(datagram_pair);
         return ret;
     }
 
-    /* The ec_datagram_lxx() calls below can not fail, because either the
-     * datagram has external memory or it is preallocated. */
+    domain->expected_working_counter +=
+        datagram_pair->expected_working_counter;
 
-    if (used[EC_DIR_OUTPUT] && used[EC_DIR_INPUT]) { // inputs and outputs
-        ec_datagram_lrw_ext(&datagram_pair->datagrams[EC_DEVICE_MAIN],
-                logical_offset, data_size, data);
-        ec_datagram_lrw(&datagram_pair->datagrams[EC_DEVICE_BACKUP],
-                logical_offset, data_size);
+    EC_MASTER_DBG(domain->master, 1,
+            "Adding datagram pair with expected WC %u.\n",
+            datagram_pair->expected_working_counter);
 
-        // If LRW is used, output FMMUs increment the working counter by 2,
-        // while input FMMUs increment it by 1.
-        domain->expected_working_counter +=
-            used[EC_DIR_OUTPUT] * 2 + used[EC_DIR_INPUT];
-    } else if (used[EC_DIR_OUTPUT]) { // outputs only
-        ec_datagram_lwr_ext(&datagram_pair->datagrams[EC_DEVICE_MAIN],
-                logical_offset, data_size, data);
-        ec_datagram_lwr(&datagram_pair->datagrams[EC_DEVICE_BACKUP],
-                logical_offset, data_size);
-
-        domain->expected_working_counter += used[EC_DIR_OUTPUT];
-    } else { // inputs only (or nothing)
-        ec_datagram_lrd_ext(&datagram_pair->datagrams[EC_DEVICE_MAIN],
-                logical_offset, data_size, data);
-        ec_datagram_lrd(&datagram_pair->datagrams[EC_DEVICE_BACKUP],
-                logical_offset, data_size);
-
-        domain->expected_working_counter += used[EC_DIR_INPUT];
-    }
-
-    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
-        snprintf(datagram_pair->datagrams[dev_idx].name,
-                EC_DATAGRAM_NAME_SIZE, "domain%u-%u-%s", domain->index,
-                logical_offset, dev_idx ? "backup" : "main");
-        ec_datagram_zero(&datagram_pair->datagrams[dev_idx]);
-    }
 
     list_add_tail(&datagram_pair->list, &domain->datagram_pairs);
     return 0;
@@ -449,17 +418,91 @@ uint8_t *ecrt_domain_data(ec_domain_t *domain)
 void ecrt_domain_process(ec_domain_t *domain)
 {
     uint16_t working_counter_sum;
-    ec_datagram_pair_t *datagram_pair;
-    unsigned int dev_idx;
+    ec_datagram_pair_t *datagram_pair = NULL;
+    ec_fmmu_config_t *fmmu;
+    uint32_t logical_datagram_address;
+    unsigned int datagram_offset, datagram_pair_wc = 0;
+    size_t datagram_size;
+    ec_datagram_t *main_datagram;
+
+#if DEBUG_REDUNDANCY
+    EC_MASTER_DBG(domain->master, 1, "domain %u process\n", domain->index);
+#endif
 
     working_counter_sum = 0;
-    list_for_each_entry(datagram_pair, &domain->datagram_pairs, list) {
-        for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
-            ec_datagram_t *datagram = &datagram_pair->datagrams[dev_idx];
-            ec_datagram_output_stats(datagram);
-            if (datagram->state == EC_DATAGRAM_RECEIVED) {
-                working_counter_sum += datagram->working_counter;
-            }
+
+    if (!list_empty(&domain->datagram_pairs)) {
+        datagram_pair =
+            list_entry(domain->datagram_pairs.next, ec_datagram_pair_t, list);
+        main_datagram = &datagram_pair->datagrams[EC_DEVICE_MAIN];
+
+        logical_datagram_address = EC_READ_U32(main_datagram->address);
+        datagram_size = main_datagram->data_size;
+        datagram_offset =
+            fmmu->logical_start_address - logical_datagram_address;
+        datagram_pair_wc = ec_datagram_pair_process(datagram_pair);
+        working_counter_sum += datagram_pair_wc;
+#if DEBUG_REDUNDANCY
+        EC_MASTER_DBG(domain->master, 1, "dgram %s log=%u\n",
+                main_datagram->name, logical_datagram_address);
+#endif
+    }
+
+    /* Go through all FMMU configs to detect data changes. */
+    list_for_each_entry(fmmu, &domain->fmmu_configs, list) {
+#if DEBUG_REDUNDANCY
+        EC_MASTER_DBG(domain->master, 1, "fmmu log=%u size=%u dir=%u\n",
+                fmmu->logical_start_address, fmmu->data_size, fmmu->dir);
+#endif
+        if (fmmu->dir != EC_DIR_INPUT) {
+            continue;
+        }
+
+        logical_datagram_address =
+            EC_READ_U32(datagram_pair->datagrams[EC_DEVICE_MAIN].address);
+        datagram_size = datagram_pair->datagrams[EC_DEVICE_MAIN].data_size;
+        datagram_offset =
+            fmmu->logical_start_address - logical_datagram_address;
+        while (datagram_offset >= datagram_size) {
+
+            datagram_pair = list_entry(datagram_pair->list.next,
+                    ec_datagram_pair_t, list);
+            main_datagram = &datagram_pair->datagrams[EC_DEVICE_MAIN];
+
+            logical_datagram_address = EC_READ_U32(main_datagram->address);
+            datagram_size = main_datagram->data_size;
+            datagram_offset =
+                fmmu->logical_start_address - logical_datagram_address;
+            datagram_pair_wc = ec_datagram_pair_process(datagram_pair);
+            working_counter_sum += datagram_pair_wc;
+#if DEBUG_REDUNDANCY
+            EC_MASTER_DBG(domain->master, 1, "dgram %s log=%u\n",
+                    main_datagram->name, logical_datagram_address);
+#endif
+        }
+
+#if DEBUG_REDUNDANCY
+        EC_MASTER_DBG(domain->master, 1, "input fmmu log=%u size=%u"
+                " using datagram %s offset=%u\n",
+                fmmu->logical_start_address, fmmu->data_size,
+                datagram_pair->datagrams[EC_DEVICE_MAIN].name,
+                datagram_offset);
+#endif
+
+        if (ec_datagram_pair_data_changed(datagram_pair,
+                    datagram_offset, fmmu->data_size, EC_DEVICE_MAIN)) {
+            /* data changed on main link. no copying necessary. */
+        } else if (ec_datagram_pair_data_changed(datagram_pair,
+                    datagram_offset, fmmu->data_size, EC_DEVICE_BACKUP)
+                || (datagram_pair_wc
+                == datagram_pair->expected_working_counter)) {
+            /* data changed on backup link or no change and complete WC.
+             * copy to main memory. */
+            uint8_t *target = datagram_pair->datagrams[EC_DEVICE_MAIN].data +
+                datagram_offset;
+            uint8_t *source = datagram_pair->datagrams[EC_DEVICE_BACKUP].data +
+                datagram_offset;
+            memcpy(target, source, fmmu->data_size);
         }
     }
 
@@ -494,6 +537,11 @@ void ecrt_domain_queue(ec_domain_t *domain)
     unsigned int dev_idx;
 
     list_for_each_entry(datagram_pair, &domain->datagram_pairs, list) {
+
+        /* copy main data to send buffer */
+        memcpy(datagram_pair->send_buffer,
+                datagram_pair->datagrams[EC_DEVICE_MAIN].data,
+                datagram_pair->datagrams[EC_DEVICE_MAIN].data_size);
 
         /* copy main data to backup datagram */
         memcpy(datagram_pair->datagrams[EC_DEVICE_BACKUP].data,

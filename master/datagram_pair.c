@@ -34,23 +34,94 @@
 
 /*****************************************************************************/
 
+#include <linux/slab.h>
+
+#include "master.h"
 #include "datagram_pair.h"
 
 /*****************************************************************************/
 
 /** Datagram pair constructor.
  */
-void ec_datagram_pair_init(
-        ec_datagram_pair_t *pair /**< Datagram pair. */
+int ec_datagram_pair_init(
+        ec_datagram_pair_t *pair, /**< Datagram pair. */
+        ec_domain_t *domain, /**< Parent domain. */
+        uint32_t logical_offset,
+        uint8_t *data,
+        size_t data_size, /**< Data size. */
+        const unsigned int used[] /**< input/output use count. */
         )
 {
-    unsigned int i;
+    unsigned int dev_idx;
+    int ret;
 
     INIT_LIST_HEAD(&pair->list);
+    pair->domain = domain;
 
-    for (i = 0; i < EC_NUM_DEVICES; i++) {
-        ec_datagram_init(&pair->datagrams[i]);
+    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        ec_datagram_init(&pair->datagrams[dev_idx]);
+        snprintf(pair->datagrams[dev_idx].name,
+                EC_DATAGRAM_NAME_SIZE, "domain%u-%u-%s", domain->index,
+                logical_offset, dev_idx ? "backup" : "main");
     }
+
+    pair->expected_working_counter = 0U;
+
+    /* backup datagram has its own memory */
+    ret = ec_datagram_prealloc(&pair->datagrams[EC_DEVICE_BACKUP],
+            data_size);
+    if (ret) {
+        goto out_datagrams;
+    }
+
+    if (!(pair->send_buffer = kmalloc(data_size, GFP_KERNEL))) {
+        EC_MASTER_ERR(domain->master,
+                "Failed to allocate domain send buffer!\n");
+        ret = -ENOMEM;
+        goto out_datagrams;
+    }
+
+    /* The ec_datagram_lxx() calls below can not fail, because either the
+     * datagram has external memory or it is preallocated. */
+
+    if (used[EC_DIR_OUTPUT] && used[EC_DIR_INPUT]) { // inputs and outputs
+        ec_datagram_lrw_ext(&pair->datagrams[EC_DEVICE_MAIN],
+                logical_offset, data_size, data);
+        ec_datagram_lrw(&pair->datagrams[EC_DEVICE_BACKUP],
+                logical_offset, data_size);
+
+        // If LRW is used, output FMMUs increment the working counter by 2,
+        // while input FMMUs increment it by 1.
+        pair->expected_working_counter =
+            used[EC_DIR_OUTPUT] * 2 + used[EC_DIR_INPUT];
+    } else if (used[EC_DIR_OUTPUT]) { // outputs only
+        ec_datagram_lwr_ext(&pair->datagrams[EC_DEVICE_MAIN],
+                logical_offset, data_size, data);
+        ec_datagram_lwr(&pair->datagrams[EC_DEVICE_BACKUP],
+                logical_offset, data_size);
+
+        pair->expected_working_counter = used[EC_DIR_OUTPUT];
+    } else { // inputs only (or nothing)
+        ec_datagram_lrd_ext(&pair->datagrams[EC_DEVICE_MAIN],
+                logical_offset, data_size, data);
+        ec_datagram_lrd(&pair->datagrams[EC_DEVICE_BACKUP],
+                logical_offset, data_size);
+
+        pair->expected_working_counter = used[EC_DIR_INPUT];
+    }
+
+    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        ec_datagram_zero(&pair->datagrams[dev_idx]);
+    }
+
+    return 0;
+
+out_datagrams:
+    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        ec_datagram_clear(&pair->datagrams[dev_idx]);
+    }
+
+    return ret;
 }
 
 /*****************************************************************************/
@@ -61,11 +132,62 @@ void ec_datagram_pair_clear(
         ec_datagram_pair_t *pair /**< Datagram pair. */
         )
 {
-    unsigned int i;
+    unsigned int dev_idx;
 
-    for (i = 0; i < EC_NUM_DEVICES; i++) {
-        ec_datagram_clear(&pair->datagrams[i]);
+    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        ec_datagram_clear(&pair->datagrams[dev_idx]);
     }
+
+    if (pair->send_buffer) {
+        kfree(pair->send_buffer);
+    }
+}
+
+/*****************************************************************************/
+
+/** Process received data.
+ */
+unsigned int ec_datagram_pair_process(
+        ec_datagram_pair_t *pair /**< Datagram pair. */
+        )
+{
+    unsigned int dev_idx, wc_sum = 0;
+
+    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        ec_datagram_t *datagram = &pair->datagrams[dev_idx];
+
+        ec_datagram_output_stats(datagram);
+
+        if (datagram->state == EC_DATAGRAM_RECEIVED) {
+            wc_sum += datagram->working_counter;
+        }
+    }
+
+    return wc_sum;
+}
+
+/*****************************************************************************/
+
+/** Process received data.
+ */
+int ec_datagram_pair_data_changed(
+        const ec_datagram_pair_t *pair,
+        size_t offset,
+        size_t size,
+        ec_device_index_t dev_idx
+        )
+{
+    uint8_t *sent = pair->send_buffer + offset;
+    uint8_t *recv = pair->datagrams[dev_idx].data + offset;
+    size_t i;
+
+    for (i = 0; i < size; i++) {
+        if (recv[i] != sent[i]) {
+            return 1;
+        }
+    }
+
+    return 0;
 }
 
 /*****************************************************************************/
