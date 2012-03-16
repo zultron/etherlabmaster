@@ -56,7 +56,7 @@
  *
  * Increment this when changing the ioctl interface!
  */
-#define EC_IOCTL_VERSION_MAGIC 14
+#define EC_IOCTL_VERSION_MAGIC 15
 
 // Command-line tool
 #define EC_IOCTL_MODULE                EC_IOR(0x00, ec_ioctl_module_t)
@@ -290,7 +290,7 @@ typedef struct {
     // outputs
     uint32_t data_size;
     uint32_t logical_base_address;
-    uint16_t working_counter;
+    uint16_t working_counter[EC_NUM_DEVICES];
     uint16_t expected_working_counter;
     uint32_t fmmu_count;
 } ec_ioctl_domain_t;
