@@ -553,7 +553,9 @@ int ec_cdev_ioctl_domain(
 
     data.data_size = domain->data_size;
     data.logical_base_address = domain->logical_base_address;
-    data.working_counter = domain->working_counter;
+    data.working_counter =
+        domain->working_counter[EC_DEVICE_MAIN]
+        + domain->working_counter[EC_DEVICE_BACKUP];
     data.expected_working_counter = domain->expected_working_counter;
     data.fmmu_count = ec_domain_fmmu_count(domain);
 
