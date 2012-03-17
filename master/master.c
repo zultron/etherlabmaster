@@ -2263,7 +2263,7 @@ void ecrt_master_send(ec_master_t *master)
 
             // clear frame statistics
             ec_device_clear_stats(&master->devices[i]);
-            return;
+            continue;
         }
 
         // send frames
