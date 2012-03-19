@@ -1229,9 +1229,8 @@ void ec_master_update_device_stats(
         )
 {
     ec_device_stats_t *s = &master->device_stats;
-    u32 tx_frame_rate, rx_frame_rate, tx_byte_rate, rx_byte_rate;
+    s32 tx_frame_rate, rx_frame_rate, tx_byte_rate, rx_byte_rate, loss_rate;
     u64 loss;
-    s32 loss_rate;
     unsigned int i;
 
     // frame statistics
@@ -1239,27 +1238,26 @@ void ec_master_update_device_stats(
         return;
     }
 
-    tx_frame_rate = (u32) (s->tx_count - s->last_tx_count) * 1000;
-    rx_frame_rate = (u32) (s->rx_count - s->last_rx_count) * 1000;
-    tx_byte_rate = (s->tx_bytes - s->last_tx_bytes);
-    rx_byte_rate = (s->rx_bytes - s->last_rx_bytes);
+    tx_frame_rate = (s->tx_count - s->last_tx_count) * 1000;
+    rx_frame_rate = (s->rx_count - s->last_rx_count) * 1000;
+    tx_byte_rate = s->tx_bytes - s->last_tx_bytes;
+    rx_byte_rate = s->rx_bytes - s->last_rx_bytes;
     loss = s->tx_count - s->rx_count;
-    loss_rate = (s32) (loss - s->last_loss) * 1000;
+    loss_rate = (loss - s->last_loss) * 1000;
 
+    /* Low-pass filter:
+     *      Y_n = y_(n - 1) + T / tau * (x - y_(n - 1))   | T = 1
+     *   -> Y_n += (x - y_(n - 1)) / tau
+     */
     for (i = 0; i < EC_RATE_COUNT; i++) {
-        unsigned int n = rate_intervals[i];
-        s->tx_frame_rates[i] =
-            (s->tx_frame_rates[i] * (n - 1) + tx_frame_rate) / n;
-        s->rx_frame_rates[i] =
-            (s->rx_frame_rates[i] * (n - 1) + rx_frame_rate) / n;
-        s->tx_byte_rates[i] =
-            (s->tx_byte_rates[i] * (n - 1) + tx_byte_rate) / n;
-        s->rx_byte_rates[i] =
-            (s->rx_byte_rates[i] * (n - 1) + rx_byte_rate) / n;
-        s->loss_rates[i] =
-            (s->loss_rates[i] * (n - 1) + loss_rate) / n;
-
+        s32 n = rate_intervals[i];
+        s->tx_frame_rates[i] += (tx_frame_rate - s->tx_frame_rates[i]) / n;
+        s->rx_frame_rates[i] += (rx_frame_rate - s->rx_frame_rates[i]) / n;
+        s->tx_byte_rates[i] += (tx_byte_rate - s->tx_byte_rates[i]) / n;
+        s->rx_byte_rates[i] += (rx_byte_rate - s->rx_byte_rates[i]) / n;
+        s->loss_rates[i] += (loss_rate - s->loss_rates[i]) / n;
     }
+
     s->last_tx_count = s->tx_count;
     s->last_rx_count = s->rx_count;
     s->last_tx_bytes = s->tx_bytes;
