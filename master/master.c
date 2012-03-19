@@ -1264,6 +1264,7 @@ void ec_master_update_device_stats(
     s->last_rx_count = s->rx_count;
     s->last_tx_bytes = s->tx_bytes;
     s->last_rx_bytes = s->rx_bytes;
+    s->last_loss = loss;
 
     ec_device_update_stats(&master->devices[EC_DEVICE_MAIN]);
     ec_device_update_stats(&master->devices[EC_DEVICE_BACKUP]);
