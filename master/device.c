@@ -465,25 +465,25 @@ void ec_device_update_stats(
 {
     unsigned int i;
 
-    u32 tx_frame_rate =
-        (u32) (device->tx_count - device->last_tx_count) * 1000;
-    u32 rx_frame_rate =
-        (u32) (device->rx_count - device->last_rx_count) * 1000;
-    u32 tx_byte_rate =
-        (device->tx_bytes - device->last_tx_bytes);
-    u32 rx_byte_rate =
-        (device->rx_bytes - device->last_rx_bytes);
+    s32 tx_frame_rate = (device->tx_count - device->last_tx_count) * 1000;
+    s32 rx_frame_rate = (device->rx_count - device->last_rx_count) * 1000;
+    s32 tx_byte_rate = (device->tx_bytes - device->last_tx_bytes);
+    s32 rx_byte_rate = (device->rx_bytes - device->last_rx_bytes);
 
+    /* Low-pass filter:
+     *      Y_n = y_(n - 1) + T / tau * (x - y_(n - 1))   | T = 1
+     *   -> Y_n += (x - y_(n - 1)) / tau
+     */
     for (i = 0; i < EC_RATE_COUNT; i++) {
-        unsigned int n = rate_intervals[i];
-        device->tx_frame_rates[i] =
-            (device->tx_frame_rates[i] * (n - 1) + tx_frame_rate) / n;
-        device->rx_frame_rates[i] =
-            (device->rx_frame_rates[i] * (n - 1) + rx_frame_rate) / n;
-        device->tx_byte_rates[i] =
-            (device->tx_byte_rates[i] * (n - 1) + tx_byte_rate) / n;
-        device->rx_byte_rates[i] =
-            (device->rx_byte_rates[i] * (n - 1) + rx_byte_rate) / n;
+        s32 n = rate_intervals[i];
+        device->tx_frame_rates[i] +=
+            (tx_frame_rate - device->tx_frame_rates[i]) / n;
+        device->rx_frame_rates[i] +=
+            (rx_frame_rate - device->rx_frame_rates[i]) / n;
+        device->tx_byte_rates[i] +=
+            (tx_byte_rate - device->tx_byte_rates[i]) / n;
+        device->rx_byte_rates[i] +=
+            (rx_byte_rate - device->rx_byte_rates[i]) / n;
     }
 
     device->last_tx_count = device->tx_count;

@@ -151,19 +151,17 @@ typedef struct {
     u64 last_rx_bytes; /**< Number of bytes received of last statistics cycle.
                         */
     u64 last_loss; /**< Tx/Rx difference of last statistics cycle. */
-    unsigned int tx_frame_rates[EC_RATE_COUNT]; /**< Transmit rates in
-                                                  frames/s for different
-                                                  statistics cycle periods. */
-    unsigned int rx_frame_rates[EC_RATE_COUNT]; /**< Receive rates in
-                                                  frames/s for different
-                                                  statistics cycle periods. */
-    unsigned int tx_byte_rates[EC_RATE_COUNT]; /**< Transmit rates in byte/s
-                                                 for different statistics
-                                                 cycle periods. */
-    unsigned int rx_byte_rates[EC_RATE_COUNT]; /**< Receive rates in byte/s
-                                                 for different statistics
-                                                 cycle periods. */
-    int loss_rates[EC_RATE_COUNT]; /**< Frame loss rates for different
+    s32 tx_frame_rates[EC_RATE_COUNT]; /**< Transmit rates in frames/s for
+                                         different statistics cycle periods.
+                                        */
+    s32 rx_frame_rates[EC_RATE_COUNT]; /**< Receive rates in frames/s for
+                                         different statistics cycle periods.
+                                        */
+    s32 tx_byte_rates[EC_RATE_COUNT]; /**< Transmit rates in byte/s for
+                                        different statistics cycle periods. */
+    s32 rx_byte_rates[EC_RATE_COUNT]; /**< Receive rates in byte/s for
+                                        different statistics cycle periods. */
+    s32 loss_rates[EC_RATE_COUNT]; /**< Frame loss rates for different
                                      statistics cycle periods. */
     unsigned long jiffies; /**< Jiffies of last statistic cycle. */
 } ec_device_stats_t;
