@@ -183,7 +183,8 @@ typedef struct ec_voe_handler ec_voe_handler_t; /**< \see ec_voe_handler. */
  * \see ecrt_master_state().
  */
 typedef struct {
-    unsigned int slaves_responding; /**< Number of slaves in the bus. */
+    unsigned int slaves_responding; /**< Sum of responding slaves on all
+                                      Ethernet devices. */
     unsigned int al_states : 4; /**< Application-layer states of all slaves.
                                   The states are coded in the lower 4 bits.
                                   If a bit is set, it means that at least one
@@ -193,7 +194,8 @@ typedef struct {
                                   - Bit 1: \a PREOP
                                   - Bit 2: \a SAFEOP
                                   - Bit 3: \a OP */
-    unsigned int link_up : 1; /**< \a true, if the network link is up. */
+    unsigned int link_up : 1; /**< \a true, if at least one Ethernet link is
+                                up. */
 } ec_master_state_t;
 
 /*****************************************************************************/
