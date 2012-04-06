@@ -52,17 +52,18 @@ int ec_datagram_pair_init(
         const unsigned int used[] /**< input/output use count. */
         )
 {
-    unsigned int dev_idx;
+    ec_device_index_t dev_idx;
     int ret;
 
     INIT_LIST_HEAD(&pair->list);
     pair->domain = domain;
 
-    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES; dev_idx++) {
         ec_datagram_init(&pair->datagrams[dev_idx]);
         snprintf(pair->datagrams[dev_idx].name,
                 EC_DATAGRAM_NAME_SIZE, "domain%u-%u-%s", domain->index,
-                logical_offset, dev_idx ? "backup" : "main");
+                logical_offset, ec_device_names[dev_idx]);
+        pair->datagrams[dev_idx].device_index = dev_idx;
     }
 
     pair->expected_working_counter = 0U;

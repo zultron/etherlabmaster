@@ -294,6 +294,7 @@ int ec_cdev_ioctl_slave(
         return -EINVAL;
     }
 
+    data.device_index = slave->device_index;
     data.vendor_id = slave->sii.vendor_id;
     data.product_code = slave->sii.product_code;
     data.revision_number = slave->sii.revision_number;

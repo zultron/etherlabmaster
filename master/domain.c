@@ -585,7 +585,7 @@ void ecrt_domain_process(ec_domain_t *domain)
 void ecrt_domain_queue(ec_domain_t *domain)
 {
     ec_datagram_pair_t *datagram_pair;
-    unsigned int dev_idx;
+    ec_device_index_t dev_idx;
 
     list_for_each_entry(datagram_pair, &domain->datagram_pairs, list) {
 
@@ -599,9 +599,9 @@ void ecrt_domain_queue(ec_domain_t *domain)
                 datagram_pair->datagrams[EC_DEVICE_MAIN].data,
                 datagram_pair->datagrams[EC_DEVICE_MAIN].data_size);
 
-        for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES; dev_idx++) {
             ec_master_queue_datagram(domain->master,
-                    &datagram_pair->datagrams[dev_idx], dev_idx);
+                    &datagram_pair->datagrams[dev_idx]);
         }
     }
 }
