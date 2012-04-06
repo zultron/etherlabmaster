@@ -67,6 +67,7 @@ void ec_fsm_master_state_sdo_dictionary(ec_fsm_master_t *);
 void ec_fsm_master_state_sdo_request(ec_fsm_master_t *);
 void ec_fsm_master_state_reg_request(ec_fsm_master_t *);
 
+void ec_fsm_master_enter_clear_addresses(ec_fsm_master_t *);
 void ec_fsm_master_enter_write_system_times(ec_fsm_master_t *);
 
 /*****************************************************************************/
@@ -79,14 +80,19 @@ void ec_fsm_master_init(
         ec_datagram_t *datagram /**< Datagram object to use. */
         )
 {
+    ec_device_index_t dev_idx;
+
     fsm->master = master;
     fsm->datagram = datagram;
     fsm->state = ec_fsm_master_state_start;
     fsm->idle = 0;
-    fsm->link_state = 0;
-    fsm->slaves_responding = 0;
+    fsm->dev_idx = EC_DEVICE_MAIN;
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        fsm->link_state[dev_idx] = 0;
+        fsm->slaves_responding[dev_idx] = 0;
+        fsm->slave_states[dev_idx] = EC_SLAVE_STATE_UNKNOWN;
+    }
     fsm->rescan_required = 0;
-    fsm->slave_states = EC_SLAVE_STATE_UNKNOWN;
 
     // init sub-state-machines
     ec_fsm_coe_init(&fsm->fsm_coe, fsm->datagram);
@@ -159,6 +165,7 @@ void ec_fsm_master_restart(
         ec_fsm_master_t *fsm /**< Master state machine. */
         )
 {
+    fsm->dev_idx = EC_DEVICE_MAIN;
     fsm->state = ec_fsm_master_state_start;
     fsm->state(fsm); // execute immediately
 }
@@ -178,6 +185,7 @@ void ec_fsm_master_state_start(
     fsm->idle = 1;
     ec_datagram_brd(fsm->datagram, 0x0130, 2);
     ec_datagram_zero(fsm->datagram);
+    fsm->datagram->device_index = fsm->dev_idx;
     fsm->state = ec_fsm_master_state_broadcast;
 }
 
@@ -196,48 +204,58 @@ void ec_fsm_master_state_broadcast(
     ec_slave_t *slave;
     ec_master_t *master = fsm->master;
 
-    if (datagram->state == EC_DATAGRAM_TIMED_OUT)
-        return; // always retry
-
     // bus topology change?
-    if (datagram->working_counter != fsm->slaves_responding) {
+    if (datagram->working_counter != fsm->slaves_responding[fsm->dev_idx]) {
         fsm->rescan_required = 1;
-        fsm->slaves_responding = datagram->working_counter;
-        EC_MASTER_INFO(master, "%u slave(s) responding.\n",
-                fsm->slaves_responding);
+        fsm->slaves_responding[fsm->dev_idx] = datagram->working_counter;
+        EC_MASTER_INFO(master, "%u slave(s) responding on %s device.\n",
+                fsm->slaves_responding[fsm->dev_idx],
+                ec_device_names[fsm->dev_idx]);
     }
 
-    if (fsm->link_state && !master->devices[EC_DEVICE_MAIN].link_state) {
-        // link went down
+    if (fsm->link_state[fsm->dev_idx] &&
+            !master->devices[fsm->dev_idx].link_state) {
+        ec_device_index_t dev_idx;
+
         EC_MASTER_DBG(master, 1, "Master state machine detected "
-                "link down. Clearing slave list.\n");
+                "link down on %s device. Clearing slave list.\n",
+                ec_device_names[fsm->dev_idx]);
 
 #ifdef EC_EOE
         ec_master_eoe_stop(master);
         ec_master_clear_eoe_handlers(master);
 #endif
         ec_master_clear_slaves(master);
-        fsm->slave_states = 0x00;
-        fsm->slaves_responding = 0; /* reset to trigger rescan on next link
-                                       up. */
-    }
-    fsm->link_state = master->devices[EC_DEVICE_MAIN].link_state;
 
-    if (datagram->state != EC_DATAGRAM_RECEIVED) {
-        ec_fsm_master_restart(fsm);
-        return;
+        for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+            fsm->slave_states[dev_idx] = 0x00;
+            fsm->slaves_responding[dev_idx] = 0; /* Reset to trigger rescan on
+                                                    next link up. */
+        }
     }
+    fsm->link_state[fsm->dev_idx] = master->devices[fsm->dev_idx].link_state;
 
-    if (fsm->slaves_responding) {
+    if (datagram->state == EC_DATAGRAM_RECEIVED &&
+            fsm->slaves_responding[fsm->dev_idx]) {
         uint8_t states = EC_READ_U8(datagram->data);
-        if (states != fsm->slave_states) { // slave states changed?
+        if (states != fsm->slave_states[fsm->dev_idx]) {
+            // slave states changed
             char state_str[EC_STATE_STRING_SIZE];
-            fsm->slave_states = states;
-            ec_state_string(fsm->slave_states, state_str, 1);
-            EC_MASTER_INFO(master, "Slave states: %s.\n", state_str);
+            fsm->slave_states[fsm->dev_idx] = states;
+            ec_state_string(states, state_str, 1);
+            EC_MASTER_INFO(master, "Slave states on %s device: %s.\n",
+                    ec_device_names[fsm->dev_idx], state_str);
         }
     } else {
-        fsm->slave_states = 0x00;
+        fsm->slave_states[fsm->dev_idx] = 0x00;
+    }
+
+    fsm->dev_idx++;
+    if (fsm->dev_idx < EC_NUM_DEVICES) {
+        // check number of responding slaves on next device
+        fsm->state = ec_fsm_master_state_start;
+        fsm->state(fsm); // execute immediately
+        return;
     }
 
     if (fsm->rescan_required) {
@@ -245,6 +263,9 @@ void ec_fsm_master_state_broadcast(
         if (!master->allow_scan) {
             up(&master->scan_sem);
         } else {
+            unsigned int count = 0, next_dev_slave, ring_position;
+            ec_device_index_t dev_idx;
+
             master->scan_busy = 1;
             up(&master->scan_sem);
 
@@ -259,9 +280,12 @@ void ec_fsm_master_state_broadcast(
 #endif
             ec_master_clear_slaves(master);
 
-            master->slave_count = fsm->slaves_responding;
+            for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES;
+                    dev_idx++) {
+                count += fsm->slaves_responding[dev_idx];
+            }
 
-            if (!master->slave_count) {
+            if (!count) {
                 // no slaves present -> finish state machine.
                 master->scan_busy = 0;
                 wake_up_interruptible(&master->scan_queue);
@@ -269,12 +293,11 @@ void ec_fsm_master_state_broadcast(
                 return;
             }
 
-            size = sizeof(ec_slave_t) * master->slave_count;
+            size = sizeof(ec_slave_t) * count;
             if (!(master->slaves =
                         (ec_slave_t *) kmalloc(size, GFP_KERNEL))) {
                 EC_MASTER_ERR(master, "Failed to allocate %u bytes"
                         " of slave memory!\n", size);
-                master->slave_count = 0; // TODO avoid retrying scan!
                 master->scan_busy = 0;
                 wake_up_interruptible(&master->scan_queue);
                 ec_fsm_master_restart(fsm);
@@ -282,21 +305,35 @@ void ec_fsm_master_state_broadcast(
             }
 
             // init slaves
-            for (i = 0; i < master->slave_count; i++) {
+            dev_idx = EC_DEVICE_MAIN;
+            next_dev_slave = fsm->slaves_responding[dev_idx];
+            ring_position = 0;
+            for (i = 0; i < count; i++, ring_position++) {
                 slave = master->slaves + i;
-                ec_slave_init(slave, master, i, i + 1);
+                while (i >= next_dev_slave) {
+                    dev_idx++;
+                    next_dev_slave += fsm->slaves_responding[dev_idx];
+                    ring_position = 0;
+                }
+
+                ec_slave_init(slave, master, dev_idx, ring_position, i + 1);
 
                 // do not force reconfiguration in operation phase to avoid
                 // unnecesssary process data interruptions
-                if (master->phase != EC_OPERATION)
+                if (master->phase != EC_OPERATION) {
                     slave->force_config = 1;
+                }
+            }
+            master->slave_count = count;
+
+            /* start with first device with slaves responding; at least one
+             * has responding slaves, otherwise count would be zero. */
+            fsm->dev_idx = EC_DEVICE_MAIN;
+            while (!fsm->slaves_responding[fsm->dev_idx]) {
+                fsm->dev_idx++;
             }
 
-            // broadcast clear all station addresses
-            ec_datagram_bwr(datagram, 0x0010, 2);
-            EC_WRITE_U16(datagram->data, 0x0000);
-            fsm->retries = EC_FSM_RETRIES;
-            fsm->state = ec_fsm_master_state_clear_addresses;
+            ec_fsm_master_enter_clear_addresses(fsm);
             return;
         }
     }
@@ -318,6 +355,7 @@ void ec_fsm_master_state_broadcast(
             ec_datagram_fprd(fsm->datagram, fsm->slave->station_address,
                     0x0130, 2);
             ec_datagram_zero(datagram);
+            fsm->datagram->device_index = fsm->slave->device_index;
             fsm->retries = EC_FSM_RETRIES;
             fsm->state = ec_fsm_master_state_read_state;
         }
@@ -411,6 +449,7 @@ int ec_fsm_master_action_process_register(
                     request->offset, request->length);
             memcpy(fsm->datagram->data, request->data, request->length);
         }
+        fsm->datagram->device_index = request->slave->device_index;
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_master_state_reg_request;
         return 1;
@@ -518,6 +557,7 @@ void ec_fsm_master_action_idle(
         fsm->state = ec_fsm_master_state_sdo_dictionary;
         ec_fsm_coe_dictionary(&fsm->fsm_coe, slave);
         ec_fsm_coe_exec(&fsm->fsm_coe); // execute immediately
+        fsm->datagram->device_index = fsm->slave->device_index;
         return;
     }
 
@@ -550,6 +590,7 @@ void ec_fsm_master_action_next_slave_state(
         ec_datagram_fprd(fsm->datagram,
                 fsm->slave->station_address, 0x0130, 2);
         ec_datagram_zero(fsm->datagram);
+        fsm->datagram->device_index = fsm->slave->device_index;
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_master_state_read_state;
         return;
@@ -607,6 +648,7 @@ void ec_fsm_master_action_configure(
         fsm->state = ec_fsm_master_state_configure_slave;
         ec_fsm_slave_config_start(&fsm->fsm_slave_config, slave);
         fsm->state(fsm); // execute immediately
+        fsm->datagram->device_index = fsm->slave->device_index;
         return;
     }
 
@@ -680,8 +722,9 @@ void ec_fsm_master_state_acknowledge(
 {
     ec_slave_t *slave = fsm->slave;
 
-    if (ec_fsm_change_exec(&fsm->fsm_change))
+    if (ec_fsm_change_exec(&fsm->fsm_change)) {
         return;
+    }
 
     if (!ec_fsm_change_success(&fsm->fsm_change)) {
         fsm->slave->error_flag = 1;
@@ -689,6 +732,22 @@ void ec_fsm_master_state_acknowledge(
     }
 
     ec_fsm_master_action_configure(fsm);
+}
+
+/*****************************************************************************/
+
+/** Start clearing slave addresses.
+ */
+void ec_fsm_master_enter_clear_addresses(
+        ec_fsm_master_t *fsm /**< Master state machine. */
+        )
+{
+    // broadcast clear all station addresses
+    ec_datagram_bwr(fsm->datagram, 0x0010, 2);
+    EC_WRITE_U16(fsm->datagram->data, 0x0000);
+    fsm->datagram->device_index = fsm->dev_idx;
+    fsm->retries = EC_FSM_RETRIES;
+    fsm->state = ec_fsm_master_state_clear_addresses;
 }
 
 /*****************************************************************************/
@@ -702,12 +761,14 @@ void ec_fsm_master_state_clear_addresses(
     ec_master_t *master = fsm->master;
     ec_datagram_t *datagram = fsm->datagram;
 
-    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--)
+    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--) {
         return;
+    }
 
     if (datagram->state != EC_DATAGRAM_RECEIVED) {
         EC_MASTER_ERR(master, "Failed to receive address"
-                " clearing datagram: ");
+                " clearing datagram on %s link: ",
+                ec_device_names[fsm->dev_idx]);
         ec_datagram_print_state(datagram);
         master->scan_busy = 0;
         wake_up_interruptible(&master->scan_queue);
@@ -715,17 +776,20 @@ void ec_fsm_master_state_clear_addresses(
         return;
     }
 
-    if (datagram->working_counter != master->slave_count) {
-        EC_MASTER_WARN(master, "Failed to clear all station addresses:"
+    if (datagram->working_counter != fsm->slaves_responding[fsm->dev_idx]) {
+        EC_MASTER_WARN(master, "Failed to clear station addresses on %s link:"
                 " Cleared %u of %u",
-                datagram->working_counter, master->slave_count);
+                ec_device_names[fsm->dev_idx], datagram->working_counter,
+                fsm->slaves_responding[fsm->dev_idx]);
     }
 
     EC_MASTER_DBG(master, 1, "Sending broadcast-write"
-            " to measure transmission delays.\n");
+            " to measure transmission delays on %s link.\n",
+            ec_device_names[fsm->dev_idx]);
 
     ec_datagram_bwr(datagram, 0x0900, 1);
     ec_datagram_zero(datagram);
+    fsm->datagram->device_index = fsm->dev_idx;
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_master_state_dc_measure_delays;
 }
@@ -745,7 +809,8 @@ void ec_fsm_master_state_dc_measure_delays(
         return;
 
     if (datagram->state != EC_DATAGRAM_RECEIVED) {
-        EC_MASTER_ERR(master, "Failed to receive delay measuring datagram: ");
+        EC_MASTER_ERR(master, "Failed to receive delay measuring datagram"
+                " on %s link: ", ec_device_names[fsm->dev_idx]);
         ec_datagram_print_state(datagram);
         master->scan_busy = 0;
         wake_up_interruptible(&master->scan_queue);
@@ -753,16 +818,30 @@ void ec_fsm_master_state_dc_measure_delays(
         return;
     }
 
-    EC_MASTER_DBG(master, 1, "%u slaves responded to delay measuring.\n",
-            datagram->working_counter);
+    EC_MASTER_DBG(master, 1, "%u slaves responded to delay measuring"
+            " on %s link.\n",
+            datagram->working_counter, ec_device_names[fsm->dev_idx]);
+
+    do {
+        fsm->dev_idx++;
+    } while (fsm->dev_idx < EC_NUM_DEVICES &&
+            !fsm->slaves_responding[fsm->dev_idx]);
+    if (fsm->dev_idx < EC_NUM_DEVICES) {
+        ec_fsm_master_enter_clear_addresses(fsm);
+        return;
+    }
 
     EC_MASTER_INFO(master, "Scanning bus.\n");
 
     // begin scanning of slaves
     fsm->slave = master->slaves;
+    EC_MASTER_DBG(master, 1, "Scanning slave %u on %s link.\n",
+            fsm->slave->ring_position,
+            ec_device_names[fsm->slave->device_index]);
     fsm->state = ec_fsm_master_state_scan_slave;
     ec_fsm_slave_scan_start(&fsm->fsm_slave_scan, fsm->slave);
     ec_fsm_slave_scan_exec(&fsm->fsm_slave_scan); // execute immediately
+    fsm->datagram->device_index = fsm->slave->device_index;
 }
 
 /*****************************************************************************/
@@ -779,8 +858,10 @@ void ec_fsm_master_state_scan_slave(
 #ifdef EC_EOE
     ec_slave_t *slave = fsm->slave;
 #endif
-    if (ec_fsm_slave_scan_exec(&fsm->fsm_slave_scan))
+
+    if (ec_fsm_slave_scan_exec(&fsm->fsm_slave_scan)) {
         return;
+    }
 
 #ifdef EC_EOE
     if (slave->sii.mailbox_protocols & EC_MBOX_EOE) {
@@ -800,8 +881,12 @@ void ec_fsm_master_state_scan_slave(
     // another slave to fetch?
     fsm->slave++;
     if (fsm->slave < master->slaves + master->slave_count) {
+        EC_MASTER_DBG(master, 1, "Scanning slave %u on %s link.\n",
+                fsm->slave->ring_position,
+                ec_device_names[fsm->slave->device_index]);
         ec_fsm_slave_scan_start(&fsm->fsm_slave_scan, fsm->slave);
         ec_fsm_slave_scan_exec(&fsm->fsm_slave_scan); // execute immediately
+        fsm->datagram->device_index = fsm->slave->device_index;
         return;
     }
 
@@ -843,8 +928,9 @@ void ec_fsm_master_state_configure_slave(
 {
     ec_master_t *master = fsm->master;
 
-    if (ec_fsm_slave_config_exec(&fsm->fsm_slave_config))
+    if (ec_fsm_slave_config_exec(&fsm->fsm_slave_config)) {
         return;
+    }
 
     fsm->slave->force_config = 0;
 
@@ -886,6 +972,7 @@ void ec_fsm_master_enter_write_system_times(
             //     and time offset (0x0920, 64 bit)
             ec_datagram_fprd(fsm->datagram, fsm->slave->station_address,
                     0x0910, 24);
+            fsm->datagram->device_index = fsm->slave->device_index;
             fsm->retries = EC_FSM_RETRIES;
             fsm->state = ec_fsm_master_state_dc_read_offset;
             return;
@@ -1031,6 +1118,7 @@ void ec_fsm_master_state_dc_read_offset(
     ec_datagram_fpwr(datagram, slave->station_address, 0x0920, 12);
     EC_WRITE_U64(datagram->data, new_offset);
     EC_WRITE_U32(datagram->data + 8, slave->transmission_delay);
+    fsm->datagram->device_index = slave->device_index;
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_master_state_dc_write_offset;
 }
@@ -1135,7 +1223,9 @@ void ec_fsm_master_state_sdo_dictionary(
     ec_slave_t *slave = fsm->slave;
     ec_master_t *master = fsm->master;
 
-    if (ec_fsm_coe_exec(&fsm->fsm_coe)) return;
+    if (ec_fsm_coe_exec(&fsm->fsm_coe)) {
+        return;
+    }
 
     if (!ec_fsm_coe_success(&fsm->fsm_coe)) {
         ec_fsm_master_restart(fsm);

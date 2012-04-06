@@ -204,6 +204,8 @@ typedef enum {
     EC_NUM_DEVICES /**< Number of devices. */
 } ec_device_index_t;
 
+extern const char *ec_device_names[EC_NUM_DEVICES];
+
 /*****************************************************************************/
 
 /** Convenience macro for printing EtherCAT-specific information to syslog.

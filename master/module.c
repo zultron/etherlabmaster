@@ -453,7 +453,7 @@ size_t ec_state_string(uint8_t states, /**< slave states */
 
 /** Device names.
  */
-static const char *ec_device_names[EC_NUM_DEVICES] = {
+const char *ec_device_names[EC_NUM_DEVICES] = {
     "main",
     "backup"
 };

@@ -554,6 +554,7 @@ int ec_master_enter_idle_phase(
         )
 {
     int ret;
+    ec_device_index_t dev_idx;
 
     EC_MASTER_DBG(master, 1, "ORPHANED -> IDLE.\n");
 
@@ -564,7 +565,9 @@ int ec_master_enter_idle_phase(
     master->phase = EC_IDLE;
 
     // reset number of responding slaves to trigger scanning
-    master->fsm.slaves_responding = 0;
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        master->fsm.slaves_responding[dev_idx] = 0;
+    }
 
     ret = ec_master_thread_start(master, ec_master_idle_thread,
             "EtherCAT-IDLE");
@@ -727,8 +730,7 @@ void ec_master_inject_external_datagrams(
             datagram->cycles_sent = 0;
 #endif
             datagram->jiffies_sent = 0;
-            ec_master_queue_datagram(master, datagram,
-                    datagram->device_index);
+            ec_master_queue_datagram(master, datagram);
         } else {
             if (datagram->data_size > master->max_queue_size) {
                 list_del_init(&datagram->queue);
@@ -800,8 +802,7 @@ void ec_master_set_send_interval(
  */
 void ec_master_queue_external_datagram(
         ec_master_t *master, /**< EtherCAT master */
-        ec_datagram_t *datagram, /**< datagram */
-        ec_device_index_t device_index /**< Device index. */
+        ec_datagram_t *datagram /**< datagram */
         )
 {
     ec_datagram_t *queued_datagram;
@@ -824,7 +825,6 @@ void ec_master_queue_external_datagram(
 
     list_add_tail(&datagram->queue, &master->external_datagram_queue);
     datagram->state = EC_DATAGRAM_QUEUED;
-    datagram->device_index = device_index;
 #ifdef EC_HAVE_CYCLES
     datagram->cycles_sent = get_cycles();
 #endif
@@ -840,8 +840,7 @@ void ec_master_queue_external_datagram(
  */
 void ec_master_queue_datagram(
         ec_master_t *master, /**< EtherCAT master */
-        ec_datagram_t *datagram, /**< datagram */
-        ec_device_index_t device_index /**< Device index. */
+        ec_datagram_t *datagram /**< datagram */
         )
 {
     ec_datagram_t *queued_datagram;
@@ -881,7 +880,6 @@ void ec_master_queue_datagram(
 
     list_add_tail(&datagram->queue, &master->datagram_queue);
     datagram->state = EC_DATAGRAM_QUEUED;
-    datagram->device_index = device_index;
 }
 
 /*****************************************************************************/
@@ -1388,8 +1386,7 @@ static int ec_master_idle_thread(void *priv_data)
         // queue and send
         down(&master->io_sem);
         if (fsm_exec) {
-            ec_master_queue_datagram(master, &master->fsm_datagram,
-                    EC_DEVICE_MAIN);
+            ec_master_queue_datagram(master, &master->fsm_datagram);
         }
         ecrt_master_send(master);
 #ifdef EC_USE_HRTIMER
@@ -2231,42 +2228,41 @@ void ecrt_master_deactivate(ec_master_t *master)
 void ecrt_master_send(ec_master_t *master)
 {
     ec_datagram_t *datagram, *n;
-    unsigned int i;
+    ec_device_index_t dev_idx;
 
     if (master->injection_seq_rt != master->injection_seq_fsm) {
-        // inject datagrams produced by master & slave FSMs
-        ec_master_queue_datagram(master, &master->fsm_datagram,
-                EC_DEVICE_MAIN);
+        // inject datagrams produced by master and slave FSMs
+        ec_master_queue_datagram(master, &master->fsm_datagram);
         master->injection_seq_rt = master->injection_seq_fsm;
     }
 
     ec_master_inject_external_datagrams(master);
 
-    for (i = 0; i < EC_NUM_DEVICES; i++) {
-        if (unlikely(!master->devices[i].link_state)) {
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        if (unlikely(!master->devices[dev_idx].link_state)) {
             // link is down, no datagram can be sent
             list_for_each_entry_safe(datagram, n,
                     &master->datagram_queue, queue) {
-                if (datagram->device_index == i) {
+                if (datagram->device_index == dev_idx) {
                     datagram->state = EC_DATAGRAM_ERROR;
                     list_del_init(&datagram->queue);
                 }
             }
 
-            if (!master->devices[i].dev) {
+            if (!master->devices[dev_idx].dev) {
                 continue;
             }
 
             // query link state
-            ec_device_poll(&master->devices[i]);
+            ec_device_poll(&master->devices[dev_idx]);
 
             // clear frame statistics
-            ec_device_clear_stats(&master->devices[i]);
+            ec_device_clear_stats(&master->devices[dev_idx]);
             continue;
         }
 
         // send frames
-        ec_master_send_datagrams(master, i);
+        ec_master_send_datagrams(master, dev_idx);
     }
 }
 
@@ -2327,7 +2323,7 @@ void ecrt_master_send_ext(ec_master_t *master)
     list_for_each_entry_safe(datagram, next, &master->ext_datagram_queue,
             queue) {
         list_del(&datagram->queue);
-        ec_master_queue_datagram(master, datagram, EC_DEVICE_MAIN);
+        ec_master_queue_datagram(master, datagram);
     }
 
     ecrt_master_send(master);
@@ -2491,9 +2487,22 @@ void ecrt_master_callbacks(ec_master_t *master,
 
 void ecrt_master_state(const ec_master_t *master, ec_master_state_t *state)
 {
-    state->slaves_responding = master->fsm.slaves_responding;
-    state->al_states = master->fsm.slave_states;
-    state->link_up = master->devices[EC_DEVICE_MAIN].link_state;
+    ec_device_index_t dev_idx;
+
+    state->slaves_responding = 0U;
+    state->al_states = 0;
+    state->link_up = 0U;
+
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        /* Announce sum of responding slaves on all links. */
+        state->slaves_responding += master->fsm.slaves_responding[dev_idx];
+
+        /* Binary-or slave states of all links. */
+        state->al_states |= master->fsm.slave_states[dev_idx];
+
+        /* Signal link up if at least one device has link. */
+        state->link_up |= master->devices[dev_idx].link_state;
+    }
 }
 
 /*****************************************************************************/
@@ -2513,8 +2522,7 @@ void ecrt_master_application_time(ec_master_t *master, uint64_t app_time)
 void ecrt_master_sync_reference_clock(ec_master_t *master)
 {
     EC_WRITE_U32(master->ref_sync_datagram.data, master->app_time);
-    ec_master_queue_datagram(master, &master->ref_sync_datagram,
-            EC_DEVICE_MAIN);
+    ec_master_queue_datagram(master, &master->ref_sync_datagram);
 }
 
 /*****************************************************************************/
@@ -2522,8 +2530,7 @@ void ecrt_master_sync_reference_clock(ec_master_t *master)
 void ecrt_master_sync_slave_clocks(ec_master_t *master)
 {
     ec_datagram_zero(&master->sync_datagram);
-    ec_master_queue_datagram(master, &master->sync_datagram,
-            EC_DEVICE_MAIN);
+    ec_master_queue_datagram(master, &master->sync_datagram);
 }
 
 /*****************************************************************************/
@@ -2531,8 +2538,7 @@ void ecrt_master_sync_slave_clocks(ec_master_t *master)
 void ecrt_master_sync_monitor_queue(ec_master_t *master)
 {
     ec_datagram_zero(&master->sync_mon_datagram);
-    ec_master_queue_datagram(master, &master->sync_mon_datagram,
-            EC_DEVICE_MAIN);
+    ec_master_queue_datagram(master, &master->sync_mon_datagram);
 }
 
 /*****************************************************************************/

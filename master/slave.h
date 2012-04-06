@@ -174,6 +174,8 @@ typedef struct {
 struct ec_slave
 {
     ec_master_t *master; /**< Master owning the slave. */
+    ec_device_index_t device_index; /**< Index of device the slave responds
+                                      on. */
 
     // addresses
     uint16_t ring_position; /**< Ring position. */
@@ -238,7 +240,8 @@ struct ec_slave
 /*****************************************************************************/
 
 // slave construction/destruction
-void ec_slave_init(ec_slave_t *, ec_master_t *, uint16_t, uint16_t);
+void ec_slave_init(ec_slave_t *, ec_master_t *, ec_device_index_t,
+        uint16_t, uint16_t);
 void ec_slave_clear(ec_slave_t *);
 
 void ec_slave_clear_sync_managers(ec_slave_t *);

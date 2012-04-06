@@ -56,7 +56,7 @@
  *
  * Increment this when changing the ioctl interface!
  */
-#define EC_IOCTL_VERSION_MAGIC 16
+#define EC_IOCTL_VERSION_MAGIC 17
 
 // Command-line tool
 #define EC_IOCTL_MODULE                EC_IOR(0x00, ec_ioctl_module_t)
@@ -195,6 +195,7 @@ typedef struct {
     uint16_t position;
 
     // outputs
+    unsigned int device_index;
     uint32_t vendor_id;
     uint32_t product_code;
     uint32_t revision_number;
