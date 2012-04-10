@@ -6,7 +6,14 @@ vim: spelllang=en spell
 
 -------------------------------------------------------------------------------
 
-Changes in 1.5:
+Changes in 1.5.1:
+
+* Fixed reset of allow_scanning flag if ecrt_master_activate() was not called.
+* Fixed missing distribution for r8169 for 2.6.32 and e1000 driver for 2.6.31.
+* Added r8169, e100, e1000 and e1000e drivers for 2.6.35.
+* Added fix for ESC port order (DC delay calculation).
+
+Changes in 1.5.0:
 
 * Added a userspace library for accessing the application interface. This
   library is licensed under LGPLv2.
@@ -35,11 +42,11 @@ Changes in 1.5:
   2.6.33 (J. Kunz), 2.6.34 (Malcolm Lewis), 2.6.35 (B. Benner),
   2.6.36 (F. Pose) and 2.6.37 (F. Pose).
 * Added e1000 driver for 2.6.26 (M. Luescher), 2.6.27, 2.6.28, 2.6.29, 2.6.32,
-  2.6.33 (J. Kunz), 2.6.37.
+  2.6.33 (J. Kunz), 2.6.35, 2.6.37.
 * Added r8169 driver for 2.6.24, 2.6.27, 2.6.28, 2.6.29, 2.6.31, 2.6.32
-  (Robbie K), 2.6.33 (J. Kunz), 2.6.37.
+  (Robbie K), 2.6.33 (J. Kunz), 2.6.35, 2.6.37.
 * Added e1000e driver for 2.6.32, 2.6.33, 2.6.34 (thanks to Siwei Zhuang),
-  2.6.37.
+  2.6.35, 2.6.37.
 * Debug interfaces are created with the Ethernet addresses of the attached
   physical device.
 * Improved error case return codes of many functions.
