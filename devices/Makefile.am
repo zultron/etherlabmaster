@@ -20,7 +20,7 @@
 #  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #
 #  ---
-#  
+#
 #  The license mentioned above concerns the source code only. Using the
 #  EtherCAT technology and brand is only permitted in compliance with the
 #  industrial property and similar rights of Beckhoff Automation GmbH.
@@ -95,6 +95,8 @@ noinst_HEADERS = \
 	e100-2.6.33-orig.c \
 	e100-2.6.37-ethercat.c \
 	e100-2.6.37-orig.c \
+	e100-3.0-ethercat.c \
+	e100-3.0-orig.c \
 	ecdev.h \
 	generic.c \
 	r8169-2.6.24-ethercat.c \
@@ -114,7 +116,7 @@ noinst_HEADERS = \
 
 EXTRA_DIST = \
 	Kbuild.in
-	
+
 BUILT_SOURCES = \
 	Kbuild
 
