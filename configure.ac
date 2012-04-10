@@ -2,7 +2,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2006-2009  Florian Pose, Ingenieurgemeinschaft IgH
+#  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
 #
 #  This file is part of the IgH EtherCAT Master.
 #
@@ -28,7 +28,7 @@
 #------------------------------------------------------------------------------
 
 AC_PREREQ(2.59)
-AC_INIT([ethercat],[1.5-pre],[fp@igh-essen.com])
+AC_INIT([ethercat],[1.5.1],[fp@igh-essen.com])
 AC_CONFIG_AUX_DIR([autoconf])
 AM_INIT_AUTOMAKE([-Wall -Werror dist-bzip2])
 AC_PREFIX_DEFAULT([/opt/etherlab])

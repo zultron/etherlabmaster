@@ -93,6 +93,8 @@ noinst_HEADERS = \
 	e100-2.6.32-orig.c \
 	e100-2.6.33-ethercat.c \
 	e100-2.6.33-orig.c \
+	e100-2.6.35-ethercat.c \
+	e100-2.6.35-orig.c \
 	e100-2.6.37-ethercat.c \
 	e100-2.6.37-orig.c \
 	e100-3.0-ethercat.c \
@@ -109,8 +111,12 @@ noinst_HEADERS = \
 	r8169-2.6.29-orig.c \
 	r8169-2.6.31-ethercat.c \
 	r8169-2.6.31-orig.c \
+	r8169-2.6.32-ethercat.c \
+	r8169-2.6.32-orig.c \
 	r8169-2.6.33-ethercat.c \
 	r8169-2.6.33-orig.c \
+	r8169-2.6.35-ethercat.c \
+	r8169-2.6.35-orig.c \
 	r8169-2.6.37-ethercat.c \
 	r8169-2.6.37-orig.c
 

@@ -605,7 +605,7 @@ int ec_master_enter_operation_phase(ec_master_t *master /**< EtherCAT master */)
         if (ret) {
             EC_MASTER_INFO(master, "Finishing slave configuration"
                     " interrupted by signal.\n");
-            goto out_allow;
+            goto out_return;
         }
 
         EC_MASTER_DBG(master, 1, "Waiting for pending slave"
@@ -656,6 +656,7 @@ int ec_master_enter_operation_phase(ec_master_t *master /**< EtherCAT master */)
     
 out_allow:
     master->allow_scan = 1;
+out_return:
     return ret;
 }
 
@@ -672,6 +673,9 @@ void ec_master_leave_operation_phase(
     } else {
         ec_master_clear_config(master);
     }
+
+    /* Re-allow scanning for IDLE phase. */
+    master->allow_scan = 1;
 
     EC_MASTER_DBG(master, 1, "OPERATION -> IDLE.\n");
 
@@ -1236,7 +1240,9 @@ static int ec_master_idle_thread(void *priv_data)
     ec_master_t *master = (ec_master_t *) priv_data;
     ec_slave_t *slave = NULL;
     int fsm_exec;
+#ifdef EC_USE_HRTIMER
     size_t sent_bytes;
+#endif
 
     // send interval in IDLE phase
     ec_master_set_send_interval(master, 1000000 / HZ); 
@@ -1271,8 +1277,10 @@ static int ec_master_idle_thread(void *priv_data)
             ec_master_queue_datagram(master, &master->fsm_datagram);
         }
         ecrt_master_send(master);
+#ifdef EC_USE_HRTIMER
         sent_bytes = master->main_device.tx_skb[
             master->main_device.tx_ring_index]->len;
+#endif
         up(&master->io_sem);
 
         if (ec_fsm_master_idle(&master->fsm)) {
@@ -1789,24 +1797,33 @@ int ec_master_calc_topology_rec(
         )
 {
     ec_slave_t *slave = master->slaves + *slave_position;
-    unsigned int i;
+    unsigned int port_index;
     int ret;
+
+    static const unsigned int next_table[EC_MAX_PORTS] = {
+        3, 2, 0, 1
+    };
 
     slave->ports[0].next_slave = port0_slave;
 
-    for (i = 1; i < EC_MAX_PORTS; i++) {
-        if (!slave->ports[i].link.loop_closed) {
+    port_index = 3;
+    while (port_index != 0) {
+        if (!slave->ports[port_index].link.loop_closed) {
             *slave_position = *slave_position + 1;
             if (*slave_position < master->slave_count) {
-                slave->ports[i].next_slave = master->slaves + *slave_position;
+                slave->ports[port_index].next_slave =
+                    master->slaves + *slave_position;
                 ret = ec_master_calc_topology_rec(master,
                         slave, slave_position);
-                if (ret)
+                if (ret) {
                     return ret;
+                }
             } else {
                 return -1;
             }
         }
+
+        port_index = next_table[port_index];
     }
 
     return 0;
@@ -2012,7 +2029,9 @@ int ecrt_master_activate(ec_master_t *master)
         return ret;
     }
 
-    master->allow_scan = 1; // allow re-scanning on topology change
+    /* Allow scanning after a topology change. */
+    master->allow_scan = 1;
+
     master->active = 1;
 
     // notify state machine, that the configuration shall now be applied
@@ -2084,7 +2103,10 @@ void ecrt_master_deactivate(ec_master_t *master)
                 "EtherCAT-IDLE"))
         EC_MASTER_WARN(master, "Failed to restart master thread!\n");
 
-    master->allow_scan = 1;
+    /* Disallow scanning to get into the same state like after a master
+     * request (after ec_master_enter_operation_phase() is called). */
+    master->allow_scan = 0;
+
     master->active = 0;
 }
 
@@ -2269,6 +2291,7 @@ int ecrt_master_get_slave(ec_master_t *master, uint16_t slave_position,
         ec_slave_info_t *slave_info)
 {
     const ec_slave_t *slave;
+    unsigned int i;
 
     if (down_interruptible(&master->master_sem)) {
         return -EINTR;
@@ -2283,6 +2306,25 @@ int ecrt_master_get_slave(ec_master_t *master, uint16_t slave_position,
     slave_info->serial_number = slave->sii.serial_number;
     slave_info->alias = slave->effective_alias;
     slave_info->current_on_ebus = slave->sii.current_on_ebus;
+
+    for (i = 0; i < EC_MAX_PORTS; i++) {
+        slave_info->ports[i].desc = slave->ports[i].desc;
+        slave_info->ports[i].link.link_up = slave->ports[i].link.link_up;
+        slave_info->ports[i].link.loop_closed =
+            slave->ports[i].link.loop_closed;
+        slave_info->ports[i].link.signal_detected =
+            slave->ports[i].link.signal_detected;
+        slave_info->ports[i].receive_time = slave->ports[i].receive_time;
+        if (slave->ports[i].next_slave) {
+            slave_info->ports[i].next_slave =
+                slave->ports[i].next_slave->ring_position;
+        } else {
+            slave_info->ports[i].next_slave = 0xffff;
+        }
+        slave_info->ports[i].delay_to_next_dc =
+            slave->ports[i].delay_to_next_dc;
+    }
+
     slave_info->al_state = slave->current_state;
     slave_info->error_flag = slave->error_flag;
     slave_info->sync_count = slave->sii.sync_count;
