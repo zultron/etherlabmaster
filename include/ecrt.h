@@ -42,6 +42,8 @@
  * Changed since 1.5:
  *
  * - Added redundancy_active flag to ec_domain_state_t.
+ * - Added ecrt_master_link_state() method and ec_master_link_state_t to query
+ *   the state of a redundant link.
  *
  * Changes in version 1.5:
  *
@@ -197,6 +199,30 @@ typedef struct {
     unsigned int link_up : 1; /**< \a true, if at least one Ethernet link is
                                 up. */
 } ec_master_state_t;
+
+/*****************************************************************************/
+
+/** Redundant link state.
+ *
+ * This is used for the output parameter of ecrt_master_link_state().
+ *
+ * \see ecrt_master_link_state().
+ */
+typedef struct {
+    unsigned int slaves_responding; /**< Sum of responding slaves on the given
+                                      link. */
+    unsigned int al_states : 4; /**< Application-layer states of the slaves on
+                                  the given link.  The states are coded in the
+                                  lower 4 bits.  If a bit is set, it means
+                                  that at least one slave in the bus is in the
+                                  corresponding state:
+                                  - Bit 0: \a INIT
+                                  - Bit 1: \a PREOP
+                                  - Bit 2: \a SAFEOP
+                                  - Bit 3: \a OP */
+    unsigned int link_up : 1; /**< \a true, if the given Ethernet link is up.
+                               */
+} ec_master_link_state_t;
 
 /*****************************************************************************/
 
@@ -855,10 +881,27 @@ void ecrt_master_send_ext(
 /** Reads the current master state.
  *
  * Stores the master state information in the given \a state structure.
+ *
+ * This method returns a global state. For the link-specific states in a
+ * redundant bus topology, use the ecrt_master_link_state() method.
  */
 void ecrt_master_state(
         const ec_master_t *master, /**< EtherCAT master. */
         ec_master_state_t *state /**< Structure to store the information. */
+        );
+
+/** Reads the current state of a redundant link.
+ *
+ * Stores the link state information in the given \a state structure.
+ *
+ * \return Zero on success, otherwise negative error code.
+ */
+int ecrt_master_link_state(
+        const ec_master_t *master, /**< EtherCAT master. */
+        unsigned int dev_idx, /**< Index of the device (0 = main device, 1 =
+                                first backup device, ...). */
+        ec_master_link_state_t *state /**< Structure to store the information.
+                                       */
         );
 
 /** Sets the application time.

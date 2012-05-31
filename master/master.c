@@ -2507,6 +2507,22 @@ void ecrt_master_state(const ec_master_t *master, ec_master_state_t *state)
 
 /*****************************************************************************/
 
+int ecrt_master_link_state(const ec_master_t *master, unsigned int dev_idx,
+        ec_master_link_state_t *state)
+{
+    if (dev_idx >= EC_NUM_DEVICES) {
+        return -EINVAL;
+    }
+
+    state->slaves_responding = master->fsm.slaves_responding[dev_idx];
+    state->al_states = master->fsm.slave_states[dev_idx];
+    state->link_up = master->devices[dev_idx].link_state;
+
+    return 0;
+}
+
+/*****************************************************************************/
+
 void ecrt_master_application_time(ec_master_t *master, uint64_t app_time)
 {
     master->app_time = app_time;
@@ -2980,6 +2996,7 @@ EXPORT_SYMBOL(ecrt_master);
 EXPORT_SYMBOL(ecrt_master_get_slave);
 EXPORT_SYMBOL(ecrt_master_slave_config);
 EXPORT_SYMBOL(ecrt_master_state);
+EXPORT_SYMBOL(ecrt_master_link_state);
 EXPORT_SYMBOL(ecrt_master_application_time);
 EXPORT_SYMBOL(ecrt_master_sync_reference_clock);
 EXPORT_SYMBOL(ecrt_master_sync_slave_clocks);

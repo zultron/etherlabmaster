@@ -1829,6 +1829,40 @@ int ec_cdev_ioctl_master_state(
 
 /** Get the master state.
  */
+int ec_cdev_ioctl_master_link_state(
+        ec_master_t *master, /**< EtherCAT master. */
+        unsigned long arg, /**< ioctl() argument. */
+        ec_cdev_priv_t *priv /**< Private data structure of file handle. */
+        )
+{
+    ec_ioctl_link_state_t ioctl;
+    ec_master_link_state_t state;
+    int ret;
+
+    if (unlikely(!priv->requested)) {
+        return -EPERM;
+    }
+
+    if (copy_from_user(&ioctl, (void __user *) arg, sizeof(ioctl))) {
+        return -EFAULT;
+    }
+
+    ret = ecrt_master_link_state(master, ioctl.dev_idx, &state);
+    if (ret < 0) {
+        return ret;
+    }
+
+    if (copy_to_user((void __user *) ioctl.state, &state, sizeof(state))) {
+        return -EFAULT;
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
+
+/** Get the master state.
+ */
 int ec_cdev_ioctl_app_time(
         ec_master_t *master, /**< EtherCAT master. */
         unsigned long arg, /**< ioctl() argument. */
@@ -3628,6 +3662,9 @@ long eccdev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
             break;
         case EC_IOCTL_MASTER_STATE:
             ret = ec_cdev_ioctl_master_state(master, arg, priv);
+            break;
+        case EC_IOCTL_MASTER_LINK_STATE:
+            ret = ec_cdev_ioctl_master_link_state(master, arg, priv);
             break;
         case EC_IOCTL_APP_TIME:
             if (!(filp->f_mode & FMODE_WRITE)) {
