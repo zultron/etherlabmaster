@@ -44,6 +44,8 @@
  * - Added redundancy_active flag to ec_domain_state_t.
  * - Added ecrt_master_link_state() method and ec_master_link_state_t to query
  *   the state of a redundant link.
+ * - Added the EC_HAVE_REDUNDANCY define, to check, if the interface contains
+ *   redundancy features.
  *
  * Changes in version 1.5:
  *
@@ -124,6 +126,17 @@
 /** EtherCAT realtime interface version word.
  */
 #define ECRT_VERSION_MAGIC ECRT_VERSION(ECRT_VER_MAJOR, ECRT_VER_MINOR)
+
+/******************************************************************************
+ * Feature flags
+ *****************************************************************************/
+
+/** Defined, if the redundancy features are available.
+ *
+ * I. e. if the \a redundancy_active flag in ec_domain_state_t and the
+ * ecrt_master_link_state() method are available.
+ */
+#define EC_HAVE_REDUNDANCY
 
 /*****************************************************************************/
 
