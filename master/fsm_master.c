@@ -524,8 +524,9 @@ void ec_fsm_master_action_idle(
     ec_slave_t *slave;
 
     // Check for pending internal SDO requests
-    if (ec_fsm_master_action_process_sdo(fsm))
+    if (ec_fsm_master_action_process_sdo(fsm)) {
         return;
+    }
 
     // enable processing of requests
     for (slave = master->slaves;
