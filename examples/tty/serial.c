@@ -548,7 +548,7 @@ void el60xx_port_run(el60xx_port_t *port, u8 *pd)
             }
 
             /* Send data */
-            
+
             tx_accepted_toggle = status & 0x0001;
             if (tx_accepted_toggle != port->tx_accepted_toggle) { // ready
                 port->tx_data_size =
