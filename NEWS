@@ -12,6 +12,7 @@ Changes in 1.5.1:
 * Fixed missing distribution for r8169 for 2.6.32 and e1000 driver for 2.6.31.
 * Added r8169, e100, e1000 and e1000e drivers for 2.6.35.
 * Added fix for ESC port order (DC delay calculation).
+* Added e1000 driver for kernel 3.0.
 
 Changes in 1.5.0:
 
