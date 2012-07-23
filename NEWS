@@ -10,8 +10,9 @@ Changes in 1.5.1:
 
 * Fixed reset of allow_scanning flag if ecrt_master_activate() was not called.
 * Fixed missing distribution for r8169 for 2.6.32 and e1000 driver for 2.6.31.
-* Added e100, e1000 and e1000e drivers for 2.6.35.
+* Added e100 and e1000 drivers for 2.6.35.
 * Added r8169 driver for 2.6.35 (F. Pose), 2.6.36 (J. Kunz), 3.2 (J. Kunz).
+* Added e1000e driver for 2.6.35 (F. Pose), 3.2 (J. Kunz).
 * Added fix for ESC port order (DC delay calculation).
 * Added e1000 driver for kernel 3.0.
 
