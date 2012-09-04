@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- *  $Id: 8139too-2.6.36-ethercat.c,v 4d8c9a441ef6 2011/05/12 14:38:48 fp $
+ *  $Id$
  *
  *  Copyright (C) 2006-2009  Florian Pose, Ingenieurgemeinschaft IgH
  *

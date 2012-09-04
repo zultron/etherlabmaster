@@ -1,6 +1,6 @@
 #------------------------------------------------------------------------------
 #
-#  $Id: Makefile.am,v ca345abf0565 2012/04/10 17:10:56 fp $
+#  $Id$
 #
 #  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
 #
