@@ -54,12 +54,6 @@
     } while (0)
 #endif
 
-/** List of intervals for frame statistics [s].
- */
-static const unsigned int rate_intervals[] = {
-    1, 10, 60
-};
-
 /*****************************************************************************/
 
 /** Constructor.
@@ -309,30 +303,6 @@ void ec_device_send(
 {
     struct sk_buff *skb = device->tx_skb[device->tx_ring_index];
 
-    // frame statistics
-    if (unlikely(jiffies - device->stats_jiffies >= HZ)) {
-        unsigned int i;
-        u32 tx_frame_rate =
-            (u32) (device->tx_count - device->last_tx_count) * 1000;
-        u32 tx_byte_rate =
-            (device->tx_bytes - device->last_tx_bytes);
-        u64 loss = device->tx_count - device->rx_count;
-        s32 loss_rate = (s32) (loss - device->last_loss) * 1000;
-        for (i = 0; i < EC_RATE_COUNT; i++) {
-            unsigned int n = rate_intervals[i];
-            device->tx_frame_rates[i] =
-                (device->tx_frame_rates[i] * (n - 1) + tx_frame_rate) / n;
-            device->tx_byte_rates[i] =
-                (device->tx_byte_rates[i] * (n - 1) + tx_byte_rate) / n;
-            device->loss_rates[i] =
-                (device->loss_rates[i] * (n - 1) + loss_rate) / n;
-        }
-        device->last_tx_count = device->tx_count;
-        device->last_tx_bytes = device->tx_bytes;
-        device->last_loss = loss;
-        device->stats_jiffies = jiffies;
-    }
-
     // set the right length for the data
     skb->len = ETH_HLEN + size;
 
@@ -350,7 +320,9 @@ void ec_device_send(
 #endif
     {
         device->tx_count++;
+        device->master->device_stats.tx_count++;
         device->tx_bytes += ETH_HLEN + size;
+        device->master->device_stats.tx_bytes += ETH_HLEN + size;
 #ifdef EC_DEBUG_IF
         ec_debug_send(&device->dbg, skb->data, ETH_HLEN + size);
 #endif
@@ -375,16 +347,20 @@ void ec_device_clear_stats(
 
     // zero frame statistics
     device->tx_count = 0;
-    device->rx_count = 0;
-    device->tx_errors = 0;
-    device->tx_bytes = 0;
     device->last_tx_count = 0;
+    device->rx_count = 0;
+    device->last_rx_count = 0;
+    device->tx_bytes = 0;
     device->last_tx_bytes = 0;
-    device->last_loss = 0;
+    device->rx_bytes = 0;
+    device->last_rx_bytes = 0;
+    device->tx_errors = 0;
+
     for (i = 0; i < EC_RATE_COUNT; i++) {
         device->tx_frame_rates[i] = 0;
+        device->rx_frame_rates[i] = 0;
         device->tx_byte_rates[i] = 0;
-        device->loss_rates[i] = 0;
+        device->rx_byte_rates[i] = 0;
     }
 }
 
@@ -479,6 +455,43 @@ void ec_device_poll(
     device->poll(device->dev);
 }
 
+/*****************************************************************************/
+
+/** Update device statistics.
+ */
+void ec_device_update_stats(
+        ec_device_t *device /**< EtherCAT device */
+        )
+{
+    unsigned int i;
+
+    s32 tx_frame_rate = (device->tx_count - device->last_tx_count) * 1000;
+    s32 rx_frame_rate = (device->rx_count - device->last_rx_count) * 1000;
+    s32 tx_byte_rate = (device->tx_bytes - device->last_tx_bytes);
+    s32 rx_byte_rate = (device->rx_bytes - device->last_rx_bytes);
+
+    /* Low-pass filter:
+     *      Y_n = y_(n - 1) + T / tau * (x - y_(n - 1))   | T = 1
+     *   -> Y_n += (x - y_(n - 1)) / tau
+     */
+    for (i = 0; i < EC_RATE_COUNT; i++) {
+        s32 n = rate_intervals[i];
+        device->tx_frame_rates[i] +=
+            (tx_frame_rate - device->tx_frame_rates[i]) / n;
+        device->rx_frame_rates[i] +=
+            (rx_frame_rate - device->rx_frame_rates[i]) / n;
+        device->tx_byte_rates[i] +=
+            (tx_byte_rate - device->tx_byte_rates[i]) / n;
+        device->rx_byte_rates[i] +=
+            (rx_byte_rate - device->rx_byte_rates[i]) / n;
+    }
+
+    device->last_tx_count = device->tx_count;
+    device->last_rx_count = device->rx_count;
+    device->last_tx_bytes = device->tx_bytes;
+    device->last_rx_bytes = device->rx_bytes;
+}
+
 /******************************************************************************
  *  Device interface
  *****************************************************************************/
@@ -496,10 +509,21 @@ void ec_device_poll(
 void ecdev_withdraw(ec_device_t *device /**< EtherCAT device */)
 {
     ec_master_t *master = device->master;
-    char str[20];
+    char dev_str[20], mac_str[20];
 
-    ec_mac_print(device->dev->dev_addr, str);
-    EC_MASTER_INFO(master, "Releasing main device %s.\n", str);
+    ec_mac_print(device->dev->dev_addr, mac_str);
+
+    if (device == &master->devices[EC_DEVICE_MAIN]) {
+        sprintf(dev_str, "main");
+    } else if (device == &master->devices[EC_DEVICE_BACKUP]) {
+        sprintf(dev_str, "backup");
+    } else {
+        EC_MASTER_WARN(master, "%s() called with unknown device %s!\n",
+                __func__, mac_str);
+        sprintf(dev_str, "UNKNOWN");
+    }
+
+    EC_MASTER_INFO(master, "Releasing %s device %s.\n", dev_str, mac_str);
     
     down(&master->device_sem);
     ec_device_detach(device);
@@ -516,17 +540,22 @@ void ecdev_withdraw(ec_device_t *device /**< EtherCAT device */)
 int ecdev_open(ec_device_t *device /**< EtherCAT device */)
 {
     int ret;
+    ec_master_t *master = device->master;
 
     ret = ec_device_open(device);
     if (ret) {
-        EC_MASTER_ERR(device->master, "Failed to open device!\n");
+        EC_MASTER_ERR(master, "Failed to open device!\n");
         return ret;
     }
 
-    ret = ec_master_enter_idle_phase(device->master);
-    if (ret) {
-        EC_MASTER_ERR(device->master, "Failed to enter IDLE phase!\n");
-        return ret;
+    if (master->devices[EC_DEVICE_MAIN].open &&
+            (ec_mac_is_zero(master->macs[EC_DEVICE_BACKUP]) ||
+             master->devices[EC_DEVICE_BACKUP].open)) {
+        ret = ec_master_enter_idle_phase(device->master);
+        if (ret) {
+            EC_MASTER_ERR(device->master, "Failed to enter IDLE phase!\n");
+            return ret;
+        }
     }
 
     return 0;
@@ -541,10 +570,15 @@ int ecdev_open(ec_device_t *device /**< EtherCAT device */)
  */
 void ecdev_close(ec_device_t *device /**< EtherCAT device */)
 {
-    ec_master_leave_idle_phase(device->master);
+    ec_master_t *master = device->master;
 
-    if (ec_device_close(device))
-        EC_MASTER_WARN(device->master, "Failed to close device!\n");
+    if (master->phase == EC_IDLE) {
+        ec_master_leave_idle_phase(master);
+    }
+
+    if (ec_device_close(device)) {
+        EC_MASTER_WARN(master, "Failed to close device!\n");
+    }
 }
 
 /*****************************************************************************/
@@ -572,6 +606,9 @@ void ecdev_receive(
     }
 
     device->rx_count++;
+    device->master->device_stats.rx_count++;
+    device->rx_bytes += size;
+    device->master->device_stats.rx_bytes += size;
 
     if (unlikely(device->master->debug_level > 1)) {
         EC_MASTER_DBG(device->master, 2, "Received frame:\n");
@@ -603,14 +640,15 @@ void ecdev_set_link(
         )
 {
     if (unlikely(!device)) {
-        EC_MASTER_WARN(device->master, "ecdev_set_link(): No device!\n");
+        EC_WARN("ecdev_set_link() called with null device!\n");
         return;
     }
 
     if (likely(state != device->link_state)) {
         device->link_state = state;
         EC_MASTER_INFO(device->master,
-                "Link state changed to %s.\n", (state ? "UP" : "DOWN"));
+                "Link state of %s changed to %s.\n",
+                device->dev->name, (state ? "UP" : "DOWN"));
     }
 }
 
@@ -625,7 +663,7 @@ uint8_t ecdev_get_link(
         )
 {
     if (unlikely(!device)) {
-        EC_MASTER_WARN(device->master, "ecdev_get_link(): No device!\n");
+        EC_WARN("ecdev_get_link() called with null device!\n");
         return 0;
     }
 

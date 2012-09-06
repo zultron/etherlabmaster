@@ -137,6 +137,37 @@ typedef struct {
 
 /*****************************************************************************/
 
+/** Device statistics.
+ */
+typedef struct {
+    u64 tx_count; /**< Number of frames sent. */
+    u64 last_tx_count; /**< Number of frames sent of last statistics cycle. */
+    u64 rx_count; /**< Number of frames received. */
+    u64 last_rx_count; /**< Number of frames received of last statistics
+                         cycle. */
+    u64 tx_bytes; /**< Number of bytes sent. */
+    u64 last_tx_bytes; /**< Number of bytes sent of last statistics cycle. */
+    u64 rx_bytes; /**< Number of bytes received. */
+    u64 last_rx_bytes; /**< Number of bytes received of last statistics cycle.
+                        */
+    u64 last_loss; /**< Tx/Rx difference of last statistics cycle. */
+    s32 tx_frame_rates[EC_RATE_COUNT]; /**< Transmit rates in frames/s for
+                                         different statistics cycle periods.
+                                        */
+    s32 rx_frame_rates[EC_RATE_COUNT]; /**< Receive rates in frames/s for
+                                         different statistics cycle periods.
+                                        */
+    s32 tx_byte_rates[EC_RATE_COUNT]; /**< Transmit rates in byte/s for
+                                        different statistics cycle periods. */
+    s32 rx_byte_rates[EC_RATE_COUNT]; /**< Receive rates in byte/s for
+                                        different statistics cycle periods. */
+    s32 loss_rates[EC_RATE_COUNT]; /**< Frame loss rates for different
+                                     statistics cycle periods. */
+    unsigned long jiffies; /**< Jiffies of last statistic cycle. */
+} ec_device_stats_t;
+
+/*****************************************************************************/
+
 /** EtherCAT master.
  *
  * Manages slaves, domains and IO.
@@ -154,11 +185,10 @@ struct ec_master {
 
     struct semaphore master_sem; /**< Master semaphore. */
 
-    ec_device_t main_device; /**< EtherCAT main device. */
-    const uint8_t *main_mac; /**< MAC address of main device. */
-    ec_device_t backup_device; /**< EtherCAT backup device. */
-    const uint8_t *backup_mac; /**< MAC address of backup device. */
+    ec_device_t devices[EC_NUM_DEVICES]; /**< EtherCAT devices. */
+    const uint8_t *macs[EC_NUM_DEVICES]; /**< Device MAC addresses. */
     struct semaphore device_sem; /**< Device semaphore. */
+    ec_device_stats_t device_stats; /**< Device statistics. */
 
     ec_fsm_master_t fsm; /**< Master state machine. */
     ec_datagram_t fsm_datagram; /**< Datagram used for state machines. */
@@ -210,8 +240,8 @@ struct ec_master {
                                       ext_datagram_queue. */
 
     struct list_head external_datagram_queue; /**< External Datagram queue. */
-    unsigned int send_interval; /**< Interval between calls to
-                                  ecrt_master_send */
+    unsigned int send_interval; /**< Interval between two calls to
+                                  ecrt_master_send(). */
     size_t max_queue_size; /**< Maximum size of datagram queue */
 
     unsigned int debug_level; /**< Master debug level. */
@@ -309,6 +339,8 @@ void ec_master_request_op(ec_master_t *);
 
 void ec_master_internal_send_cb(void *);
 void ec_master_internal_receive_cb(void *);
+
+extern const unsigned int rate_intervals[EC_RATE_COUNT]; // see master.c
 
 /*****************************************************************************/
 

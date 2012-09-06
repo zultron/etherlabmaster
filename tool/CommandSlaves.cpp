@@ -144,7 +144,7 @@ void CommandSlaves::listSlaves(
         )
 {
     ec_ioctl_master_t master;
-    unsigned int i;
+    unsigned int i, lastDevice;
     ec_ioctl_slave_t slave;
     uint16_t lastAlias, aliasIndex;
     Info info;
@@ -184,6 +184,7 @@ void CommandSlaves::listSlaves(
 
             info.state = alStateString(slave.al_state);
             info.flag = (slave.error_flag ? 'E' : '+');
+            info.device = slave.device_index;
 
             if (strlen(slave.name)) {
                 info.name = slave.name;
@@ -215,7 +216,12 @@ void CommandSlaves::listSlaves(
         cout << "Master" << dec << m.getIndex() << endl;
     }
 
+    lastDevice = EC_DEVICE_MAIN;
     for (iter = infoList.begin(); iter != infoList.end(); iter++) {
+        if (iter->device != lastDevice) {
+            lastDevice = iter->device;
+            cout << "xxx LINK FAILURE xxx" << endl;
+        }
         cout << indent << setfill(' ') << right
             << setw(maxPosWidth) << iter->pos << "  "
             << setw(maxAliasWidth) << iter->alias
@@ -245,6 +251,7 @@ void CommandSlaves::showSlaves(
             cout << "Alias: " << si->alias << endl;
 
         cout
+            << "Device: " << (si->device_index ? "Backup" : "Main") << endl
             << "State: " << alStateString(si->al_state) << endl
             << "Flag: " << (si->error_flag ? 'E' : '+') << endl
             << "Identity:" << endl
@@ -332,7 +339,8 @@ void CommandSlaves::showSlaves(
                 }
                 cout << "  " << setw(10);
                 if (!si->ports[i].link.loop_closed) {
-                    cout << si->ports[i].receive_time - si->ports[0].receive_time;
+                    cout << si->ports[i].receive_time -
+                        si->ports[0].receive_time;
                 } else {
                     cout << "-";
                 }
@@ -406,7 +414,8 @@ void CommandSlaves::showSlaves(
                     << "    Enable SDO: "
                     << (si->coe_details.enable_sdo ? "yes" : "no") << endl
                     << "    Enable SDO Info: "
-                    << (si->coe_details.enable_sdo_info ? "yes" : "no") << endl
+                    << (si->coe_details.enable_sdo_info ? "yes" : "no")
+                    << endl
                     << "    Enable PDO Assign: "
                     << (si->coe_details.enable_pdo_assign
                             ? "yes" : "no") << endl

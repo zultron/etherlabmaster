@@ -37,7 +37,7 @@ Changes in 1.5.0:
     - Added e100 driver for 2.6.29, thanks to Andre Puschmann.
     - Added e100 driver for 2.6.31.
     - Added e100 driver for 2.6.32.
-    - Added e100 driver for 2.6.33, thanks for J. Kunz.
+    - Added e100 driver for 2.6.33, thanks to J. Kunz.
     - Added e100 driver for 2.6.37.
     - Added e100 driver for 3.0.
 * Added 8139too driver for kernels 2.6.25 (F. Pose), 2.6.26 (M. Luescher),
@@ -90,7 +90,7 @@ Changes in 1.5.0:
   supports ranges like '0,3,8-10'.
 * A sync manager is always enabled, if it contains registered process data.
 * Added a configuration switch --enable-wildcards to use 0xffffffff as a
-* wildcard for vendor ID and product code.
+  wildcard for vendor ID and product code.
 * Added support for systemd.
 
 Changes in 1.4.0:

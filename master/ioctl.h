@@ -56,7 +56,7 @@
  *
  * Increment this when changing the ioctl interface!
  */
-#define EC_IOCTL_VERSION_MAGIC 12
+#define EC_IOCTL_VERSION_MAGIC 18
 
 // Command-line tool
 #define EC_IOCTL_MODULE                EC_IOR(0x00, ec_ioctl_module_t)
@@ -101,42 +101,43 @@
 #define EC_IOCTL_SEND                   EC_IO(0x23)
 #define EC_IOCTL_RECEIVE                EC_IO(0x24)
 #define EC_IOCTL_MASTER_STATE          EC_IOR(0x25, ec_master_state_t)
-#define EC_IOCTL_APP_TIME              EC_IOW(0x26, ec_ioctl_app_time_t)
-#define EC_IOCTL_SYNC_REF               EC_IO(0x27)
-#define EC_IOCTL_SYNC_SLAVES            EC_IO(0x28)
-#define EC_IOCTL_SYNC_MON_QUEUE         EC_IO(0x29)
-#define EC_IOCTL_SYNC_MON_PROCESS      EC_IOR(0x2a, uint32_t)
-#define EC_IOCTL_RESET                  EC_IO(0x2b)
-#define EC_IOCTL_SC_SYNC               EC_IOW(0x2c, ec_ioctl_config_t)
-#define EC_IOCTL_SC_WATCHDOG           EC_IOW(0x2d, ec_ioctl_config_t)
-#define EC_IOCTL_SC_ADD_PDO            EC_IOW(0x2e, ec_ioctl_config_pdo_t)
-#define EC_IOCTL_SC_CLEAR_PDOS         EC_IOW(0x2f, ec_ioctl_config_pdo_t)
-#define EC_IOCTL_SC_ADD_ENTRY          EC_IOW(0x30, ec_ioctl_add_pdo_entry_t)
-#define EC_IOCTL_SC_CLEAR_ENTRIES      EC_IOW(0x31, ec_ioctl_config_pdo_t)
-#define EC_IOCTL_SC_REG_PDO_ENTRY     EC_IOWR(0x32, ec_ioctl_reg_pdo_entry_t)
-#define EC_IOCTL_SC_DC                 EC_IOW(0x33, ec_ioctl_config_t)
-#define EC_IOCTL_SC_SDO                EC_IOW(0x34, ec_ioctl_sc_sdo_t)
-#define EC_IOCTL_SC_SDO_REQUEST       EC_IOWR(0x35, ec_ioctl_sdo_request_t)
-#define EC_IOCTL_SC_VOE               EC_IOWR(0x36, ec_ioctl_voe_t)
-#define EC_IOCTL_SC_STATE             EC_IOWR(0x37, ec_ioctl_sc_state_t)
-#define EC_IOCTL_SC_IDN                EC_IOW(0x38, ec_ioctl_sc_idn_t)
-#define EC_IOCTL_DOMAIN_OFFSET          EC_IO(0x39)
-#define EC_IOCTL_DOMAIN_PROCESS         EC_IO(0x3a)
-#define EC_IOCTL_DOMAIN_QUEUE           EC_IO(0x3b)
-#define EC_IOCTL_DOMAIN_STATE         EC_IOWR(0x3c, ec_ioctl_domain_state_t)
-#define EC_IOCTL_SDO_REQUEST_TIMEOUT  EC_IOWR(0x3d, ec_ioctl_sdo_request_t)
-#define EC_IOCTL_SDO_REQUEST_STATE    EC_IOWR(0x3e, ec_ioctl_sdo_request_t)
-#define EC_IOCTL_SDO_REQUEST_READ     EC_IOWR(0x3f, ec_ioctl_sdo_request_t)
-#define EC_IOCTL_SDO_REQUEST_WRITE    EC_IOWR(0x40, ec_ioctl_sdo_request_t)
-#define EC_IOCTL_SDO_REQUEST_DATA     EC_IOWR(0x41, ec_ioctl_sdo_request_t)
-#define EC_IOCTL_VOE_SEND_HEADER       EC_IOW(0x42, ec_ioctl_voe_t)
-#define EC_IOCTL_VOE_REC_HEADER       EC_IOWR(0x43, ec_ioctl_voe_t)
-#define EC_IOCTL_VOE_READ              EC_IOW(0x44, ec_ioctl_voe_t)
-#define EC_IOCTL_VOE_READ_NOSYNC       EC_IOW(0x45, ec_ioctl_voe_t)
-#define EC_IOCTL_VOE_WRITE            EC_IOWR(0x46, ec_ioctl_voe_t)
-#define EC_IOCTL_VOE_EXEC             EC_IOWR(0x47, ec_ioctl_voe_t)
-#define EC_IOCTL_VOE_DATA             EC_IOWR(0x48, ec_ioctl_voe_t)
-#define EC_IOCTL_SET_SEND_INTERVAL     EC_IOW(0x49, size_t)
+#define EC_IOCTL_MASTER_LINK_STATE    EC_IOWR(0x26, ec_ioctl_link_state_t)
+#define EC_IOCTL_APP_TIME              EC_IOW(0x27, ec_ioctl_app_time_t)
+#define EC_IOCTL_SYNC_REF               EC_IO(0x28)
+#define EC_IOCTL_SYNC_SLAVES            EC_IO(0x29)
+#define EC_IOCTL_SYNC_MON_QUEUE         EC_IO(0x2a)
+#define EC_IOCTL_SYNC_MON_PROCESS      EC_IOR(0x2b, uint32_t)
+#define EC_IOCTL_RESET                  EC_IO(0x2c)
+#define EC_IOCTL_SC_SYNC               EC_IOW(0x2d, ec_ioctl_config_t)
+#define EC_IOCTL_SC_WATCHDOG           EC_IOW(0x2e, ec_ioctl_config_t)
+#define EC_IOCTL_SC_ADD_PDO            EC_IOW(0x2f, ec_ioctl_config_pdo_t)
+#define EC_IOCTL_SC_CLEAR_PDOS         EC_IOW(0x20, ec_ioctl_config_pdo_t)
+#define EC_IOCTL_SC_ADD_ENTRY          EC_IOW(0x31, ec_ioctl_add_pdo_entry_t)
+#define EC_IOCTL_SC_CLEAR_ENTRIES      EC_IOW(0x32, ec_ioctl_config_pdo_t)
+#define EC_IOCTL_SC_REG_PDO_ENTRY     EC_IOWR(0x33, ec_ioctl_reg_pdo_entry_t)
+#define EC_IOCTL_SC_DC                 EC_IOW(0x34, ec_ioctl_config_t)
+#define EC_IOCTL_SC_SDO                EC_IOW(0x35, ec_ioctl_sc_sdo_t)
+#define EC_IOCTL_SC_SDO_REQUEST       EC_IOWR(0x36, ec_ioctl_sdo_request_t)
+#define EC_IOCTL_SC_VOE               EC_IOWR(0x37, ec_ioctl_voe_t)
+#define EC_IOCTL_SC_STATE             EC_IOWR(0x38, ec_ioctl_sc_state_t)
+#define EC_IOCTL_SC_IDN                EC_IOW(0x39, ec_ioctl_sc_idn_t)
+#define EC_IOCTL_DOMAIN_OFFSET          EC_IO(0x3a)
+#define EC_IOCTL_DOMAIN_PROCESS         EC_IO(0x3b)
+#define EC_IOCTL_DOMAIN_QUEUE           EC_IO(0x3c)
+#define EC_IOCTL_DOMAIN_STATE         EC_IOWR(0x3d, ec_ioctl_domain_state_t)
+#define EC_IOCTL_SDO_REQUEST_TIMEOUT  EC_IOWR(0x3e, ec_ioctl_sdo_request_t)
+#define EC_IOCTL_SDO_REQUEST_STATE    EC_IOWR(0x3f, ec_ioctl_sdo_request_t)
+#define EC_IOCTL_SDO_REQUEST_READ     EC_IOWR(0x30, ec_ioctl_sdo_request_t)
+#define EC_IOCTL_SDO_REQUEST_WRITE    EC_IOWR(0x41, ec_ioctl_sdo_request_t)
+#define EC_IOCTL_SDO_REQUEST_DATA     EC_IOWR(0x42, ec_ioctl_sdo_request_t)
+#define EC_IOCTL_VOE_SEND_HEADER       EC_IOW(0x43, ec_ioctl_voe_t)
+#define EC_IOCTL_VOE_REC_HEADER       EC_IOWR(0x44, ec_ioctl_voe_t)
+#define EC_IOCTL_VOE_READ              EC_IOW(0x45, ec_ioctl_voe_t)
+#define EC_IOCTL_VOE_READ_NOSYNC       EC_IOW(0x46, ec_ioctl_voe_t)
+#define EC_IOCTL_VOE_WRITE            EC_IOWR(0x47, ec_ioctl_voe_t)
+#define EC_IOCTL_VOE_EXEC             EC_IOWR(0x48, ec_ioctl_voe_t)
+#define EC_IOCTL_VOE_DATA             EC_IOWR(0x49, ec_ioctl_voe_t)
+#define EC_IOCTL_SET_SEND_INTERVAL     EC_IOW(0x4a, size_t)
 
 /*****************************************************************************/
 
@@ -168,11 +169,22 @@ typedef struct {
         uint64_t tx_count;
         uint64_t rx_count;
         uint64_t tx_bytes;
+        uint64_t rx_bytes;
         uint64_t tx_errors;
-        uint32_t tx_frame_rates[EC_RATE_COUNT];
-        uint32_t tx_byte_rates[EC_RATE_COUNT];
-        int32_t loss_rates[EC_RATE_COUNT];
-    } devices[2];
+        int32_t tx_frame_rates[EC_RATE_COUNT];
+        int32_t rx_frame_rates[EC_RATE_COUNT];
+        int32_t tx_byte_rates[EC_RATE_COUNT];
+        int32_t rx_byte_rates[EC_RATE_COUNT];
+    } devices[EC_NUM_DEVICES];
+    uint64_t tx_count;
+    uint64_t rx_count;
+    uint64_t tx_bytes;
+    uint64_t rx_bytes;
+    int32_t tx_frame_rates[EC_RATE_COUNT];
+    int32_t rx_frame_rates[EC_RATE_COUNT];
+    int32_t tx_byte_rates[EC_RATE_COUNT];
+    int32_t rx_byte_rates[EC_RATE_COUNT];
+    int32_t loss_rates[EC_RATE_COUNT];
     uint64_t app_time;
     uint16_t ref_clock;
 } ec_ioctl_master_t;
@@ -184,6 +196,7 @@ typedef struct {
     uint16_t position;
 
     // outputs
+    unsigned int device_index;
     uint32_t vendor_id;
     uint32_t product_code;
     uint32_t revision_number;
@@ -279,7 +292,7 @@ typedef struct {
     // outputs
     uint32_t data_size;
     uint32_t logical_base_address;
-    uint16_t working_counter;
+    uint16_t working_counter[EC_NUM_DEVICES];
     uint16_t expected_working_counter;
     uint32_t fmmu_count;
 } ec_ioctl_domain_t;
@@ -656,6 +669,16 @@ typedef struct {
     uint8_t *data;
     ec_request_state_t state;
 } ec_ioctl_voe_t;
+
+/*****************************************************************************/
+
+typedef struct {
+    // inputs
+    uint32_t dev_idx;
+
+    // outputs
+    ec_master_link_state_t *state;
+} ec_ioctl_link_state_t;
 
 /*****************************************************************************/
 

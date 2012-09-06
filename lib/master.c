@@ -256,8 +256,9 @@ int ecrt_master_get_sync_manager(ec_master_t *master, uint16_t slave_position,
 {
     ec_ioctl_slave_sync_t data;
 
-    if (sync_index >= EC_MAX_SYNC_MANAGERS)
+    if (sync_index >= EC_MAX_SYNC_MANAGERS) {
         return -ENOENT;
+    }
 
     memset(&data, 0x00, sizeof(ec_ioctl_slave_sync_t));
     data.slave_position = slave_position;
@@ -547,6 +548,21 @@ void ecrt_master_state(const ec_master_t *master, ec_master_state_t *state)
 {
     if (ioctl(master->fd, EC_IOCTL_MASTER_STATE, state) == -1) {
         fprintf(stderr, "Failed to get master state: %s\n", strerror(errno));
+    }
+}
+
+/*****************************************************************************/
+
+int ecrt_master_link_state(const ec_master_t *master, unsigned int dev_idx,
+        ec_master_link_state_t *state)
+{
+    ec_ioctl_link_state_t io;
+
+    io.dev_idx = dev_idx;
+    io.state = state;
+    if (ioctl(master->fd, EC_IOCTL_MASTER_LINK_STATE, &io) == -1) {
+        fprintf(stderr, "Failed to get link state: %s\n", strerror(errno));
+        return -errno;
     }
 }
 

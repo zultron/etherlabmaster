@@ -145,16 +145,19 @@ void ec_fsm_slave_state_ready(
         )
 {
     // Check for pending external SDO requests
-    if (ec_fsm_slave_action_process_sdo(fsm))
+    if (ec_fsm_slave_action_process_sdo(fsm)) {
         return;
+    }
 
     // Check for pending FoE requests
-    if (ec_fsm_slave_action_process_foe(fsm))
+    if (ec_fsm_slave_action_process_foe(fsm)) {
         return;
+    }
 
     // Check for pending SoE requests
-    if (ec_fsm_slave_action_process_soe(fsm))
+    if (ec_fsm_slave_action_process_soe(fsm)) {
         return;
+    }
 }
 
 /*****************************************************************************/

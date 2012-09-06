@@ -36,6 +36,7 @@ obj-m := ec_master.o
 ec_master-objs := \
 	cdev.o \
 	datagram.o \
+	datagram_pair.o \
 	device.o \
 	domain.o \
 	fmmu_config.o \

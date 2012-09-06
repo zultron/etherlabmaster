@@ -196,6 +196,16 @@ enum {
     EC_SDO_ENTRY_ACCESS_COUNT /**< Number of states. */
 };
 
+/** Master devices.
+ */
+typedef enum {
+    EC_DEVICE_MAIN, /**< Main device. */
+    EC_DEVICE_BACKUP, /**< Backup device */
+    EC_NUM_DEVICES /**< Number of devices. */
+} ec_device_index_t;
+
+extern const char *ec_device_names[EC_NUM_DEVICES];
+
 /*****************************************************************************/
 
 /** Convenience macro for printing EtherCAT-specific information to syslog.

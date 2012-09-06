@@ -136,6 +136,11 @@ void CommandDomains::showDomain(
     ec_ioctl_domain_fmmu_t fmmu;
     unsigned int dataOffset;
     string indent(doIndent ? "  " : "");
+    unsigned int wc_sum = 0, dev_idx;
+
+    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        wc_sum += domain.working_counter[dev_idx];
+    }
 
     cout << indent << "Domain" << dec << domain.index << ":"
         << " LogBaseAddr 0x"
@@ -144,8 +149,14 @@ void CommandDomains::showDomain(
         << ", Size " << dec << setfill(' ')
         << setw(3) << domain.data_size
         << ", WorkingCounter "
-        << domain.working_counter << "/"
-        << domain.expected_working_counter << endl;
+        << wc_sum << "/"
+        << domain.expected_working_counter;
+    if (EC_NUM_DEVICES == 2) {
+        cout << " (" << domain.working_counter[EC_DEVICE_MAIN]
+            << "+" << domain.working_counter[EC_DEVICE_BACKUP]
+            << ")";
+    }
+    cout << endl;
 
     if (!domain.data_size || getVerbosity() != Verbose)
         return;

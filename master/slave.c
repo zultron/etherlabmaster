@@ -62,6 +62,7 @@ char *ec_slave_sii_string(ec_slave_t *, unsigned int);
 void ec_slave_init(
         ec_slave_t *slave, /**< EtherCAT slave */
         ec_master_t *master, /**< EtherCAT master */
+        ec_device_index_t dev_idx, /**< Device index. */
         uint16_t ring_position, /**< ring position */
         uint16_t station_address /**< station address to configure */
         )
@@ -70,6 +71,7 @@ void ec_slave_init(
     int ret;
 
     slave->master = master;
+    slave->device_index = dev_idx;
     slave->ring_position = ring_position;
     slave->station_address = station_address;
     slave->effective_alias = 0x0000;

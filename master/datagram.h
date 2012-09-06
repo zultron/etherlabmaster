@@ -85,9 +85,10 @@ typedef enum {
 /** EtherCAT datagram.
  */
 typedef struct {
-    struct list_head list; /**< Needed by domain datagram lists. */
     struct list_head queue; /**< Master datagram queue item. */
     struct list_head sent; /**< Master list item for sent datagrams. */
+    ec_device_index_t device_index; /**< Device via which the datagram shall
+                                      be / was sent. */
     ec_datagram_type_t type; /**< Datagram type (APRD, BWR, etc.). */
     uint8_t address[EC_ADDR_LEN]; /**< Recipient address. */
     uint8_t *data; /**< Datagram payload. */
@@ -130,9 +131,12 @@ int ec_datagram_frmw(ec_datagram_t *, uint16_t, uint16_t, size_t);
 int ec_datagram_brd(ec_datagram_t *, uint16_t, size_t);
 int ec_datagram_bwr(ec_datagram_t *, uint16_t, size_t);
 int ec_datagram_brw(ec_datagram_t *, uint16_t, size_t);
-int ec_datagram_lrd(ec_datagram_t *, uint32_t, size_t, uint8_t *);
-int ec_datagram_lwr(ec_datagram_t *, uint32_t, size_t, uint8_t *);
-int ec_datagram_lrw(ec_datagram_t *, uint32_t, size_t, uint8_t *);
+int ec_datagram_lrd(ec_datagram_t *, uint32_t, size_t);
+int ec_datagram_lwr(ec_datagram_t *, uint32_t, size_t);
+int ec_datagram_lrw(ec_datagram_t *, uint32_t, size_t);
+int ec_datagram_lrd_ext(ec_datagram_t *, uint32_t, size_t, uint8_t *);
+int ec_datagram_lwr_ext(ec_datagram_t *, uint32_t, size_t, uint8_t *);
+int ec_datagram_lrw_ext(ec_datagram_t *, uint32_t, size_t, uint8_t *);
 
 void ec_datagram_print_state(const ec_datagram_t *);
 void ec_datagram_print_wc_error(const ec_datagram_t *);
