@@ -317,7 +317,7 @@ static void e1000_irq_enable(struct e1000_adapter *adapter)
 
 	if (adapter->ecdev)
 		return;
- 
+
 	ew32(IMS, IMS_ENABLE_MASK);
 	E1000_WRITE_FLUSH();
 }
@@ -2095,7 +2095,7 @@ static void e1000_leave_82542_rst(struct e1000_adapter *adapter)
 		/* No need to loop, because 82542 supports only 1 queue */
 		struct e1000_rx_ring *ring = &adapter->rx_ring[0];
 		e1000_configure_rx(adapter);
-		if (adapter->ecdev) { 
+		if (adapter->ecdev) {
 			/* fill rx ring completely! */
 			adapter->alloc_rx_buf(adapter, ring, ring->count);
 		} else {
@@ -2298,7 +2298,7 @@ static void e1000_82547_tx_fifo_stall(unsigned long data)
 			atomic_set(&adapter->tx_fifo_stall, 0);
 			if (!adapter->ecdev) netif_wake_queue(netdev);
 		} else if (!test_bit(__E1000_DOWN, &adapter->flags)) {
-			if (!adapter->ecdev) 
+			if (!adapter->ecdev)
 				mod_timer(&adapter->tx_fifo_stall_timer, jiffies + 1);
 		}
 	}

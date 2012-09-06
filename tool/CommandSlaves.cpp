@@ -111,7 +111,7 @@ void CommandSlaves::execute(const StringVector &args)
 	MasterIndexList masterIndices;
     SlaveList slaves;
     bool doIndent;
-    
+
     if (args.size()) {
         stringstream err;
         err << "'" << getName() << "' takes no arguments!";
@@ -155,14 +155,14 @@ void CommandSlaves::listSlaves(
     unsigned int maxPosWidth = 0, maxAliasWidth = 0,
                  maxRelPosWidth = 0, maxStateWidth = 0;
     string indent(doIndent ? "  " : "");
-    
+
     m.getMaster(&master);
 
     lastAlias = 0;
     aliasIndex = 0;
     for (i = 0; i < master.slave_count; i++) {
         m.getSlave(&slave, i);
-        
+
         if (slave.alias) {
             lastAlias = slave.alias;
             aliasIndex = 0;
@@ -296,7 +296,7 @@ void CommandSlaves::showSlaves(
         if (si->dc_supported)
             cout << "  RxTime [ns]  Diff [ns]   NextDc [ns]";
         cout << endl;
-            
+
         for (i = 0; i < EC_MAX_PORTS; i++) {
             cout << "   " << i << "  " << setfill(' ') << left << setw(4);
             switch (si->ports[i].desc) {
@@ -329,7 +329,7 @@ void CommandSlaves::showSlaves(
             } else {
                 cout << "-";
             }
-            
+
             if (si->dc_supported) {
                 cout << "  " << setw(11) << right;
                 if (!si->ports[i].link.loop_closed) {

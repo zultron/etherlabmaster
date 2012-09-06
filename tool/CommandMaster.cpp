@@ -74,7 +74,7 @@ void CommandMaster::execute(const StringVector &args)
     time_t epoch;
     char time_str[MAX_TIME_STR_SIZE + 1];
     size_t time_str_size;
-    
+
     if (args.size()) {
         err << "'" << getName() << "' takes no arguments!";
         throwInvalidUsageException(err);

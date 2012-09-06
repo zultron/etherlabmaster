@@ -51,7 +51,7 @@ string CommandRegWrite::helpString(const string &binaryBaseName) const
 
     str << binaryBaseName << " " << getName()
         << " [OPTIONS] <OFFSET> <DATA>" << endl
-        << endl 
+        << endl
         << getBriefDescription() << endl
         << endl
         << "This command requires a single slave to be selected." << endl
@@ -91,7 +91,7 @@ void CommandRegWrite::execute(const StringVector &args)
         err << "'" << getName() << "' takes exactly two arguments!";
         throwInvalidUsageException(err);
     }
-    
+
     strOffset << args[0];
     strOffset
         >> resetiosflags(ios::basefield) // guess base from prefix
@@ -100,7 +100,7 @@ void CommandRegWrite::execute(const StringVector &args)
         err << "Invalid offset '" << args[0] << "'!";
         throwInvalidUsageException(err);
     }
-  
+
     if (getDataType().empty()) {
         if (args[1] == "-") {
             loadRegData(&data, cin);

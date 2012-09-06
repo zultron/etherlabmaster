@@ -110,7 +110,7 @@ typedef struct {
 /*****************************************************************************/
 
 /** Constructor.
- * 
+ *
  * \return 0 in case of success, else < 0
  */
 int ec_cdev_init(
@@ -1674,12 +1674,12 @@ int ec_cdev_ioctl_activate(
     ec_domain_t *domain;
     off_t offset;
     int ret;
-    
+
     if (unlikely(!priv->requested))
         return -EPERM;
 
     /* Get the sum of the domains' process data sizes. */
-    
+
     priv->process_data_size = 0;
 
     if (down_interruptible(&master->master_sem))
@@ -1688,7 +1688,7 @@ int ec_cdev_ioctl_activate(
     list_for_each_entry(domain, &master->domains, list) {
         priv->process_data_size += ecrt_domain_size(domain);
     }
-    
+
     up(&master->master_sem);
 
     if (priv->process_data_size) {
@@ -1813,7 +1813,7 @@ int ec_cdev_ioctl_master_state(
         )
 {
     ec_master_state_t data;
-    
+
     if (unlikely(!priv->requested))
         return -EPERM;
 
@@ -1870,7 +1870,7 @@ int ec_cdev_ioctl_app_time(
         )
 {
     ec_ioctl_app_time_t data;
-    
+
     if (unlikely(!priv->requested))
         return -EPERM;
 
@@ -2458,7 +2458,7 @@ int ec_cdev_ioctl_sc_state(
     ec_ioctl_sc_state_t data;
     const ec_slave_config_t *sc;
     ec_slave_config_state_t state;
-    
+
     if (unlikely(!priv->requested))
         return -EPERM;
 
@@ -2630,7 +2630,7 @@ int ec_cdev_ioctl_domain_state(
     ec_ioctl_domain_state_t data;
     const ec_domain_t *domain;
     ec_domain_state_t state;
-    
+
     if (unlikely(!priv->requested))
         return -EPERM;
 

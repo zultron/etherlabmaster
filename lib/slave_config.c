@@ -1,11 +1,11 @@
 /******************************************************************************
- *  
+ *
  *  $Id$
- *  
+ *
  *  Copyright (C) 2006-2009  Florian Pose, Ingenieurgemeinschaft IgH
- *  
+ *
  *  This file is part of the IgH EtherCAT master userspace library.
- *  
+ *
  *  The IgH EtherCAT master userspace library is free software; you can
  *  redistribute it and/or modify it under the terms of the GNU Lesser General
  *  Public License as published by the Free Software Foundation; version 2.1
@@ -19,9 +19,9 @@
  *  You should have received a copy of the GNU Lesser General Public License
  *  along with the IgH EtherCAT master userspace library. If not, see
  *  <http://www.gnu.org/licenses/>.
- *  
+ *
  *  ---
- *  
+ *
  *  The license mentioned above concerns the source code only. Using the
  *  EtherCAT technology and brand is only permitted in compliance with the
  *  industrial property and similar rights of Beckhoff Automation GmbH.
@@ -86,7 +86,7 @@ int ecrt_slave_config_sync_manager(ec_slave_config_t *sc, uint8_t sync_index,
                 strerror(errno));
         return -1; // FIXME
     }
-    
+
     return 0;
 }
 
@@ -124,7 +124,7 @@ int ecrt_slave_config_pdo_assign_add(ec_slave_config_t *sc,
                 strerror(errno));
         return -1;  // FIXME
     }
-    
+
     return 0;
 }
 
@@ -163,7 +163,7 @@ int ecrt_slave_config_pdo_mapping_add(ec_slave_config_t *sc,
                 strerror(errno));
         return -1;  // FIXME
     }
-    
+
     return 0;
 }
 
@@ -428,13 +428,13 @@ ec_sdo_request_t *ecrt_slave_config_create_sdo_request(ec_slave_config_t *sc,
     data.sdo_index = index;
     data.sdo_subindex = subindex;
     data.size = size;
-    
+
     if (ioctl(sc->master->fd, EC_IOCTL_SC_SDO_REQUEST, &data) == -1) {
         fprintf(stderr, "Failed to create SDO request: %s\n",
                 strerror(errno));
         ec_sdo_request_clear(req);
         free(req);
-        return NULL; 
+        return NULL;
     }
 
     req->next = NULL;
@@ -495,13 +495,13 @@ ec_voe_handler_t *ecrt_slave_config_create_voe_handler(ec_slave_config_t *sc,
 
     data.config_index = sc->index;
     data.size = size;
-    
+
     if (ioctl(sc->master->fd, EC_IOCTL_SC_VOE, &data) == -1) {
         fprintf(stderr, "Failed to create VoE handler: %s\n",
                 strerror(errno));
         ec_voe_handler_clear(voe);
         free(voe);
-        return NULL; 
+        return NULL;
     }
 
     voe->next = NULL;
@@ -524,7 +524,7 @@ void ecrt_slave_config_state(const ec_slave_config_t *sc,
 
     data.config_index = sc->index;
     data.state = state;
-    
+
     if (ioctl(sc->master->fd, EC_IOCTL_SC_STATE, &data) == -1) {
         fprintf(stderr, "Failed to get slave configuration state: %s\n",
                 strerror(errno));

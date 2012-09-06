@@ -272,7 +272,7 @@ void ec_slave_config_load_default_sync_config(ec_slave_config_t *sc)
 
     if (!sc->slave)
         return;
-    
+
     for (sync_index = 0; sync_index < EC_MAX_SYNC_MANAGERS; sync_index++) {
         sync_config = &sc->sync_configs[sync_index];
         if ((sync = ec_slave_get_sync(sc->slave, sync_index))) {
@@ -471,7 +471,7 @@ int ecrt_slave_config_sync_manager(ec_slave_config_t *sc, uint8_t sync_index,
         ec_direction_t dir, ec_watchdog_mode_t watchdog_mode)
 {
     ec_sync_config_t *sync_config;
-    
+
     EC_CONFIG_DBG(sc, 1, "ecrt_slave_config_sync_manager(sc = 0x%p,"
             " sync_index = %u, dir = %i, watchdog_mode = %i)\n",
             sc, sync_index, dir, watchdog_mode);
@@ -562,7 +562,7 @@ int ecrt_slave_config_pdo_mapping_add(ec_slave_config_t *sc,
     ec_pdo_t *pdo = NULL;
     ec_pdo_entry_t *entry;
     int retval = 0;
-    
+
     EC_CONFIG_DBG(sc, 1, "%s(sc = 0x%p, "
             "pdo_index = 0x%04X, entry_index = 0x%04X, "
             "entry_subindex = 0x%02X, entry_bit_length = %u)\n",
@@ -583,7 +583,7 @@ int ecrt_slave_config_pdo_mapping_add(ec_slave_config_t *sc,
             retval = PTR_ERR(entry);
     } else {
         EC_CONFIG_ERR(sc, "PDO 0x%04X is not assigned.\n", pdo_index);
-        retval = -ENOENT; 
+        retval = -ENOENT;
     }
 
     return retval;
@@ -596,7 +596,7 @@ void ecrt_slave_config_pdo_mapping_clear(ec_slave_config_t *sc,
 {
     uint8_t sync_index;
     ec_pdo_t *pdo = NULL;
-    
+
     EC_CONFIG_DBG(sc, 1, "%s(sc = 0x%p, pdo_index = 0x%04X)\n",
             __func__, sc, pdo_index);
 
@@ -787,7 +787,7 @@ int ecrt_slave_config_sdo(ec_slave_config_t *sc, uint16_t index,
         kfree(req);
         return ret;
     }
-        
+
     down(&sc->master->master_sem);
     list_add_tail(&req->list, &sc->sdo_configs);
     up(&sc->master->master_sem);
@@ -872,7 +872,7 @@ int ecrt_slave_config_complete_sdo(ec_slave_config_t *sc, uint16_t index,
         kfree(req);
         return ret;
     }
-        
+
     down(&sc->master->master_sem);
     list_add_tail(&req->list, &sc->sdo_configs);
     up(&sc->master->master_sem);
@@ -913,12 +913,12 @@ ec_sdo_request_t *ecrt_slave_config_create_sdo_request_err(
     // prepare data for optional writing
     memset(req->data, 0x00, size);
     req->data_size = size;
-    
+
     down(&sc->master->master_sem);
     list_add_tail(&req->list, &sc->sdo_requests);
     up(&sc->master->master_sem);
 
-    return req; 
+    return req;
 }
 
 /*****************************************************************************/
@@ -960,7 +960,7 @@ ec_voe_handler_t *ecrt_slave_config_create_voe_handler_err(
     list_add_tail(&voe->list, &sc->voe_handlers);
     up(&sc->master->master_sem);
 
-    return voe; 
+    return voe;
 }
 
 /*****************************************************************************/
@@ -992,7 +992,7 @@ void ecrt_slave_config_state(const ec_slave_config_t *sc,
 
 /*****************************************************************************/
 
-int ecrt_slave_config_idn(ec_slave_config_t *sc, uint8_t drive_no, 
+int ecrt_slave_config_idn(ec_slave_config_t *sc, uint8_t drive_no,
         uint16_t idn, ec_al_state_t state, const uint8_t *data,
         size_t size)
 {
@@ -1038,7 +1038,7 @@ int ecrt_slave_config_idn(ec_slave_config_t *sc, uint8_t drive_no,
         kfree(req);
         return ret;
     }
-        
+
     down(&sc->master->master_sem);
     list_add_tail(&req->list, &sc->soe_configs);
     up(&sc->master->master_sem);

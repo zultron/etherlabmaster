@@ -653,7 +653,7 @@ struct rtl8139_private {
 	struct mii_if_info	mii;
 	unsigned int		regs_len;
 	unsigned long		fifo_copy_timeout;
-    
+
 	ec_device_t *ecdev;
 };
 
@@ -1066,7 +1066,7 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	tp->mii.reg_num_mask = 0x1f;
 
 	/* dev is fully set up and ready to use now */
-    
+
 	// offer device to EtherCAT master module
 	tp->ecdev = ecdev_offer(dev, ec_poll, THIS_MODULE);
 

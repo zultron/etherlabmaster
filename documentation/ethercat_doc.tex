@@ -5,7 +5,7 @@
 %  $Id$
 %
 %  vi: spell spelllang=en tw=78
-% 
+%
 %------------------------------------------------------------------------------
 
 \documentclass[a4paper,12pt,BCOR6mm,bibtotoc,idxtotoc]{scrbook}
@@ -926,7 +926,7 @@ the corresponding port. The master can read out the relative receive times,
 then calculate time delays between the slaves (using its knowledge of the bus
 topology), and finally calculate the time delays from the reference clock to
 each slave. These values are programmed into the slaves' transmission delay
-registers. In this way, the drift compensation can reach nanosecond synchrony. 
+registers. In this way, the drift compensation can reach nanosecond synchrony.
 
 \paragraph{Checking Synchrony} DC-capable slaves provide the 32-bit ``System
 time difference'' register at address \lstinline+0x092c+, where the system
@@ -1805,7 +1805,7 @@ configured.
 
 \item[FMMU Configuration] If there are FMMUs configurations supplied by the
 application (i.\,e.\ if the application registered PDO entries), they are
-applied. 
+applied.
 
 \item[SAFEOP] The state change FSM is used to bring the slave to SAFEOP state.
 If this is the requested state, the state machine is finished.
@@ -3092,7 +3092,7 @@ install the EtherCAT header, init script, sysconfig file and the userspace
 tool to the prefix path. The second one will install the kernel modules to the
 kernel's modules directory. The final \lstinline+depmod+ call is necessary to
 include the kernel modules into the \textit{modules.dep} file to make it
-available to the \lstinline+modprobe+ command, used in the init script. 
+available to the \lstinline+modprobe+ command, used in the init script.
 
 \begin{lstlisting}
 # `\textbf{make install}`

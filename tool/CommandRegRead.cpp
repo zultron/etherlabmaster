@@ -140,7 +140,7 @@ void CommandRegRead::execute(const StringVector &args)
         err << "Offset and length exceeding 64k!";
         throwInvalidUsageException(err);
     }
-    
+
     MasterDevice m(getSingleMasterIndex());
     m.open(MasterDevice::Read);
     slaves = selectedSlaves(m);

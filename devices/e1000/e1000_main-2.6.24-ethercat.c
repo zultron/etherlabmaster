@@ -2402,7 +2402,7 @@ e1000_leave_82542_rst(struct e1000_adapter *adapter)
 		/* No need to loop, because 82542 supports only 1 queue */
 		struct e1000_rx_ring *ring = &adapter->rx_ring[0];
 		e1000_configure_rx(adapter);
-		if (adapter->ecdev) { 
+		if (adapter->ecdev) {
 			/* fill rx ring completely! */
 			adapter->alloc_rx_buf(adapter, ring, ring->count);
 		} else {
@@ -3849,7 +3849,7 @@ e1000_intr_msi(int irq, void *data)
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
 	int i;
-	
+
 	if (adapter->ecdev) {
 #ifdef CONFIG_E1000_NAPI
 		int ec_work_done = 0;
@@ -4013,7 +4013,7 @@ e1000_intr(int irq, void *data)
 			atomic_inc(&adapter->irq_sem);
 			E1000_WRITE_REG(hw, IMC, ~0);
 		}
-	
+
 		adapter->total_tx_bytes = 0;
 		adapter->total_rx_bytes = 0;
 		adapter->total_tx_packets = 0;

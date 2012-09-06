@@ -1205,7 +1205,7 @@ static void e100_configure(struct nic *nic, struct cb *cb, struct sk_buff *skb)
 		config->multicast_all = 0x1;		/* 1=accept, 0=no */
 
 	/* disable WoL when up */
-	if (nic->ecdev || 
+	if (nic->ecdev ||
 			(netif_running(nic->netdev) || !(nic->flags & wol_magic)))
 		config->magic_packet_disable = 0x1;	/* 1=off, 0=on */
 
@@ -3239,7 +3239,7 @@ static int __init e100_init_module(void)
 {
 	printk(KERN_INFO DRV_NAME " " DRV_DESCRIPTION " " DRV_VERSION
 			", master " EC_MASTER_VERSION "\n");
- 
+
  	return pci_register_driver(&e100_driver);
 }
 

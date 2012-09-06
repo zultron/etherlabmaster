@@ -2709,7 +2709,7 @@ static void rtl8169_phy_timer(unsigned long __opaque)
 
 	if (!tp->ecdev)
 		spin_lock_irq(&tp->lock);
-	
+
 	if (tp->phy_reset_pending(ioaddr)) {
 		/*
 		 * A busy loop could burn quite a few cycles on nowadays CPU.
@@ -3339,7 +3339,6 @@ static int rtl8169_open(struct net_device *dev)
 			goto err_release_ring_2;
 
 		napi_enable(&tp->napi);
- 
 	}
 
 	rtl_hw_start(dev);
@@ -4943,7 +4942,7 @@ static int rtl8169_suspend(struct device *device)
 	struct pci_dev *pdev = to_pci_dev(device);
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct rtl8169_private *tp = netdev_priv(dev);
-	
+
 	if (tp->ecdev)
  		return -EBUSY;
 

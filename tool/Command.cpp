@@ -222,7 +222,7 @@ bool Command::matchesSubstr(const string &cmd) const
 {
     return name.substr(0, cmd.length()) == cmd;
 }
-    
+
 /****************************************************************************/
 
 bool Command::matchesAbbrev(const string &abb) const
@@ -238,7 +238,7 @@ bool Command::matchesAbbrev(const string &abb) const
 
     return true;
 }
-    
+
 /*****************************************************************************/
 
 string Command::numericInfo()
@@ -497,7 +497,7 @@ string Command::alStateString(uint8_t state)
         default: ret = "???";
     }
 
-    if (state & EC_SLAVE_STATE_ACK_ERR) { 
+    if (state & EC_SLAVE_STATE_ACK_ERR) {
         ret += "+ERROR";
     }
 

@@ -2965,7 +2965,7 @@ static pci_ers_result_t e100_io_error_detected(struct pci_dev *pdev, pci_channel
 
 	/* Similar to calling e100_down(), but avoids adpater I/O. */
 	netdev->stop(netdev);
-    
+
     if (!nic->ecdev) {
     	/* Detach; put netif into state similar to hotplug unplug. */
 	    napi_enable(&nic->napi);

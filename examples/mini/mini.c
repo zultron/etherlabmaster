@@ -331,7 +331,7 @@ void cyclic_task(unsigned long data)
 
         // check for islave configuration state(s) (optional)
         check_slave_config_states();
-        
+
 #if SDO_ACCESS
         // read process data SDO
         read_sdo();
@@ -387,12 +387,12 @@ int __init init_mini_module(void)
 #if EXTERNAL_MEMORY
     unsigned int size;
 #endif
-    
+
     printk(KERN_INFO PFX "Starting...\n");
 
     master = ecrt_request_master(0);
     if (!master) {
-        ret = -EBUSY; 
+        ret = -EBUSY;
         printk(KERN_ERR PFX "Requesting master 0 failed.\n");
         goto out_return;
     }

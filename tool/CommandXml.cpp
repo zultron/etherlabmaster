@@ -115,7 +115,7 @@ void CommandXml::generateSlaveXml(
     for (i = 0; i < indent; i++) {
         in += "  ";
     }
-    
+
     cout
         << in << "<EtherCATInfo>" << endl
         << in << "  <!-- Slave " << slave.position << " -->" << endl
@@ -178,7 +178,7 @@ void CommandXml::generateSlaveXml(
                         << in << "            <SubIndex>"
                         << dec << (unsigned int) entry.subindex
                         << "</SubIndex>" << endl;
-                
+
                 cout
                     << in << "            <BitLen>"
                     << dec << (unsigned int) entry.bit_length

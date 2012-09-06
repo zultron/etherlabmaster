@@ -259,7 +259,7 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
 
 /*****************************************************************************/
 
-/** Clear the sync manager array. 
+/** Clear the sync manager array.
  */
 void ec_slave_clear_sync_managers(ec_slave_t *slave /**< EtherCAT slave. */)
 {
@@ -579,7 +579,7 @@ char *ec_slave_sii_string(
         unsigned int index /**< string index */
         )
 {
-    if (!index--) 
+    if (!index--)
         return NULL;
 
     if (index >= slave->sii.string_count) {
@@ -794,7 +794,7 @@ void ec_slave_attach_pdo_names(
     unsigned int i;
     ec_sync_t *sync;
     ec_pdo_t *pdo;
-    
+
     for (i = 0; i < slave->sii.sync_count; i++) {
         sync = slave->sii.syncs + i;
         list_for_each_entry(pdo, &sync->pdos.list, list) {

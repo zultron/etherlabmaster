@@ -206,7 +206,7 @@ struct ec_master {
     /* Configuration applied by the application. */
     struct list_head configs; /**< List of slave configurations. */
     struct list_head domains; /**< List of domains. */
-    
+
     u64 app_time; /**< Time of the last ecrt_master_sync() call. */
     u64 app_start_time; /**< Application start time. */
     u8 has_app_time; /**< Application time is valid. */
@@ -217,7 +217,7 @@ struct ec_master {
     ec_datagram_t sync_mon_datagram; /**< Datagram used for DC synchronisation
                                        monitoring. */
     ec_slave_t *dc_ref_clock; /**< DC reference clock slave. */
-    
+
     unsigned int scan_busy; /**< Current scan state. */
     unsigned int allow_scan; /**< \a True, if slave scanning is allowed. */
     struct semaphore scan_sem; /**< Semaphore protecting the \a scan_busy

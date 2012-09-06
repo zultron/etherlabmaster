@@ -482,7 +482,7 @@ static int ec_tty_write_room(struct tty_struct *tty)
 {
     ec_tty_t *t = (ec_tty_t *) tty->driver_data;
     int ret = ec_tty_tx_space(t);
-    
+
 #if EC_TTY_DEBUG >= 2
     printk(KERN_INFO PFX "%s() = %i.\n", __func__, ret);
 #endif
@@ -496,7 +496,7 @@ static int ec_tty_chars_in_buffer(struct tty_struct *tty)
 {
     ec_tty_t *t = (ec_tty_t *) tty->driver_data;
     int ret;
-    
+
 #if EC_TTY_DEBUG >= 2
     printk(KERN_INFO PFX "%s().\n", __func__);
 #endif
@@ -506,7 +506,7 @@ static int ec_tty_chars_in_buffer(struct tty_struct *tty)
 #if EC_TTY_DEBUG >= 2
     printk(KERN_INFO PFX "%s() = %i.\n", __func__, ret);
 #endif
-    
+
     return ret;
 }
 
@@ -528,7 +528,7 @@ static int ec_tty_ioctl(struct tty_struct *tty, struct file *file,
 {
     ec_tty_t *t = (ec_tty_t *) tty->driver_data;
     int ret = -ENOTTY;
-    
+
 #if EC_TTY_DEBUG >= 2
     printk(KERN_INFO PFX "%s(tty=%p, file=%p, cmd=%08x, arg=%08lx).\n",
             __func__, tty, file, cmd, arg);

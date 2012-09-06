@@ -3575,7 +3575,7 @@ void e1000e_down(struct e1000_adapter *adapter)
 		ew32(RCTL, rctl & ~E1000_RCTL_EN);
 	/* flush and sleep below */
 
-	if (!adapter->ecdev) 
+	if (!adapter->ecdev)
 		netif_stop_queue(netdev);
 
 	/* disable transmits in the hardware */
@@ -4391,7 +4391,7 @@ static void e1000_watchdog_task(struct work_struct *work)
 		e1000_update_mng_vlan(adapter);
 
 	if (link) {
-		if ((adapter->ecdev && !ecdev_get_link(adapter->ecdev)) 
+		if ((adapter->ecdev && !ecdev_get_link(adapter->ecdev))
 				|| (!adapter->ecdev && !netif_carrier_ok(netdev))) {
 			bool txb2b = 1;
 
@@ -4489,7 +4489,7 @@ static void e1000_watchdog_task(struct work_struct *work)
 
 			if (adapter->ecdev)
 				ecdev_set_link(adapter->ecdev, 1);
-			else 
+			else
 				netif_carrier_on(netdev);
 
 			if (!adapter->ecdev && !test_bit(__E1000_DOWN, &adapter->state))
@@ -4497,7 +4497,7 @@ static void e1000_watchdog_task(struct work_struct *work)
 					  round_jiffies(jiffies + 2 * HZ));
 		}
 	} else {
-		if ((adapter->ecdev && ecdev_get_link(adapter->ecdev)) 
+		if ((adapter->ecdev && ecdev_get_link(adapter->ecdev))
 				|| (!adapter->ecdev && netif_carrier_ok(netdev))) {
 			adapter->link_speed = 0;
 			adapter->link_duplex = 0;
@@ -4537,7 +4537,7 @@ link_up:
 
 	e1000e_update_adaptive(&adapter->hw);
 
-	if ((adapter->ecdev && !ecdev_get_link(adapter->ecdev)) 
+	if ((adapter->ecdev && !ecdev_get_link(adapter->ecdev))
 			|| (!adapter->ecdev && (!netif_carrier_ok(netdev) &&
 	    	(e1000_desc_unused(tx_ring) + 1 < tx_ring->count)))) {
 		/*
@@ -5767,7 +5767,7 @@ static void e1000_shutdown(struct pci_dev *pdev)
 	bool wake = false;
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct e1000_adapter *adapter = netdev_priv(netdev);
-	
+
 	if (adapter->ecdev)
 		return;
 

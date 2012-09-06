@@ -509,7 +509,7 @@ void ec_eoe_state_rx_fetch(ec_eoe_t *eoe /**< EoE handler */)
 #if EOE_DEBUG_LEVEL >= 2
     EC_SLAVE_DBG(eoe->slave, 0, "EoE %s RX fragment %u%s, offset %u,"
             " frame %u%s, %u octets\n", eoe->dev->name, fragment_number,
-           last_fragment ? "" : "+", fragment_offset, frame_number, 
+           last_fragment ? "" : "+", fragment_offset, frame_number,
            time_appended ? ", + timestamp" : "",
            time_appended ? rec_size - 8 : rec_size - 4);
 #endif
