@@ -7,6 +7,7 @@ syntax: glob
 **.o
 **.o.cmd
 **.swp
+**/.deps/*.Po
 **/.tmp_*.gcno
 **~
 .tmp_versions
