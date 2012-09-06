@@ -284,7 +284,7 @@ void ec_fsm_pdo_read_action_next_pdo(
     }
 
     // finished reading PDO configuration
-    
+
     ec_pdo_list_copy(&fsm->sync->pdos, &fsm->pdos);
     ec_pdo_list_clear_pdos(&fsm->pdos);
 
@@ -389,7 +389,7 @@ ec_pdo_t *ec_fsm_pdo_conf_action_next_pdo(
         const struct list_head *list /**< current PDO list item */
         )
 {
-    list = list->next; 
+    list = list->next;
     if (list == &fsm->pdos.list)
         return NULL; // no next PDO
     return list_entry(list, ec_pdo_t, list);
@@ -406,7 +406,7 @@ void ec_fsm_pdo_conf_action_next_sync(
     fsm->sync_index++;
 
     for (; fsm->sync_index < EC_MAX_SYNC_MANAGERS; fsm->sync_index++) {
-        if (!fsm->slave->config) { 
+        if (!fsm->slave->config) {
             // slave configuration removed in the meantime
             fsm->state = ec_fsm_pdo_state_error;
             return;
@@ -418,7 +418,7 @@ void ec_fsm_pdo_conf_action_next_sync(
             fsm->state = ec_fsm_pdo_state_error;
             return;
         }
-        
+
         if (!(fsm->sync = ec_slave_get_sync(fsm->slave, fsm->sync_index))) {
             if (!list_empty(&fsm->pdos.list))
                 EC_SLAVE_WARN(fsm->slave, "PDOs configured for SM%u,"
@@ -464,7 +464,7 @@ void ec_fsm_pdo_conf_action_pdo_mapping(
     if (list_empty(&fsm->slave_pdo.entries)) {
         EC_SLAVE_DBG(fsm->slave, 1, "Reading mapping of PDO 0x%04X.\n",
                 fsm->pdo->index);
-            
+
         // pdo mapping is unknown; start loading it
         ec_fsm_pdo_entry_start_reading(&fsm->fsm_pdo_entry, fsm->slave,
                 &fsm->slave_pdo);
@@ -639,7 +639,7 @@ void ec_fsm_pdo_conf_state_zero_pdo_count(
     ec_pdo_list_clear_pdos(&fsm->sync->pdos);
 
     // assign all PDOs belonging to the current sync manager
-    
+
     // find first PDO
     if (!(fsm->pdo = ec_fsm_pdo_conf_action_next_pdo(fsm, &fsm->pdos.list))) {
 
@@ -669,7 +669,7 @@ void ec_fsm_pdo_conf_action_assign_pdo(
 
     EC_SLAVE_DBG(fsm->slave, 1, "Assigning PDO 0x%04X at position %u.\n",
             fsm->pdo->index, fsm->pdo_pos);
-    
+
     fsm->state = ec_fsm_pdo_conf_state_assign_pdo;
     ec_fsm_coe_transfer(fsm->fsm_coe, fsm->slave, &fsm->request);
     ec_fsm_coe_exec(fsm->fsm_coe); // execute immediately
@@ -706,7 +706,7 @@ void ec_fsm_pdo_conf_state_assign_pdo(
         EC_SLAVE_DBG(fsm->slave, 1,
                 "Setting number of assigned PDOs to %u.\n",
                 fsm->pdo_pos);
-        
+
         fsm->state = ec_fsm_pdo_conf_state_set_pdo_count;
         ec_fsm_coe_transfer(fsm->fsm_coe, fsm->slave, &fsm->request);
         ec_fsm_coe_exec(fsm->fsm_coe); // execute immediately
@@ -717,7 +717,7 @@ void ec_fsm_pdo_conf_state_assign_pdo(
     fsm->pdo_pos++;
     ec_fsm_pdo_conf_action_assign_pdo(fsm);
 }
-    
+
 /*****************************************************************************/
 
 /** Set the number of assigned PDOs.

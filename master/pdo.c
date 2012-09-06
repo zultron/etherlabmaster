@@ -47,7 +47,7 @@ void ec_pdo_init(
         ec_pdo_t *pdo /**< EtherCAT PDO */
         )
 {
-    pdo->sync_index = -1; // not assigned 
+    pdo->sync_index = -1; // not assigned
     pdo->name = NULL;
     INIT_LIST_HEAD(&pdo->entries);
 }
@@ -131,7 +131,7 @@ int ec_pdo_set_name(
 
     if (pdo->name && name && !strcmp(pdo->name, name))
         return 0;
-    
+
     if (pdo->name)
         kfree(pdo->name);
 

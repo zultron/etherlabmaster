@@ -57,7 +57,7 @@
 /*****************************************************************************/
 
 /** Constructor.
- * 
+ *
  * \return 0 in case of success, else < 0
  */
 int ec_device_init(
@@ -524,7 +524,7 @@ void ecdev_withdraw(ec_device_t *device /**< EtherCAT device */)
     }
 
     EC_MASTER_INFO(master, "Releasing %s device %s.\n", dev_str, mac_str);
-    
+
     down(&master->device_sem);
     ec_device_detach(device);
     up(&master->device_sem);
@@ -587,7 +587,7 @@ void ecdev_close(ec_device_t *device /**< EtherCAT device */)
  *
  * Forwards the received data to the master. The master will analyze the frame
  * and dispatch the received commands to the sending instances.
- * 
+ *
  * \ingroup DeviceInterface
  */
 void ecdev_receive(
@@ -631,7 +631,7 @@ void ecdev_receive(
  *
  * If the device notifies the master about the link being down, the master
  * will not try to send frames using this device.
- * 
+ *
  * \ingroup DeviceInterface
  */
 void ecdev_set_link(

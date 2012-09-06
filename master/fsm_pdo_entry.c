@@ -111,7 +111,7 @@ void ec_fsm_pdo_entry_start_reading(
     fsm->target_pdo = pdo;
 
     ec_pdo_clear_entries(fsm->target_pdo);
-    
+
     fsm->state = ec_fsm_pdo_entry_read_state_start;
 }
 
@@ -355,7 +355,7 @@ ec_pdo_entry_t *ec_fsm_pdo_entry_conf_next_entry(
         const struct list_head *list /**< current entry list item */
         )
 {
-    list = list->next; 
+    list = list->next;
     if (list == &fsm->source_pdo->entries)
         return NULL; // no next entry
     return list_entry(list, ec_pdo_entry_t, list);
@@ -382,7 +382,7 @@ void ec_fsm_pdo_entry_conf_state_zero_entry_count(
     // find first entry
     if (!(fsm->entry = ec_fsm_pdo_entry_conf_next_entry(
                     fsm, &fsm->source_pdo->entries))) {
-        
+
         EC_SLAVE_DBG(fsm->slave, 1, "No entries to map.\n");
 
         fsm->state = ec_fsm_pdo_entry_state_end; // finished
@@ -415,7 +415,7 @@ void ec_fsm_pdo_entry_conf_action_map(
     fsm->request.data_size = 4;
     ec_sdo_request_address(&fsm->request, fsm->source_pdo->index, fsm->entry_pos);
     ecrt_sdo_request_write(&fsm->request);
-    
+
     fsm->state = ec_fsm_pdo_entry_conf_state_map_entry;
     ec_fsm_coe_transfer(fsm->fsm_coe, fsm->slave, &fsm->request);
     ec_fsm_coe_exec(fsm->fsm_coe); // execute immediately
@@ -453,7 +453,7 @@ void ec_fsm_pdo_entry_conf_state_map_entry(
 
         EC_SLAVE_DBG(fsm->slave, 1, "Setting number of PDO entries to %u.\n",
                 fsm->entry_pos);
-        
+
         fsm->state = ec_fsm_pdo_entry_conf_state_set_entry_count;
         ec_fsm_coe_transfer(fsm->fsm_coe, fsm->slave, &fsm->request);
         ec_fsm_coe_exec(fsm->fsm_coe); // execute immediately

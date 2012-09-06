@@ -175,13 +175,13 @@ int __init init_mini_module(void)
 {
     int ret = -1;
     ec_slave_config_t *sc;
-    
+
     printk(KERN_INFO PFX "Starting...\n");
 
     master = ecrt_request_master(0);
     if (!master) {
         printk(KERN_ERR PFX "Requesting master 0 failed.\n");
-        ret = -EBUSY; 
+        ret = -EBUSY;
         goto out_return;
     }
 

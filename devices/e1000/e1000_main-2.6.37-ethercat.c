@@ -23,7 +23,7 @@
   Linux NICS <linux.nics@intel.com>
   e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
- 
+
   vim: noexpandtab
 
 *******************************************************************************/
@@ -332,7 +332,7 @@ static void e1000_irq_enable(struct e1000_adapter *adapter)
 	if (adapter->ecdev) {
 		return;
 	}
- 
+
 	ew32(IMS, IMS_ENABLE_MASK);
 	E1000_WRITE_FLUSH();
 }
@@ -2160,7 +2160,7 @@ static void e1000_leave_82542_rst(struct e1000_adapter *adapter)
 		/* No need to loop, because 82542 supports only 1 queue */
 		struct e1000_rx_ring *ring = &adapter->rx_ring[0];
 		e1000_configure_rx(adapter);
-		if (adapter->ecdev) { 
+		if (adapter->ecdev) {
 			/* fill rx ring completely! */
 			adapter->alloc_rx_buf(adapter, ring, ring->count);
 		} else {

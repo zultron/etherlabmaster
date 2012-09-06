@@ -1,11 +1,11 @@
 /******************************************************************************
- *  
+ *
  *  $Id$
- *  
+ *
  *  Copyright (C) 2006-2009  Florian Pose, Ingenieurgemeinschaft IgH
- *  
+ *
  *  This file is part of the IgH EtherCAT master userspace library.
- *  
+ *
  *  The IgH EtherCAT master userspace library is free software; you can
  *  redistribute it and/or modify it under the terms of the GNU Lesser General
  *  Public License as published by the Free Software Foundation; version 2.1
@@ -19,9 +19,9 @@
  *  You should have received a copy of the GNU Lesser General Public License
  *  along with the IgH EtherCAT master userspace library. If not, see
  *  <http://www.gnu.org/licenses/>.
- *  
+ *
  *  ---
- *  
+ *
  *  The license mentioned above concerns the source code only. Using the
  *  EtherCAT technology and brand is only permitted in compliance with the
  *  industrial property and similar rights of Beckhoff Automation GmbH.
@@ -60,7 +60,7 @@ int ecrt_domain_reg_pdo_entry_list(ec_domain_t *domain,
     const ec_pdo_entry_reg_t *reg;
     ec_slave_config_t *sc;
     int ret;
-    
+
     for (reg = regs; reg->index; reg++) {
         if (!(sc = ecrt_master_slave_config(domain->master, reg->alias,
                         reg->position, reg->vendor_id, reg->product_code)))
@@ -88,9 +88,9 @@ uint8_t *ecrt_domain_data(ec_domain_t *domain)
         if (offset == -1) {
             fprintf(stderr, "Failed to get domain offset: %s\n",
                     strerror(errno));
-            return NULL; 
+            return NULL;
         }
-    
+
         domain->process_data = domain->master->process_data + offset;
     }
 
@@ -125,7 +125,7 @@ void ecrt_domain_state(const ec_domain_t *domain, ec_domain_state_t *state)
 
     data.domain_index = domain->index;
     data.state = state;
-    
+
     if (ioctl(domain->master->fd, EC_IOCTL_DOMAIN_STATE, &data) == -1) {
         fprintf(stderr, "Failed to get domain state: %s\n",
                 strerror(errno));

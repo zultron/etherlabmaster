@@ -287,7 +287,7 @@ int __init init_mod(void)
 
     master = ecrt_request_master(0);
     if (!master) {
-        ret = -EBUSY; 
+        ret = -EBUSY;
         printk(KERN_ERR PFX "Requesting master 0 failed!\n");
         goto out_return;
     }

@@ -170,7 +170,7 @@ void CommandConfig::showDetailedConfigs(
             << "Product code: 0x"
             << setw(8) << configIter->product_code << endl << indent
             << "Attached slave: ";
-        
+
         if (configIter->slave_position != -1) {
             m.getSlave(&slave, configIter->slave_position);
             cout << dec << configIter->slave_position

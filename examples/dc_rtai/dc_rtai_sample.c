@@ -220,7 +220,7 @@ void run(long data)
             tv.tv_sec++;
         }
         ecrt_master_application_time(master, EC_TIMEVAL2NANO(tv));
-            
+
         if (sync_ref_counter) {
             sync_ref_counter--;
         } else {
@@ -280,7 +280,7 @@ int __init init_mod(void)
 
     master = ecrt_request_master(0);
     if (!master) {
-        ret = -EBUSY; 
+        ret = -EBUSY;
         printk(KERN_ERR PFX "Requesting master 0 failed!\n");
         goto out_return;
     }

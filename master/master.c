@@ -156,7 +156,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 
     master->slaves = NULL;
     master->slave_count = 0;
-    
+
     INIT_LIST_HEAD(&master->configs);
     INIT_LIST_HEAD(&master->domains);
 
@@ -172,7 +172,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     master->config_busy = 0;
     sema_init(&master->config_sem, 1);
     init_waitqueue_head(&master->config_queue);
-    
+
     INIT_LIST_HEAD(&master->datagram_queue);
     master->datagram_index = 0;
 
@@ -180,7 +180,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     sema_init(&master->ext_queue_sem, 1);
 
     INIT_LIST_HEAD(&master->external_datagram_queue);
-    
+
     // send interval in IDLE phase
     ec_master_set_send_interval(master, 1000000 / HZ);
 
@@ -274,7 +274,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     ret = ec_cdev_init(&master->cdev, master, device_number);
     if (ret)
         goto out_clear_sync_mon;
-    
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
     master->class_device = device_create(class, NULL,
             MKDEV(MAJOR(device_number), master->index), NULL,
@@ -334,7 +334,7 @@ void ec_master_clear(
 #endif
 
     ec_cdev_clear(&master->cdev);
-    
+
 #ifdef EC_EOE
     ec_master_clear_eoe_handlers(master);
 #endif
@@ -512,7 +512,7 @@ int ec_master_thread_start(
         master->thread = NULL;
         return err;
     }
-    
+
     return 0;
 }
 
@@ -525,7 +525,7 @@ void ec_master_thread_stop(
         )
 {
     unsigned long sleep_jiffies;
-    
+
     if (!master->thread) {
         EC_MASTER_WARN(master, "%s(): Already finished!\n", __func__);
         return;
@@ -539,7 +539,7 @@ void ec_master_thread_stop(
 
     if (master->fsm_datagram.state != EC_DATAGRAM_SENT)
         return;
-    
+
     // wait for FSM datagram
     sleep_jiffies = max(HZ / 100, 1); // 10 ms, at least 1 jiffy
     schedule_timeout(sleep_jiffies);
@@ -586,7 +586,7 @@ void ec_master_leave_idle_phase(ec_master_t *master /**< EtherCAT master */)
     EC_MASTER_DBG(master, 1, "IDLE -> ORPHANED.\n");
 
     master->phase = EC_ORPHANED;
-    
+
 #ifdef EC_EOE
     ec_master_eoe_stop(master);
 #endif
@@ -647,7 +647,7 @@ int ec_master_enter_operation_phase(
                     " interrupted by signal.\n");
             goto out_allow;
         }
-        
+
         EC_MASTER_DBG(master, 1, "Waiting for pending"
                 " slave scan returned.\n");
     }
@@ -672,7 +672,7 @@ int ec_master_enter_operation_phase(
     master->app_receive_cb = NULL;
     master->app_cb_data = NULL;
     return ret;
-    
+
 out_allow:
     master->allow_scan = 1;
 out_return:
@@ -1035,7 +1035,7 @@ void ec_master_send_datagrams(
 /** Processes a received frame.
  *
  * This function is called by the network driver for every received frame.
- * 
+ *
  * \return 0 in case of success, else < 0
  */
 void ec_master_receive_datagrams(ec_master_t *master, /**< EtherCAT master */
@@ -1357,7 +1357,7 @@ static int ec_master_idle_thread(void *priv_data)
 #endif
 
     // send interval in IDLE phase
-    ec_master_set_send_interval(master, 1000000 / HZ); 
+    ec_master_set_send_interval(master, 1000000 / HZ);
 
     EC_MASTER_DBG(master, 1, "Idle thread running with send interval = %u us,"
             " max data size=%zu\n", master->send_interval,
@@ -1410,7 +1410,7 @@ static int ec_master_idle_thread(void *priv_data)
 #endif
         }
     }
-    
+
     EC_MASTER_DBG(master, 1, "Master IDLE thread exiting...\n");
 
     return 0;
@@ -1468,7 +1468,7 @@ static int ec_master_operation_thread(void *priv_data)
         }
 #endif
     }
-    
+
     EC_MASTER_DBG(master, 1, "Master OP thread exiting...\n");
     return 0;
 }
@@ -1584,7 +1584,7 @@ schedule:
             schedule();
         }
     }
-    
+
     EC_MASTER_DBG(master, 1, "EoE thread exiting...\n");
     return 0;
 }
@@ -1601,7 +1601,7 @@ void ec_master_detach_slave_configs(
     ec_slave_config_t *sc;
 
     list_for_each_entry(sc, &master->configs, list) {
-        ec_slave_config_detach(sc); 
+        ec_slave_config_detach(sc);
     }
 }
 
@@ -1892,7 +1892,7 @@ void ec_master_find_dc_ref_clock(
     }
 
     master->dc_ref_clock = ref;
-    
+
     // This call always succeeds, because the datagram has been pre-allocated.
     ec_datagram_frmw(&master->sync_datagram,
             ref ? ref->station_address : 0xffff, 0x0910, 4);
@@ -2110,7 +2110,7 @@ int ecrt_master_activate(ec_master_t *master)
         }
         domain_offset += domain->data_size;
     }
-    
+
     up(&master->master_sem);
 
     // restart EoE process and master thread with new locking
@@ -2129,7 +2129,7 @@ int ecrt_master_activate(ec_master_t *master)
     master->send_cb = master->app_send_cb;
     master->receive_cb = master->app_receive_cb;
     master->cb_data = master->app_cb_data;
-    
+
 #ifdef EC_EOE
     if (eoe_was_running) {
         ec_master_eoe_start(master);
@@ -2175,11 +2175,11 @@ void ecrt_master_deactivate(ec_master_t *master)
     eoe_was_running = master->eoe_thread != NULL;
     ec_master_eoe_stop(master);
 #endif
-    
+
     master->send_cb = ec_master_internal_send_cb;
     master->receive_cb = ec_master_internal_receive_cb;
     master->cb_data = master;
-    
+
     ec_master_clear_config(master);
 
     for (slave = master->slaves;

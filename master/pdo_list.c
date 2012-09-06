@@ -152,7 +152,7 @@ int ec_pdo_list_add_pdo_copy(
         EC_ERR("PDO 0x%04X is already mapped!\n", pdo->index);
         return -EEXIST;
     }
-    
+
     if (!(mapped_pdo = kmalloc(sizeof(ec_pdo_t), GFP_KERNEL))) {
         EC_ERR("Failed to allocate PDO memory.\n");
         return -ENOMEM;
@@ -190,7 +190,7 @@ int ec_pdo_list_copy(
         if (ret)
             return ret;
     }
-    
+
     return 0;
 }
 

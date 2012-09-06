@@ -647,7 +647,7 @@ struct rtl8139_private {
 	struct mii_if_info	mii;
 	unsigned int		regs_len;
 	unsigned long		fifo_copy_timeout;
-    
+
 	ec_device_t *ecdev;
 };
 

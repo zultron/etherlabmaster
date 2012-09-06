@@ -590,7 +590,7 @@ typedef struct {
     uint16_t entry_index;
     uint8_t entry_subindex;
     uint32_t domain_index;
-    
+
     // outputs
     unsigned int bit_position;
 } ec_ioctl_reg_pdo_entry_t;

@@ -52,7 +52,7 @@ MASTER0_DEVICE=""
 #
 # Note: The e100, e1000, e1000e and r8169 drivers are not built by default.
 # Enable them with the --enable-<driver> configure switches.
-# 
+#
 DEVICE_MODULES=""
 
 #
@@ -60,7 +60,7 @@ DEVICE_MODULES=""
 #
 # This can usually be left empty. Adjust this variable, if you have problems
 # with module loading.
-# 
+#
 #MODPROBE_FLAGS="-b"
 
 #------------------------------------------------------------------------------

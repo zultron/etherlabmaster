@@ -95,7 +95,7 @@ void CommandPdos::execute(const StringVector &args)
     SlaveList slaves;
     SlaveList::const_iterator si;
     bool showHeader, multiMaster;
-    
+
     if (args.size()) {
         stringstream err;
         err << "'" << getName() << "' takes no arguments!";
@@ -130,7 +130,7 @@ void CommandPdos::listSlavePdos(
     ec_ioctl_slave_sync_pdo_t pdo;
     ec_ioctl_slave_sync_pdo_entry_t entry;
     unsigned int i, j, k;
-    
+
     if (showHeader && slave.sync_count)
         cout << "=== Master " << m.getIndex()
             << ", Slave " << slave.position << " ===" << endl;

@@ -80,7 +80,7 @@ static const char *type_strings[] = {
     "ARMW",
     "FRMW"
 };
-    
+
 /*****************************************************************************/
 
 /** Constructor.
@@ -622,7 +622,7 @@ void ec_datagram_output_stats(
 {
     if (jiffies - datagram->stats_output_jiffies > HZ) {
         datagram->stats_output_jiffies = jiffies;
-    
+
         if (unlikely(datagram->skip_count)) {
             EC_WARN("Datagram %p (%s) was SKIPPED %u time%s.\n",
                     datagram, datagram->name,

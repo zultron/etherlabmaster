@@ -672,7 +672,7 @@ e1000_down(struct e1000_adapter *adapter)
 	netdev->tx_queue_len = adapter->tx_queue_len;
 	adapter->link_speed = 0;
 	adapter->link_duplex = 0;
-	
+
 	if (!adapter->ecdev) {
 		netif_carrier_off(netdev);
 		netif_stop_queue(netdev);
@@ -2467,7 +2467,7 @@ e1000_leave_82542_rst(struct e1000_adapter *adapter)
 		/* No need to loop, because 82542 supports only 1 queue */
 		struct e1000_rx_ring *ring = &adapter->rx_ring[0];
 		e1000_configure_rx(adapter);
-		if (adapter->ecdev) { 
+		if (adapter->ecdev) {
 			/* fill rx ring completely! */
 			adapter->alloc_rx_buf(adapter, ring, ring->count);
 		} else {
@@ -3924,7 +3924,7 @@ e1000_intr_msi(int irq, void *data)
 	struct net_device *netdev = data;
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
-	
+
 	int i;
 
 	if (adapter->ecdev) {
@@ -4103,7 +4103,7 @@ e1000_intr(int irq, void *data)
 
 #endif
 	}
-	
+
 	return IRQ_HANDLED;
 }
 

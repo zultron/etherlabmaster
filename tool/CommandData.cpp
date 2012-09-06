@@ -102,7 +102,7 @@ void CommandData::outputDomainData(
     ec_ioctl_domain_data_t data;
     unsigned char *processData;
     unsigned int i;
-    
+
     if (!domain.data_size)
         return;
 
