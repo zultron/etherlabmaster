@@ -384,11 +384,13 @@ int ec_eoe_is_idle(const ec_eoe_t *eoe /**< EoE handler */)
  *
  * Starts a new receiving sequence by queueing a datagram that checks the
  * slave's mailbox for a new EoE datagram.
+ *
+ * \fixme Use both devices.
  */
 void ec_eoe_state_rx_start(ec_eoe_t *eoe /**< EoE handler */)
 {
     if (eoe->slave->error_flag ||
-            !eoe->slave->master->main_device.link_state) {
+            !eoe->slave->master->devices[EC_DEVICE_MAIN].link_state) {
         eoe->rx_idle = 1;
         eoe->tx_idle = 1;
         return;
@@ -611,6 +613,8 @@ void ec_eoe_state_rx_fetch(ec_eoe_t *eoe /**< EoE handler */)
  *
  * Starts a new transmit sequence. If no data is available, a new receive
  * sequence is started instead.
+ *
+ * \fixme Use both devices.
  */
 void ec_eoe_state_tx_start(ec_eoe_t *eoe /**< EoE handler */)
 {
@@ -619,7 +623,7 @@ void ec_eoe_state_tx_start(ec_eoe_t *eoe /**< EoE handler */)
 #endif
 
     if (eoe->slave->error_flag ||
-            !eoe->slave->master->main_device.link_state) {
+            !eoe->slave->master->devices[EC_DEVICE_MAIN].link_state) {
         eoe->rx_idle = 1;
         eoe->tx_idle = 1;
         return;

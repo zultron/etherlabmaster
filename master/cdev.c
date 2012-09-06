@@ -190,10 +190,11 @@ int ec_cdev_ioctl_master(
         )
 {
     ec_ioctl_master_t data;
-    unsigned int i;
+    unsigned int i, j;
 
     if (down_interruptible(&master->master_sem))
         return -EINTR;
+
     data.slave_count = master->slave_count;
     data.config_count = ec_master_config_count(master);
     data.domain_count = ec_master_domain_count(master);
@@ -203,49 +204,55 @@ int ec_cdev_ioctl_master(
     data.phase = (uint8_t) master->phase;
     data.active = (uint8_t) master->active;
     data.scan_busy = master->scan_busy;
+
     up(&master->master_sem);
 
     if (down_interruptible(&master->device_sem))
         return -EINTR;
 
-    if (master->main_device.dev) {
-        memcpy(data.devices[0].address,
-                master->main_device.dev->dev_addr, ETH_ALEN);
-    } else {
-        memcpy(data.devices[0].address, master->main_mac, ETH_ALEN); 
-    }
-    data.devices[0].attached = master->main_device.dev ? 1 : 0;
-    data.devices[0].link_state = master->main_device.link_state ? 1 : 0;
-    data.devices[0].tx_count = master->main_device.tx_count;
-    data.devices[0].rx_count = master->main_device.rx_count;
-    data.devices[0].tx_bytes = master->main_device.tx_bytes;
-    data.devices[0].tx_errors = master->main_device.tx_errors;
-    for (i = 0; i < EC_RATE_COUNT; i++) {
-        data.devices[0].tx_frame_rates[i] =
-            master->main_device.tx_frame_rates[i];
-        data.devices[0].tx_byte_rates[i] =
-            master->main_device.tx_byte_rates[i];
-        data.devices[0].loss_rates[i] = master->main_device.loss_rates[i];
+    for (i = 0; i < EC_NUM_DEVICES; i++) {
+        ec_device_t *device = &master->devices[i];
+
+        if (device->dev) {
+            memcpy(data.devices[i].address,
+                    device->dev->dev_addr, ETH_ALEN);
+        } else {
+            memcpy(data.devices[i].address, master->macs[i], ETH_ALEN);
+        }
+        data.devices[i].attached = device->dev ? 1 : 0;
+        data.devices[i].link_state = device->link_state ? 1 : 0;
+        data.devices[i].tx_count = device->tx_count;
+        data.devices[i].rx_count = device->rx_count;
+        data.devices[i].tx_bytes = device->tx_bytes;
+        data.devices[i].rx_bytes = device->rx_bytes;
+        data.devices[i].tx_errors = device->tx_errors;
+        for (j = 0; j < EC_RATE_COUNT; j++) {
+            data.devices[i].tx_frame_rates[j] =
+                device->tx_frame_rates[j];
+            data.devices[i].rx_frame_rates[j] =
+                device->rx_frame_rates[j];
+            data.devices[i].tx_byte_rates[j] =
+                device->tx_byte_rates[j];
+            data.devices[i].rx_byte_rates[j] =
+                device->rx_byte_rates[j];
+        }
     }
 
-    if (master->backup_device.dev) {
-        memcpy(data.devices[1].address,
-                master->backup_device.dev->dev_addr, ETH_ALEN); 
-    } else {
-        memcpy(data.devices[1].address, master->backup_mac, ETH_ALEN); 
-    }
-    data.devices[1].attached = master->backup_device.dev ? 1 : 0;
-    data.devices[1].link_state = master->backup_device.link_state ? 1 : 0;
-    data.devices[1].tx_count = master->backup_device.tx_count;
-    data.devices[1].rx_count = master->backup_device.rx_count;
-    data.devices[1].tx_bytes = master->backup_device.tx_bytes;
-    data.devices[1].tx_errors = master->backup_device.tx_errors;
+    data.tx_count = master->device_stats.tx_count;
+    data.rx_count = master->device_stats.rx_count;
+    data.tx_bytes = master->device_stats.tx_bytes;
+    data.rx_bytes = master->device_stats.rx_bytes;
     for (i = 0; i < EC_RATE_COUNT; i++) {
-        data.devices[1].tx_frame_rates[i] =
-            master->backup_device.tx_frame_rates[i];
-        data.devices[1].tx_byte_rates[i] =
-            master->backup_device.tx_byte_rates[i];
-        data.devices[1].loss_rates[i] = master->backup_device.loss_rates[i];
+        data.tx_frame_rates[i] =
+            master->device_stats.tx_frame_rates[i];
+        data.rx_frame_rates[i] =
+            master->device_stats.rx_frame_rates[i];
+        data.tx_byte_rates[i] =
+            master->device_stats.tx_byte_rates[i];
+        data.rx_byte_rates[i] =
+            master->device_stats.rx_byte_rates[i];
+        data.loss_rates[i] =
+            master->device_stats.loss_rates[i];
     }
 
     up(&master->device_sem);
@@ -287,6 +294,7 @@ int ec_cdev_ioctl_slave(
         return -EINVAL;
     }
 
+    data.device_index = slave->device_index;
     data.vendor_id = slave->sii.vendor_id;
     data.product_code = slave->sii.product_code;
     data.revision_number = slave->sii.revision_number;
@@ -530,6 +538,7 @@ int ec_cdev_ioctl_domain(
 {
     ec_ioctl_domain_t data;
     const ec_domain_t *domain;
+    unsigned int dev_idx;
 
     if (copy_from_user(&data, (void __user *) arg, sizeof(data))) {
         return -EFAULT;
@@ -546,7 +555,9 @@ int ec_cdev_ioctl_domain(
 
     data.data_size = domain->data_size;
     data.logical_base_address = domain->logical_base_address;
-    data.working_counter = domain->working_counter;
+    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        data.working_counter[dev_idx] = domain->working_counter[dev_idx];
+    }
     data.expected_working_counter = domain->expected_working_counter;
     data.fmmu_count = ec_domain_fmmu_count(domain);
 
@@ -1810,6 +1821,40 @@ int ec_cdev_ioctl_master_state(
 
     if (copy_to_user((void __user *) arg, &data, sizeof(data)))
         return -EFAULT;
+
+    return 0;
+}
+
+/*****************************************************************************/
+
+/** Get the master state.
+ */
+int ec_cdev_ioctl_master_link_state(
+        ec_master_t *master, /**< EtherCAT master. */
+        unsigned long arg, /**< ioctl() argument. */
+        ec_cdev_priv_t *priv /**< Private data structure of file handle. */
+        )
+{
+    ec_ioctl_link_state_t ioctl;
+    ec_master_link_state_t state;
+    int ret;
+
+    if (unlikely(!priv->requested)) {
+        return -EPERM;
+    }
+
+    if (copy_from_user(&ioctl, (void __user *) arg, sizeof(ioctl))) {
+        return -EFAULT;
+    }
+
+    ret = ecrt_master_link_state(master, ioctl.dev_idx, &state);
+    if (ret < 0) {
+        return ret;
+    }
+
+    if (copy_to_user((void __user *) ioctl.state, &state, sizeof(state))) {
+        return -EFAULT;
+    }
 
     return 0;
 }
@@ -3617,6 +3662,9 @@ long eccdev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
             break;
         case EC_IOCTL_MASTER_STATE:
             ret = ec_cdev_ioctl_master_state(master, arg, priv);
+            break;
+        case EC_IOCTL_MASTER_LINK_STATE:
+            ret = ec_cdev_ioctl_master_link_state(master, arg, priv);
             break;
         case EC_IOCTL_APP_TIME:
             if (!(filp->f_mode & FMODE_WRITE)) {

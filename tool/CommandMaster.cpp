@@ -93,7 +93,7 @@ void CommandMaster::execute(const StringVector &args)
             << "  Phase: ";
 
         switch (data.phase) {
-            case 0:  cout << "Waiting for device..."; break;
+            case 0:  cout << "Waiting for device(s)..."; break;
             case 1:  cout << "Idle"; break;
             case 2:  cout << "Operation"; break;
             default: cout << "???";
@@ -114,12 +114,6 @@ void CommandMaster::execute(const StringVector &args)
                     && data.devices[i].address[5] == 0x00) {
                 cout << "None.";
             } else {
-                unsigned int lost =
-                    data.devices[i].tx_count - data.devices[i].rx_count;
-                if (lost == 1) {
-                    // allow one frame travelling
-                    lost = 0;
-                }
                 cout << hex << setfill('0')
                     << setw(2) << (unsigned int) data.devices[i].address[0]
                     << ":"
@@ -139,11 +133,12 @@ void CommandMaster::execute(const StringVector &args)
                     << (data.devices[i].link_state ? "UP" : "DOWN") << endl
                     << "      Tx frames:   "
                     << data.devices[i].tx_count << endl
-                    << "      Rx frames:   "
-                    << data.devices[i].rx_count << endl
-                    << "      Lost frames: " << lost << endl
                     << "      Tx bytes:    "
                     << data.devices[i].tx_bytes << endl
+                    << "      Rx frames:   "
+                    << data.devices[i].rx_count << endl
+                    << "      Rx bytes:    "
+                    << data.devices[i].rx_bytes << endl
                     << "      Tx errors:   "
                     << data.devices[i].tx_errors << endl
                     << "      Tx frame rate [1/s]: "
@@ -166,33 +161,106 @@ void CommandMaster::execute(const StringVector &args)
                     }
                 }
                 cout << endl
-                    << "      Loss rate [1/s]:     "
-                    << setprecision(0) << fixed;
+                    << "      Rx frame rate [1/s]: "
+                    << setfill(' ') << setprecision(0) << fixed;
                 for (j = 0; j < EC_RATE_COUNT; j++) {
                     cout << setw(ColWidth)
-                        << data.devices[i].loss_rates[j] / 1000.0;
+                        << data.devices[i].rx_frame_rates[j] / 1000.0;
                     if (j < EC_RATE_COUNT - 1) {
                         cout << " ";
                     }
                 }
                 cout << endl
-                    << "      Frame loss [%]:      "
+                    << "      Rx rate [KByte/s]:   "
                     << setprecision(1) << fixed;
                 for (j = 0; j < EC_RATE_COUNT; j++) {
-                    double perc = 0.0;
-                    if (data.devices[i].tx_frame_rates[j]) {
-                        perc = 100.0 * data.devices[i].loss_rates[j] /
-                            data.devices[i].tx_frame_rates[j];
-                    }
-                    cout << setw(ColWidth) << perc;
+                    cout << setw(ColWidth)
+                        << data.devices[i].rx_byte_rates[j] / 1024.0;
                     if (j < EC_RATE_COUNT - 1) {
                         cout << " ";
                     }
                 }
                 cout << setprecision(0) << endl;
             }
-            cout << endl;
         }
+        unsigned int lost = data.tx_count - data.rx_count;
+        if (lost == 1) {
+            // allow one frame travelling
+            lost = 0;
+        }
+        cout << "    Common:" << endl
+            << "      Tx frames:   "
+            << data.tx_count << endl
+            << "      Tx bytes:    "
+            << data.tx_bytes << endl
+            << "      Rx frames:   "
+            << data.rx_count << endl
+            << "      Rx bytes:    "
+            << data.rx_bytes << endl
+            << "      Lost frames: " << lost << endl
+            << "      Tx frame rate [1/s]: "
+            << setfill(' ') << setprecision(0) << fixed;
+        for (j = 0; j < EC_RATE_COUNT; j++) {
+            cout << setw(ColWidth)
+                << data.tx_frame_rates[j] / 1000.0;
+            if (j < EC_RATE_COUNT - 1) {
+                cout << " ";
+            }
+        }
+        cout << endl
+            << "      Tx rate [KByte/s]:   "
+            << setprecision(1) << fixed;
+        for (j = 0; j < EC_RATE_COUNT; j++) {
+            cout << setw(ColWidth)
+                << data.tx_byte_rates[j] / 1024.0;
+            if (j < EC_RATE_COUNT - 1) {
+                cout << " ";
+            }
+        }
+        cout << endl
+            << "      Rx frame rate [1/s]: "
+            << setfill(' ') << setprecision(0) << fixed;
+        for (j = 0; j < EC_RATE_COUNT; j++) {
+            cout << setw(ColWidth)
+                << data.rx_frame_rates[j] / 1000.0;
+            if (j < EC_RATE_COUNT - 1) {
+                cout << " ";
+            }
+        }
+        cout << endl
+            << "      Rx rate [KByte/s]:   "
+            << setprecision(1) << fixed;
+        for (j = 0; j < EC_RATE_COUNT; j++) {
+            cout << setw(ColWidth)
+                << data.rx_byte_rates[j] / 1024.0;
+            if (j < EC_RATE_COUNT - 1) {
+                cout << " ";
+            }
+        }
+        cout << endl
+            << "      Loss rate [1/s]:     "
+            << setprecision(0) << fixed;
+        for (j = 0; j < EC_RATE_COUNT; j++) {
+            cout << setw(ColWidth)
+                << data.loss_rates[j] / 1000.0;
+            if (j < EC_RATE_COUNT - 1) {
+                cout << " ";
+            }
+        }
+        cout << endl
+            << "      Frame loss [%]:      "
+            << setprecision(1) << fixed;
+        for (j = 0; j < EC_RATE_COUNT; j++) {
+            double perc = 0.0;
+            if (data.tx_frame_rates[j]) {
+                perc = 100.0 * data.loss_rates[j] / data.tx_frame_rates[j];
+            }
+            cout << setw(ColWidth) << perc;
+            if (j < EC_RATE_COUNT - 1) {
+                cout << " ";
+            }
+        }
+        cout << setprecision(0) << endl;
 
         cout << "  Distributed clocks:" << endl
             << "    Reference clock: ";

@@ -31,6 +31,7 @@
 noinst_HEADERS = \
 	cdev.c cdev.h \
 	datagram.c datagram.h \
+	datagram_pair.c datagram_pair.h \
 	debug.c	debug.h \
 	device.c device.h \
 	domain.c domain.h \

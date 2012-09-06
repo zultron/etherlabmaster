@@ -51,6 +51,7 @@ class CommandSlaves:
             string state;
             string flag;
             string name;
+            unsigned int device;
         };
 
         void listSlaves(MasterDevice &, const SlaveList &, bool);
