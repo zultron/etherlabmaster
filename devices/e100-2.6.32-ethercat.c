@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- *  $Id: e100-2.6.32-ethercat.c,v d05df15dcc6c 2011/09/22 16:51:31 fp $
+ *  $Id$
  *
  *  Copyright (C) 2007-2008  Florian Pose, Ingenieurgemeinschaft IgH
  *
