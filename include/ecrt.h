@@ -848,8 +848,7 @@ void ecrt_master_deactivate(
         );
 
 
-/** Set interval between calls to ecrt_master_send
- *
+/** Set interval between calls to ecrt_master_send().
  */
 int ecrt_master_set_send_interval(
         ec_master_t *master, /**< EtherCAT master. */
