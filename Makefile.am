@@ -30,10 +30,10 @@
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = \
-    devices \
-    include \
-    master \
-    script
+	devices \
+	include \
+	master \
+	script
 
 if BUILD_TOOL
 SUBDIRS += tool
@@ -51,14 +51,14 @@ endif
 SUBDIRS += examples
 
 DIST_SUBDIRS = \
-    devices \
-    examples \
-    include \
-    lib \
-    m4 \
-    master \
-    script \
-    tool \
+	devices \
+	examples \
+	include \
+	lib \
+	m4 \
+	master \
+	script \
+	tool \
 	tty
 
 noinst_HEADERS = \
