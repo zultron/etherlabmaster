@@ -28,14 +28,12 @@
 #
 #------------------------------------------------------------------------------
 
-AM_CFLAGS = -Wall
-
 lib_LTLIBRARIES = libethercat.la
 
 #------------------------------------------------------------------------------
 
+libethercat_la_CFLAGS = -I$(srcdir)/.. -fno-strict-aliasing -Wall
 libethercat_la_LDFLAGS = -version-info 1:0:0
-libethercat_la_CFLAGS = -I$(srcdir)/.. -fno-strict-aliasing
 libethercat_la_SOURCES = \
 	common.c \
 	domain.c \

@@ -255,8 +255,6 @@ void read_sdo(void)
 
 void cyclic_task()
 {
-    int i;
-
     // receive process data
     ecrt_master_receive(master);
     ecrt_domain_process(domain1);
