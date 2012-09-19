@@ -27,12 +27,10 @@
 #
 #------------------------------------------------------------------------------
 
-AM_CFLAGS = -Wall
-
 noinst_PROGRAMS = ec_user_example
 
 ec_user_example_SOURCES = main.c
-ec_user_example_CFLAGS = -I$(top_srcdir)/include
+ec_user_example_CFLAGS = -I$(top_srcdir)/include -Wall
 ec_user_example_LDFLAGS = -L$(top_builddir)/lib/.libs -lethercat
 
 #------------------------------------------------------------------------------
