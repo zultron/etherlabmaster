@@ -37,6 +37,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <sys/ioctl.h>
 
 #include "sdo_request.h"
 #include "master/ioctl.h"

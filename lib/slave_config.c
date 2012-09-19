@@ -70,7 +70,6 @@ int ecrt_slave_config_sync_manager(ec_slave_config_t *sc, uint8_t sync_index,
         ec_direction_t dir, ec_watchdog_mode_t watchdog_mode)
 {
     ec_ioctl_config_t data;
-    unsigned int i;
 
     if (sync_index >= EC_MAX_SYNC_MANAGERS)
         return -ENOENT;
@@ -473,7 +472,6 @@ ec_voe_handler_t *ecrt_slave_config_create_voe_handler(ec_slave_config_t *sc,
 {
     ec_ioctl_voe_t data;
     ec_voe_handler_t *voe;
-    unsigned int index;
 
     voe = malloc(sizeof(ec_voe_handler_t));
     if (!voe) {
