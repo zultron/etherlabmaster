@@ -1,4 +1,4 @@
-/******************************************************************************
+/*****************************************************************************
  *
  *  $Id$
  *
@@ -26,7 +26,7 @@
  *  EtherCAT technology and brand is only permitted in compliance with the
  *  industrial property and similar rights of Beckhoff Automation GmbH.
  *
- *****************************************************************************/
+ ****************************************************************************/
 
 #include <stdlib.h>
 #include <sys/ioctl.h>
@@ -40,7 +40,7 @@
 #include "slave_config.h"
 #include "master/ioctl.h"
 
-/*****************************************************************************/
+/****************************************************************************/
 
 int ecrt_master_reserve(ec_master_t *master)
 {
@@ -52,7 +52,7 @@ int ecrt_master_reserve(ec_master_t *master)
     return 0;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 void ec_master_clear_config(ec_master_t *master)
 {
@@ -76,7 +76,7 @@ void ec_master_clear_config(ec_master_t *master)
     master->first_config = NULL;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 void ec_master_clear(ec_master_t *master)
 {
@@ -91,7 +91,7 @@ void ec_master_clear(ec_master_t *master)
     }
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 void ec_master_add_domain(ec_master_t *master, ec_domain_t *domain)
 {
@@ -106,7 +106,7 @@ void ec_master_add_domain(ec_master_t *master, ec_domain_t *domain)
     }
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 ec_domain_t *ecrt_master_create_domain(ec_master_t *master)
 {
@@ -136,7 +136,7 @@ ec_domain_t *ecrt_master_create_domain(ec_master_t *master)
     return domain;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 void ec_master_add_slave_config(ec_master_t *master, ec_slave_config_t *sc)
 {
@@ -151,7 +151,7 @@ void ec_master_add_slave_config(ec_master_t *master, ec_slave_config_t *sc)
     }
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 ec_slave_config_t *ecrt_master_slave_config(ec_master_t *master,
         uint16_t alias, uint16_t position, uint32_t vendor_id,
@@ -192,7 +192,7 @@ ec_slave_config_t *ecrt_master_slave_config(ec_master_t *master,
     return sc;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 int ecrt_master(ec_master_t* master, ec_master_info_t *master_info)
 {
@@ -210,7 +210,7 @@ int ecrt_master(ec_master_t* master, ec_master_info_t *master_info)
     return 0;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 int ecrt_master_get_slave(ec_master_t *master, uint16_t slave_position,
         ec_slave_info_t *slave_info)
@@ -233,13 +233,16 @@ int ecrt_master_get_slave(ec_master_t *master, uint16_t slave_position,
     slave_info->alias = data.alias;
     slave_info->current_on_ebus = data.current_on_ebus;
     for ( i = 0; i < EC_MAX_PORTS; i++ ) {
-    	slave_info->ports[i].desc = data.ports[i].desc;
-    	slave_info->ports[i].link.link_up = data.ports[i].link.link_up;
-    	slave_info->ports[i].link.loop_closed = data.ports[i].link.loop_closed;
-    	slave_info->ports[i].link.signal_detected = data.ports[i].link.signal_detected;
-    	slave_info->ports[i].receive_time = data.ports[i].receive_time;
-    	slave_info->ports[i].next_slave = data.ports[i].next_slave;
-    	slave_info->ports[i].delay_to_next_dc = data.ports[i].delay_to_next_dc;
+        slave_info->ports[i].desc = data.ports[i].desc;
+        slave_info->ports[i].link.link_up = data.ports[i].link.link_up;
+        slave_info->ports[i].link.loop_closed =
+            data.ports[i].link.loop_closed;
+        slave_info->ports[i].link.signal_detected =
+            data.ports[i].link.signal_detected;
+        slave_info->ports[i].receive_time = data.ports[i].receive_time;
+        slave_info->ports[i].next_slave = data.ports[i].next_slave;
+        slave_info->ports[i].delay_to_next_dc =
+            data.ports[i].delay_to_next_dc;
     }
     slave_info->al_state = data.al_state;
     slave_info->error_flag = data.error_flag;
@@ -249,7 +252,7 @@ int ecrt_master_get_slave(ec_master_t *master, uint16_t slave_position,
     return 0;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 int ecrt_master_get_sync_manager(ec_master_t *master, uint16_t slave_position,
         uint8_t sync_index, ec_sync_info_t *sync)
@@ -281,7 +284,7 @@ int ecrt_master_get_sync_manager(ec_master_t *master, uint16_t slave_position,
     return 0;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 int ecrt_master_get_pdo(ec_master_t *master, uint16_t slave_position,
         uint8_t sync_index, uint16_t pos, ec_pdo_info_t *pdo)
@@ -309,7 +312,7 @@ int ecrt_master_get_pdo(ec_master_t *master, uint16_t slave_position,
     return 0;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 int ecrt_master_get_pdo_entry(ec_master_t *master, uint16_t slave_position,
         uint8_t sync_index, uint16_t pdo_pos, uint16_t entry_pos,
@@ -339,7 +342,7 @@ int ecrt_master_get_pdo_entry(ec_master_t *master, uint16_t slave_position,
     return 0;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 int ecrt_master_sdo_download(ec_master_t *master, uint16_t slave_position,
         uint16_t index, uint8_t subindex, uint8_t *data,
@@ -366,7 +369,7 @@ int ecrt_master_sdo_download(ec_master_t *master, uint16_t slave_position,
     return 0;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 int ecrt_master_sdo_download_complete(ec_master_t *master,
         uint16_t slave_position, uint16_t index, uint8_t *data,
@@ -393,7 +396,7 @@ int ecrt_master_sdo_download_complete(ec_master_t *master,
     return 0;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 int ecrt_master_sdo_upload(ec_master_t *master, uint16_t slave_position,
         uint16_t index, uint8_t subindex, uint8_t *target,
@@ -420,7 +423,7 @@ int ecrt_master_sdo_upload(ec_master_t *master, uint16_t slave_position,
     return 0;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 int ecrt_master_write_idn(ec_master_t *master, uint16_t slave_position,
         uint8_t drive_no, uint16_t idn, uint8_t *data, size_t data_size,
@@ -445,7 +448,7 @@ int ecrt_master_write_idn(ec_master_t *master, uint16_t slave_position,
     return 0;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 int ecrt_master_read_idn(ec_master_t *master, uint16_t slave_position,
         uint8_t drive_no, uint16_t idn, uint8_t *target, size_t target_size,
@@ -471,7 +474,7 @@ int ecrt_master_read_idn(ec_master_t *master, uint16_t slave_position,
     return 0;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 int ecrt_master_activate(ec_master_t *master)
 {
@@ -486,7 +489,8 @@ int ecrt_master_activate(ec_master_t *master)
         master->process_data = mmap(0, master->process_data_size,
                 PROT_READ | PROT_WRITE, MAP_SHARED, master->fd, 0);
         if (master->process_data == MAP_FAILED) {
-            fprintf(stderr, "Failed to map process data: %s", strerror(errno));
+            fprintf(stderr, "Failed to map process data: %s",
+                    strerror(errno));
             master->process_data = NULL;
             master->process_data_size = 0;
             return -1; // FIXME
@@ -499,7 +503,7 @@ int ecrt_master_activate(ec_master_t *master)
     return 0;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 void ecrt_master_deactivate(ec_master_t *master)
 {
@@ -511,9 +515,10 @@ void ecrt_master_deactivate(ec_master_t *master)
     ec_master_clear_config(master);
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
-int ecrt_master_set_send_interval(ec_master_t *master,size_t send_interval_us)
+int ecrt_master_set_send_interval(ec_master_t *master,
+        size_t send_interval_us)
 {
     if (ioctl(master->fd, EC_IOCTL_SET_SEND_INTERVAL,
                 &send_interval_us) == -1) {
@@ -524,7 +529,7 @@ int ecrt_master_set_send_interval(ec_master_t *master,size_t send_interval_us)
     return 0;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 void ecrt_master_send(ec_master_t *master)
 {
@@ -533,7 +538,7 @@ void ecrt_master_send(ec_master_t *master)
     }
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 void ecrt_master_receive(ec_master_t *master)
 {
@@ -542,7 +547,7 @@ void ecrt_master_receive(ec_master_t *master)
     }
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 void ecrt_master_state(const ec_master_t *master, ec_master_state_t *state)
 {
@@ -551,7 +556,7 @@ void ecrt_master_state(const ec_master_t *master, ec_master_state_t *state)
     }
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 int ecrt_master_link_state(const ec_master_t *master, unsigned int dev_idx,
         ec_master_link_state_t *state)
@@ -566,7 +571,7 @@ int ecrt_master_link_state(const ec_master_t *master, unsigned int dev_idx,
     }
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 void ecrt_master_application_time(ec_master_t *master, uint64_t app_time)
 {
@@ -580,7 +585,7 @@ void ecrt_master_application_time(ec_master_t *master, uint64_t app_time)
     }
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 void ecrt_master_sync_reference_clock(ec_master_t *master)
 {
@@ -590,7 +595,7 @@ void ecrt_master_sync_reference_clock(ec_master_t *master)
     }
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 void ecrt_master_sync_slave_clocks(ec_master_t *master)
 {
@@ -599,7 +604,7 @@ void ecrt_master_sync_slave_clocks(ec_master_t *master)
     }
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 void ecrt_master_sync_monitor_queue(ec_master_t *master)
 {
@@ -609,7 +614,7 @@ void ecrt_master_sync_monitor_queue(ec_master_t *master)
     }
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 uint32_t ecrt_master_sync_monitor_process(ec_master_t *master)
 {
@@ -624,7 +629,7 @@ uint32_t ecrt_master_sync_monitor_process(ec_master_t *master)
     return time_diff;
 }
 
-/*****************************************************************************/
+/****************************************************************************/
 
 void ecrt_master_reset(ec_master_t *master)
 {
@@ -633,4 +638,4 @@ void ecrt_master_reset(ec_master_t *master)
     }
 }
 
-/*****************************************************************************/
+/****************************************************************************/
