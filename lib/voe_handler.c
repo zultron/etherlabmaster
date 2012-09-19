@@ -49,8 +49,9 @@
 
 void ec_voe_handler_clear(ec_voe_handler_t *voe)
 {
-    if (voe->data)
+    if (voe->data) {
         free(voe->data);
+    }
 }
 
 /*****************************************************************************/
