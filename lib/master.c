@@ -28,6 +28,7 @@
  *
  ****************************************************************************/
 
+#include <unistd.h> /* close() */
 #include <stdlib.h>
 #include <sys/ioctl.h>
 #include <stdio.h>
@@ -159,7 +160,6 @@ ec_slave_config_t *ecrt_master_slave_config(ec_master_t *master,
 {
     ec_ioctl_config_t data;
     ec_slave_config_t *sc;
-    int index;
 
     sc = malloc(sizeof(ec_slave_config_t));
     if (!sc) {
@@ -216,7 +216,7 @@ int ecrt_master_get_slave(ec_master_t *master, uint16_t slave_position,
         ec_slave_info_t *slave_info)
 {
     ec_ioctl_slave_t data;
-    int index, i;
+    int i;
 
     data.position = slave_position;
 
@@ -569,6 +569,8 @@ int ecrt_master_link_state(const ec_master_t *master, unsigned int dev_idx,
         fprintf(stderr, "Failed to get link state: %s\n", strerror(errno));
         return -errno;
     }
+
+    return 0;
 }
 
 /****************************************************************************/
