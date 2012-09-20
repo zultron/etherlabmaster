@@ -15,9 +15,9 @@
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General
 #  Public License for more details.
 #
-#  You should have received a copy of the GNU General Public License along
-#  with the IgH EtherCAT Master; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+#  You should have received a copy of the GNU General Public License along with
+#  the IgH EtherCAT Master; if not, write to the Free Software Foundation,
+#  Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #
 #  ---
 #
@@ -25,18 +25,21 @@
 #  EtherCAT technology and brand is only permitted in compliance with the
 #  industrial property and similar rights of Beckhoff Automation GmbH.
 #
-#  vi: syntax=make
-#
 #------------------------------------------------------------------------------
 
-obj-m := mini/
+noinst_PROGRAMS = ec_xenomai_example
 
-ifeq (@ENABLE_TTY@,1)
-	obj-m += tty/
-endif
+ec_xenomai_example_SOURCES = main.c
 
-ifeq (@ENABLE_RTAI@,1)
-	obj-m += rtai/ dc_rtai/
-endif
+ec_xenomai_example_CFLAGS = \
+	-Wall \
+	-I$(top_srcdir)/include \
+	$(XENOMAI_NATIVE_CFLAGS) \
+	$(XENOMAI_RTDM_CFLAGS)
+
+ec_xenomai_example_LDFLAGS = \
+	-L$(top_builddir)/lib/.libs -lethercat_rtdm \
+	$(XENOMAI_NATIVE_LDFLAGS) \
+	$(XENOMAI_RTDM_LDFLAGS)
 
 #------------------------------------------------------------------------------

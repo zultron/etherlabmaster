@@ -2,7 +2,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+#  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
 #
 #  This file is part of the IgH EtherCAT Master.
 #
@@ -40,13 +40,29 @@ SUBDIRS += \
 	tty
 endif
 
+if ENABLE_RTDM
+if ENABLE_XENOMAI
+SUBDIRS += \
+	xenomai \
+	xenomai_posix
+endif
+
+if ENABLE_RTAI
+SUBDIRS += \
+	rtai_rtdm
+endif
+endif
+
 DIST_SUBDIRS = \
 	dc_rtai \
 	dc_user \
 	mini \
 	rtai \
+	rtai_rtdm \
 	tty \
-	user
+	user \
+	xenomai \
+	xenomai_posix
 
 EXTRA_DIST = \
 	Kbuild.in

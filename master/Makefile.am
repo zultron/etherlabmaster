@@ -2,7 +2,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+#  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
 #
 #  This file is part of the IgH EtherCAT Master.
 #
@@ -32,7 +32,7 @@ noinst_HEADERS = \
 	cdev.c cdev.h \
 	datagram.c datagram.h \
 	datagram_pair.c datagram_pair.h \
-	debug.c	debug.h \
+	debug.c debug.h \
 	device.c device.h \
 	domain.c domain.h \
 	doxygen.c \
@@ -52,13 +52,15 @@ noinst_HEADERS = \
 	fsm_slave_scan.c fsm_slave_scan.h \
 	fsm_soe.c fsm_soe.h \
 	globals.h \
-	ioctl.h \
+	ioctl.c ioctl.h \
 	mailbox.c mailbox.h \
 	master.c master.h \
 	module.c \
 	pdo.c pdo.h \
 	pdo_entry.c pdo_entry.h \
 	pdo_list.c pdo_list.h \
+	rtdm-ioctl.c \
+	rtdm.c rtdm.h \
 	sdo.c sdo.h \
 	sdo_entry.c sdo_entry.h \
 	sdo_request.c sdo_request.h \

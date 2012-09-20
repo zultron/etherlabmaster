@@ -2,7 +2,7 @@
 #
 #  $Id$
 #
-#  Copyright (C) 2006-2009  Florian Pose, Ingenieurgemeinschaft IgH
+#  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
 #
 #  This file is part of the IgH EtherCAT master userspace library.
 #
@@ -32,8 +32,6 @@ lib_LTLIBRARIES = libethercat.la
 
 #------------------------------------------------------------------------------
 
-libethercat_la_CFLAGS = -I$(srcdir)/.. -fno-strict-aliasing -Wall
-libethercat_la_LDFLAGS = -version-info 1:0:0
 libethercat_la_SOURCES = \
 	common.c \
 	domain.c \
@@ -48,5 +46,30 @@ noinst_HEADERS = \
 	sdo_request.h \
 	slave_config.h \
 	voe_handler.h
+
+libethercat_la_CFLAGS = -fno-strict-aliasing -Wall
+libethercat_la_LDFLAGS = -version-info 1:0:0
+
+#------------------------------------------------------------------------------
+
+if ENABLE_RTDM
+
+lib_LTLIBRARIES += libethercat_rtdm.la
+
+libethercat_rtdm_la_SOURCES = $(libethercat_la_SOURCES)
+libethercat_rtdm_la_CFLAGS = $(libethercat_la_CFLAGS) -DUSE_RTDM
+libethercat_rtdm_la_LDFLAGS = $(libethercat_la_LDFLAGS)
+
+if ENABLE_XENOMAI
+libethercat_rtdm_la_CFLAGS += $(XENOMAI_RTDM_CFLAGS)
+libethercat_rtdm_la_LDFLAGS += $(XENOMAI_RTDM_LDFLAGS)
+endif
+
+if ENABLE_RTAI
+libethercat_rtdm_la_CFLAGS += $(RTAI_LXRT_CFLAGS)
+libethercat_rtdm_la_LDFLAGS += $(RTAI_LXRT_LDFLAGS)
+endif
+
+endif
 
 #------------------------------------------------------------------------------

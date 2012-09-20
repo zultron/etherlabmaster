@@ -100,12 +100,18 @@ examples/modules.order
 examples/rtai/Kbuild
 examples/rtai/Makefile
 examples/rtai/Makefile.in
+examples/rtai_rtdm/.libs
+examples/rtai_rtdm/ec_rtai_rtdm_example
 examples/user/.deps
 examples/user/.libs
 examples/user/Makefile
 examples/user/Makefile.in
 examples/user/TAGS
 examples/user/ec_user_example
+examples/xenomai/.libs
+examples/xenomai/ec_xenomai_example
+examples/xenomai_posix/.libs
+examples/xenomai_posix/ec_xenomai_posix_example
 include/Makefile
 include/Makefile.in
 include/TAGS
@@ -115,6 +121,7 @@ lib/Makefile
 lib/Makefile.in
 lib/TAGS
 lib/libethercat.la
+lib/libethercat_rtdm.la
 libtool
 m4/Makefile
 m4/Makefile.in
