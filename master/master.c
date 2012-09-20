@@ -2,7 +2,7 @@
  *
  *  $Id$
  *
- *  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -298,8 +298,24 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
         goto out_clear_cdev;
     }
 
+#ifdef EC_RTDM
+    // init RTDM device
+    ret = ec_rtdm_dev_init(&master->rtdm_dev, master);
+    if (ret) {
+        goto out_unregister_class_device;
+    }
+#endif
+
     return 0;
 
+#ifdef EC_RTDM
+out_unregister_class_device:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 26)
+    device_unregister(master->class_device);
+#else
+    class_device_unregister(master->class_device);
+#endif
+#endif
 out_clear_cdev:
     ec_cdev_clear(&master->cdev);
 out_clear_sync_mon:
@@ -327,6 +343,10 @@ void ec_master_clear(
         ec_master_t *master /**< EtherCAT master */
         )
 {
+#ifdef EC_RTDM
+    ec_rtdm_dev_clear(&master->rtdm_dev);
+#endif
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 26)
     device_unregister(master->class_device);
 #else

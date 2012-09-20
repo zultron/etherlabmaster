@@ -2,7 +2,7 @@
  *
  *  $Id$
  *
- *  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT master userspace library.
  *
@@ -781,7 +781,7 @@ int ecrt_master_sdo_upload(
  * error occurred.
  *
  * \retval  0 Success.
- * \retval -1 An error occured.
+ * \retval <0 Error code.
  */
 int ecrt_master_write_idn(
         ec_master_t *master, /**< EtherCAT master. */
@@ -800,7 +800,7 @@ int ecrt_master_write_idn(
  * error occurred.
  *
  * \retval  0 Success.
- * \retval -1 An error occured.
+ * \retval <0 Error code.
  */
 int ecrt_master_read_idn(
         ec_master_t *master, /**< EtherCAT master. */
@@ -848,6 +848,10 @@ void ecrt_master_deactivate(
         );
 
 /** Set interval between calls to ecrt_master_send().
+ *
+ * \retval 0 on success.
+ * \retval <0 Error code.
+ *
  */
 int ecrt_master_set_send_interval(
         ec_master_t *master, /**< EtherCAT master. */

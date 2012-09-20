@@ -2,7 +2,7 @@
  *
  *  $Id$
  *
- *  Copyright (C) 2006-2009  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT master userspace library.
  *
@@ -35,15 +35,13 @@
 
 /*****************************************************************************/
 
-#include <sys/ioctl.h>
-#include <sys/mman.h>
 #include <stdio.h>
-#include <errno.h>
 #include <string.h>
+#include <errno.h> /* ENOENT */
 
+#include "ioctl.h"
 #include "domain.h"
 #include "master.h"
-#include "master/ioctl.h"
 
 /*****************************************************************************/
 
@@ -64,11 +62,11 @@ int ecrt_domain_reg_pdo_entry_list(ec_domain_t *domain,
     for (reg = regs; reg->index; reg++) {
         if (!(sc = ecrt_master_slave_config(domain->master, reg->alias,
                         reg->position, reg->vendor_id, reg->product_code)))
-            return -1; // FIXME
+            return -ENOENT;
 
         if ((ret = ecrt_slave_config_reg_pdo_entry(sc, reg->index,
                         reg->subindex, domain, reg->bit_position)) < 0)
-            return -1; // FIXME
+            return ret;
 
         *reg->offset = ret;
     }
@@ -85,9 +83,9 @@ uint8_t *ecrt_domain_data(ec_domain_t *domain)
 
         offset = ioctl(domain->master->fd, EC_IOCTL_DOMAIN_OFFSET,
                 domain->index);
-        if (offset == -1) {
+        if (EC_IOCTL_IS_ERROR(offset)) {
             fprintf(stderr, "Failed to get domain offset: %s\n",
-                    strerror(errno));
+                    strerror(EC_IOCTL_ERRNO(offset)));
             return NULL;
         }
 
@@ -101,9 +99,12 @@ uint8_t *ecrt_domain_data(ec_domain_t *domain)
 
 void ecrt_domain_process(ec_domain_t *domain)
 {
-    if (ioctl(domain->master->fd, EC_IOCTL_DOMAIN_PROCESS,
-                domain->index) == -1) {
-        fprintf(stderr, "Failed to process domain: %s\n", strerror(errno));
+    int ret;
+
+    ret = ioctl(domain->master->fd, EC_IOCTL_DOMAIN_PROCESS, domain->index);
+    if (EC_IOCTL_IS_ERROR(ret)) {
+        fprintf(stderr, "Failed to process domain: %s\n",
+                strerror(EC_IOCTL_ERRNO(ret)));
     }
 }
 
@@ -111,9 +112,12 @@ void ecrt_domain_process(ec_domain_t *domain)
 
 void ecrt_domain_queue(ec_domain_t *domain)
 {
-    if (ioctl(domain->master->fd, EC_IOCTL_DOMAIN_QUEUE,
-                domain->index) == -1) {
-        fprintf(stderr, "Failed to queue domain: %s\n", strerror(errno));
+    int ret;
+
+    ret = ioctl(domain->master->fd, EC_IOCTL_DOMAIN_QUEUE, domain->index);
+    if (EC_IOCTL_IS_ERROR(ret)) {
+        fprintf(stderr, "Failed to queue domain: %s\n",
+                strerror(EC_IOCTL_ERRNO(ret)));
     }
 }
 
@@ -122,13 +126,15 @@ void ecrt_domain_queue(ec_domain_t *domain)
 void ecrt_domain_state(const ec_domain_t *domain, ec_domain_state_t *state)
 {
     ec_ioctl_domain_state_t data;
+    int ret;
 
     data.domain_index = domain->index;
     data.state = state;
 
-    if (ioctl(domain->master->fd, EC_IOCTL_DOMAIN_STATE, &data) == -1) {
+    ret = ioctl(domain->master->fd, EC_IOCTL_DOMAIN_STATE, &data);
+    if (EC_IOCTL_IS_ERROR(ret)) {
         fprintf(stderr, "Failed to get domain state: %s\n",
-                strerror(errno));
+                strerror(EC_IOCTL_ERRNO(ret)));
     }
 }
 

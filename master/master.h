@@ -2,7 +2,7 @@
  *
  *  $Id$
  *
- *  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -54,6 +54,10 @@
 #include "ethernet.h"
 #include "fsm_master.h"
 #include "cdev.h"
+
+#ifdef EC_RTDM
+#include "rtdm.h"
+#endif
 
 /*****************************************************************************/
 
@@ -181,6 +185,10 @@ struct ec_master {
     struct device *class_device; /**< Master class device. */
 #else
     struct class_device *class_device; /**< Master class device. */
+#endif
+
+#ifdef EC_RTDM
+    ec_rtdm_dev_t rtdm_dev; /**< RTDM device. */
 #endif
 
     struct semaphore master_sem; /**< Master semaphore. */

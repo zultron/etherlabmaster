@@ -2,7 +2,7 @@
  *
  *  $Id$
  *
- *  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -96,7 +96,7 @@
 #define EC_IOCTL_REQUEST                EC_IO(0x1e)
 #define EC_IOCTL_CREATE_DOMAIN          EC_IO(0x1f)
 #define EC_IOCTL_CREATE_SLAVE_CONFIG  EC_IOWR(0x20, ec_ioctl_config_t)
-#define EC_IOCTL_ACTIVATE              EC_IOR(0x21, size_t)
+#define EC_IOCTL_ACTIVATE              EC_IOR(0x21, ec_ioctl_master_activate_t)
 #define EC_IOCTL_DEACTIVATE             EC_IO(0x22)
 #define EC_IOCTL_SEND                   EC_IO(0x23)
 #define EC_IOCTL_RECEIVE                EC_IO(0x24)
@@ -574,6 +574,14 @@ typedef struct {
 /*****************************************************************************/
 
 typedef struct {
+    // outputs
+    void *process_data;
+    size_t process_data_size;
+} ec_ioctl_master_activate_t;
+
+/*****************************************************************************/
+
+typedef struct {
     // inputs
     uint32_t config_index;
     uint16_t pdo_index;
@@ -686,6 +694,32 @@ typedef struct {
     // inputs
     uint64_t app_time;
 } ec_ioctl_app_time_t;
+
+/*****************************************************************************/
+
+#ifdef __KERNEL__
+
+/** Context data structure for file handles.
+ */
+typedef struct {
+    unsigned int writable; /**< Device was opened with write permission. */
+    unsigned int requested; /**< Master was requested via this file handle. */
+    uint8_t *process_data; /**< Total process data area. */
+    size_t process_data_size; /**< Size of the \a process_data. */
+} ec_ioctl_context_t;
+
+long ec_ioctl(ec_master_t *, ec_ioctl_context_t *, unsigned int,
+		void __user *);
+
+#ifdef EC_RTDM
+
+long ec_ioctl_rtdm(ec_master_t *, ec_ioctl_context_t *, unsigned int,
+		void __user *);
+int ec_rtdm_mmap(ec_ioctl_context_t *, void **);
+
+#endif
+
+#endif
 
 /*****************************************************************************/
 
