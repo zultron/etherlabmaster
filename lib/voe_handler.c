@@ -171,15 +171,9 @@ ec_request_state_t ecrt_voe_handler_execute(ec_voe_handler_t *voe)
 
     if (data.size) { // new data waiting to be copied
         if (voe->mem_size < data.size) {
-            if (voe->data)
-                free(voe->data);
-            voe->data = malloc(data.size);
-            if (!voe->data) {
-                voe->mem_size = 0;
-                fprintf(stderr, "Failed to allocate VoE data memory!");
-                return EC_REQUEST_ERROR;
-            }
-            voe->mem_size = data.size;
+            fprintf(stderr, "Received %u bytes do not fit info VoE data"
+                    " memory (%u bytes)!\n", data.size, voe->mem_size);
+            return EC_REQUEST_ERROR;
         }
 
         data.data = voe->data;
