@@ -190,7 +190,7 @@ void ec_fsm_pdo_entry_read_state_start(
         ec_fsm_pdo_entry_t *fsm /**< PDO mapping state machine. */
         )
 {
-    ec_sdo_request_address(&fsm->request, fsm->target_pdo->index, 0);
+    ecrt_sdo_request_index(&fsm->request, fsm->target_pdo->index, 0);
     ecrt_sdo_request_read(&fsm->request);
 
     fsm->state = ec_fsm_pdo_entry_read_state_count;
@@ -243,7 +243,8 @@ void ec_fsm_pdo_entry_read_action_next(
         )
 {
     if (fsm->entry_pos <= fsm->entry_count) {
-        ec_sdo_request_address(&fsm->request, fsm->target_pdo->index, fsm->entry_pos);
+        ecrt_sdo_request_index(&fsm->request, fsm->target_pdo->index,
+                fsm->entry_pos);
         ecrt_sdo_request_read(&fsm->request);
         fsm->state = ec_fsm_pdo_entry_read_state_entry;
         ec_fsm_coe_transfer(fsm->fsm_coe, fsm->slave, &fsm->request);
@@ -336,7 +337,7 @@ void ec_fsm_pdo_entry_conf_state_start(
     // set mapped PDO entry count to zero
     EC_WRITE_U8(fsm->request.data, 0);
     fsm->request.data_size = 1;
-    ec_sdo_request_address(&fsm->request, fsm->source_pdo->index, 0);
+    ecrt_sdo_request_index(&fsm->request, fsm->source_pdo->index, 0);
     ecrt_sdo_request_write(&fsm->request);
 
     EC_SLAVE_DBG(fsm->slave, 1, "Setting entry count to zero.\n");
@@ -413,7 +414,8 @@ void ec_fsm_pdo_entry_conf_action_map(
         | fsm->entry->subindex << 8 | fsm->entry->bit_length;
     EC_WRITE_U32(fsm->request.data, value);
     fsm->request.data_size = 4;
-    ec_sdo_request_address(&fsm->request, fsm->source_pdo->index, fsm->entry_pos);
+    ecrt_sdo_request_index(&fsm->request, fsm->source_pdo->index,
+            fsm->entry_pos);
     ecrt_sdo_request_write(&fsm->request);
 
     fsm->state = ec_fsm_pdo_entry_conf_state_map_entry;
@@ -448,7 +450,7 @@ void ec_fsm_pdo_entry_conf_state_map_entry(
         // No more entries to add. Write entry count.
         EC_WRITE_U8(fsm->request.data, fsm->entry_pos);
         fsm->request.data_size = 1;
-        ec_sdo_request_address(&fsm->request, fsm->source_pdo->index, 0);
+        ecrt_sdo_request_index(&fsm->request, fsm->source_pdo->index, 0);
         ecrt_sdo_request_write(&fsm->request);
 
         EC_SLAVE_DBG(fsm->slave, 1, "Setting number of PDO entries to %u.\n",

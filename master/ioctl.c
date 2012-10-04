@@ -2580,6 +2580,41 @@ static int ec_ioctl_domain_state(
 
 /*****************************************************************************/
 
+/** Sets an SDO request's SDO index and subindex.
+ */
+static int ec_ioctl_sdo_request_index(
+        ec_master_t *master, /**< EtherCAT master. */
+        void *arg, /**< ioctl() argument. */
+        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
+        )
+{
+    ec_ioctl_sdo_request_t data;
+    ec_slave_config_t *sc;
+    ec_sdo_request_t *req;
+
+    if (unlikely(!ctx->requested))
+        return -EPERM;
+
+    if (copy_from_user(&data, (void __user *) arg, sizeof(data)))
+        return -EFAULT;
+
+    /* no locking of master_sem needed, because neither sc nor req will not be
+     * deleted in the meantime. */
+
+    if (!(sc = ec_master_get_config(master, data.config_index))) {
+        return -ENOENT;
+    }
+
+    if (!(req = ec_slave_config_find_sdo_request(sc, data.request_index))) {
+        return -ENOENT;
+    }
+
+    ecrt_sdo_request_index(req, data.sdo_index, data.sdo_subindex);
+    return 0;
+}
+
+/*****************************************************************************/
+
 /** Sets an SDO request's timeout.
  */
 static int ec_ioctl_sdo_request_timeout(
@@ -3685,6 +3720,13 @@ long EC_IOCTL(ec_master_t *master, ec_ioctl_context_t *ctx,
             break;
         case EC_IOCTL_DOMAIN_STATE:
             ret = ec_ioctl_domain_state(master, arg, ctx);
+            break;
+        case EC_IOCTL_SDO_REQUEST_INDEX:
+            if (!ctx->writable) {
+                ret = -EPERM;
+                break;
+            }
+            ret = ec_ioctl_sdo_request_index(master, arg, ctx);
             break;
         case EC_IOCTL_SDO_REQUEST_TIMEOUT:
             if (!ctx->writable) {

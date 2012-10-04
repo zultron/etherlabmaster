@@ -2608,7 +2608,7 @@ int ecrt_master_sdo_download(ec_master_t *master, uint16_t slave_position,
     }
 
     ec_sdo_request_init(&request.req);
-    ec_sdo_request_address(&request.req, index, subindex);
+    ecrt_sdo_request_index(&request.req, index, subindex);
     if (ec_sdo_request_alloc(&request.req, data_size)) {
         ec_sdo_request_clear(&request.req);
         return -ENOMEM;
@@ -2687,7 +2687,7 @@ int ecrt_master_sdo_download_complete(ec_master_t *master,
     }
 
     ec_sdo_request_init(&request.req);
-    ec_sdo_request_address(&request.req, index, 0);
+    ecrt_sdo_request_index(&request.req, index, 0);
     if (ec_sdo_request_alloc(&request.req, data_size)) {
         ec_sdo_request_clear(&request.req);
         return -ENOMEM;
@@ -2766,7 +2766,7 @@ int ecrt_master_sdo_upload(ec_master_t *master, uint16_t slave_position,
             target, target_size, result_size, abort_code);
 
     ec_sdo_request_init(&request.req);
-    ec_sdo_request_address(&request.req, index, subindex);
+    ecrt_sdo_request_index(&request.req, index, subindex);
     ecrt_sdo_request_read(&request.req);
 
     if (down_interruptible(&master->master_sem)) {
