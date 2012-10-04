@@ -779,7 +779,7 @@ int ecrt_slave_config_sdo(ec_slave_config_t *sc, uint16_t index,
     }
 
     ec_sdo_request_init(req);
-    ec_sdo_request_address(req, index, subindex);
+    ecrt_sdo_request_index(req, index, subindex);
 
     ret = ec_sdo_request_copy_data(req, data, size);
     if (ret < 0) {
@@ -863,7 +863,7 @@ int ecrt_slave_config_complete_sdo(ec_slave_config_t *sc, uint16_t index,
     }
 
     ec_sdo_request_init(req);
-    ec_sdo_request_address(req, index, 0);
+    ecrt_sdo_request_index(req, index, 0);
     req->complete_access = 1;
 
     ret = ec_sdo_request_copy_data(req, data, size);
@@ -901,7 +901,7 @@ ec_sdo_request_t *ecrt_slave_config_create_sdo_request_err(
     }
 
     ec_sdo_request_init(req);
-    ec_sdo_request_address(req, index, subindex);
+    ecrt_sdo_request_index(req, index, subindex);
 
     ret = ec_sdo_request_alloc(req, size);
     if (ret < 0) {

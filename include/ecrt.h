@@ -46,6 +46,8 @@
  *   the state of a redundant link.
  * - Added the EC_HAVE_REDUNDANCY define, to check, if the interface contains
  *   redundancy features.
+ * - Added ecrt_sdo_request_index() to change SDO index and subindex after
+ *   handler creation.
  *
  * Changes in version 1.5:
  *
@@ -1446,6 +1448,18 @@ void ecrt_domain_state(
 /*****************************************************************************
  * SDO request methods.
  ****************************************************************************/
+
+/** Set the SDO index and subindex.
+ *
+ * \attention If the SDO index and/or subindex is changed while
+ * ecrt_sdo_request_state() returns EC_SDO_REQUEST_BUSY, this may lead to
+ * unexpected results.
+ */
+void ecrt_sdo_request_index(
+        ec_sdo_request_t *req, /**< SDO request. */
+        uint16_t index, /**< SDO index. */
+        uint8_t subindex /**< SDO subindex. */
+        );
 
 /** Set the timeout for an SDO request.
  *

@@ -218,7 +218,7 @@ void ec_fsm_pdo_read_action_next_sync(
 
         ec_pdo_list_clear_pdos(&fsm->pdos);
 
-        ec_sdo_request_address(&fsm->request, 0x1C10 + fsm->sync_index, 0);
+        ecrt_sdo_request_index(&fsm->request, 0x1C10 + fsm->sync_index, 0);
         ecrt_sdo_request_read(&fsm->request);
         fsm->state = ec_fsm_pdo_read_state_pdo_count;
         ec_fsm_coe_transfer(fsm->fsm_coe, fsm->slave, &fsm->request);
@@ -274,7 +274,7 @@ void ec_fsm_pdo_read_action_next_pdo(
         )
 {
     if (fsm->pdo_pos <= fsm->pdo_count) {
-        ec_sdo_request_address(&fsm->request, 0x1C10 + fsm->sync_index,
+        ecrt_sdo_request_index(&fsm->request, 0x1C10 + fsm->sync_index,
                 fsm->pdo_pos);
         ecrt_sdo_request_read(&fsm->request);
         fsm->state = ec_fsm_pdo_read_state_pdo;
@@ -597,7 +597,7 @@ void ec_fsm_pdo_conf_action_check_assignment(
         // set mapped PDO count to zero
         EC_WRITE_U8(fsm->request.data, 0); // zero PDOs mapped
         fsm->request.data_size = 1;
-        ec_sdo_request_address(&fsm->request, 0x1C10 + fsm->sync_index, 0);
+        ecrt_sdo_request_index(&fsm->request, 0x1C10 + fsm->sync_index, 0);
         ecrt_sdo_request_write(&fsm->request);
 
         EC_SLAVE_DBG(fsm->slave, 1, "Setting number of assigned"
@@ -663,7 +663,7 @@ void ec_fsm_pdo_conf_action_assign_pdo(
 {
     EC_WRITE_U16(fsm->request.data, fsm->pdo->index);
     fsm->request.data_size = 2;
-    ec_sdo_request_address(&fsm->request,
+    ecrt_sdo_request_index(&fsm->request,
             0x1C10 + fsm->sync_index, fsm->pdo_pos);
     ecrt_sdo_request_write(&fsm->request);
 
@@ -700,7 +700,7 @@ void ec_fsm_pdo_conf_state_assign_pdo(
         // no more PDOs to assign, set PDO count
         EC_WRITE_U8(fsm->request.data, fsm->pdo_pos);
         fsm->request.data_size = 1;
-        ec_sdo_request_address(&fsm->request, 0x1C10 + fsm->sync_index, 0);
+        ecrt_sdo_request_index(&fsm->request, 0x1C10 + fsm->sync_index, 0);
         ecrt_sdo_request_write(&fsm->request);
 
         EC_SLAVE_DBG(fsm->slave, 1,

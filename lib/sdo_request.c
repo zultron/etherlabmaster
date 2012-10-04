@@ -55,6 +55,26 @@ void ec_sdo_request_clear(ec_sdo_request_t *req)
  * Application interface.
  ****************************************************************************/
 
+void ecrt_sdo_request_index(ec_sdo_request_t *req, uint16_t index,
+        uint8_t subindex)
+{
+    ec_ioctl_sdo_request_t data;
+    int ret;
+
+    data.config_index = req->config->index;
+    data.request_index = req->index;
+    data.sdo_index = index;
+    data.sdo_subindex = subindex;
+
+    ret = ioctl(req->config->master->fd, EC_IOCTL_SDO_REQUEST_INDEX, &data);
+    if (EC_IOCTL_IS_ERROR(ret)) {
+        fprintf(stderr, "Failed to set SDO request index/subindex: %s\n",
+                strerror(EC_IOCTL_ERRNO(ret)));
+    }
+}
+
+/*****************************************************************************/
+
 void ecrt_sdo_request_timeout(ec_sdo_request_t *req, uint32_t timeout)
 {
     ec_ioctl_sdo_request_t data;
