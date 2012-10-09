@@ -1350,6 +1350,7 @@ static int ec_ioctl_config_sdo(
     ioctl->size = req->data_size;
     memcpy(ioctl->data, req->data,
             min((u32) ioctl->size, (u32) EC_MAX_SDO_DATA_SIZE));
+    ioctl->complete_access = req->complete_access;
 
     up(&master->master_sem);
 
