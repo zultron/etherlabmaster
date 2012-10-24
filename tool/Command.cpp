@@ -216,6 +216,13 @@ void Command::setOutputFile(const string &f)
     outputFile = f;
 };
 
+/*****************************************************************************/
+
+void Command::setSkin(const string &s)
+{
+    skin = s;
+};
+
 /****************************************************************************/
 
 bool Command::matchesSubstr(const string &cmd) const
