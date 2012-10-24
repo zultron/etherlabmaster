@@ -113,6 +113,9 @@ class Command
         void setOutputFile(const string &);
         const string &getOutputFile() const;
 
+        void setSkin(const string &);
+        const string &getSkin() const;
+
         bool matchesSubstr(const string &) const;
         bool matchesAbbrev(const string &) const;
 
@@ -151,6 +154,7 @@ class Command
         string dataType;
         bool force;
         string outputFile;
+        string skin;
 
         Command();
 };
@@ -195,6 +199,13 @@ inline bool Command::getForce() const
 inline const string &Command::getOutputFile() const
 {
     return outputFile;
+}
+
+/****************************************************************************/
+
+inline const string &Command::getSkin() const
+{
+    return skin;
 }
 
 /****************************************************************************/
