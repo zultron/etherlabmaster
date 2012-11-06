@@ -38,6 +38,7 @@
 #include "master.h"
 #include "mailbox.h"
 #include "fsm_coe.h"
+#include "slave_config.h"
 
 /*****************************************************************************/
 
@@ -267,6 +268,13 @@ int ec_fsm_coe_check_emergency(
                 " request:\n");
         ec_print_data(data, size);
         return 1;
+    }
+
+    {
+        ec_slave_config_t *sc = fsm->slave->config;
+        if (sc) {
+            ec_coe_emerg_ring_push(&sc->emerg_ring, data + 2);
+        }
     }
 
     EC_SLAVE_WARN(fsm->slave, "CoE Emergency Request received:\n"

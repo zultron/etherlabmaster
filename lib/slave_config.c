@@ -403,6 +403,84 @@ int ecrt_slave_config_sdo32(ec_slave_config_t *sc, uint16_t index,
 
 /*****************************************************************************/
 
+int ecrt_slave_config_emerg_size(ec_slave_config_t *sc, size_t elements)
+{
+    ec_ioctl_sc_emerg_t io;
+    int ret;
+
+    io.config_index = sc->index;
+    io.size = elements;
+
+    ret = ioctl(sc->master->fd, EC_IOCTL_SC_EMERG_SIZE, &io);
+    if (EC_IOCTL_IS_ERROR(ret)) {
+        fprintf(stderr, "Failed to set emergency ring size: %s\n",
+                strerror(EC_IOCTL_ERRNO(ret)));
+        return -EC_IOCTL_ERRNO(ret);
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
+
+int ecrt_slave_config_emerg_pop(ec_slave_config_t *sc, uint8_t *target)
+{
+    ec_ioctl_sc_emerg_t io;
+    int ret;
+
+    io.config_index = sc->index;
+    io.target = target;
+
+    ret = ioctl(sc->master->fd, EC_IOCTL_SC_EMERG_POP, &io);
+    if (EC_IOCTL_IS_ERROR(ret)) {
+        fprintf(stderr, "Failed to get emergency message: %s\n",
+                strerror(EC_IOCTL_ERRNO(ret)));
+        return -EC_IOCTL_ERRNO(ret);
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
+
+int ecrt_slave_config_emerg_clear(ec_slave_config_t *sc)
+{
+    ec_ioctl_sc_emerg_t io;
+    int ret;
+
+    io.config_index = sc->index;
+
+    ret = ioctl(sc->master->fd, EC_IOCTL_SC_EMERG_CLEAR, &io);
+    if (EC_IOCTL_IS_ERROR(ret)) {
+        fprintf(stderr, "Failed to clear emergency ring: %s\n",
+                strerror(EC_IOCTL_ERRNO(ret)));
+        return -EC_IOCTL_ERRNO(ret);
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
+
+int ecrt_slave_config_emerg_overruns(ec_slave_config_t *sc)
+{
+    ec_ioctl_sc_emerg_t io;
+    int ret;
+
+    io.config_index = sc->index;
+
+    ret = ioctl(sc->master->fd, EC_IOCTL_SC_EMERG_OVERRUNS, &io);
+    if (EC_IOCTL_IS_ERROR(ret)) {
+        fprintf(stderr, "Failed to get emergency overruns: %s\n",
+                strerror(EC_IOCTL_ERRNO(ret)));
+        return -EC_IOCTL_ERRNO(ret);
+    }
+
+    return io.overruns;
+}
+
+/*****************************************************************************/
+
 void ec_slave_config_add_sdo_request(ec_slave_config_t *sc,
         ec_sdo_request_t *req)
 {

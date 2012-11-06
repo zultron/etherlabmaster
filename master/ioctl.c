@@ -2276,6 +2276,169 @@ static int ec_ioctl_sc_sdo(
 
 /*****************************************************************************/
 
+/** Set the emergency ring buffer size.
+ */
+static int ec_ioctl_sc_emerg_size(
+        ec_master_t *master, /**< EtherCAT master. */
+        void *arg, /**< ioctl() argument. */
+        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
+        )
+{
+    ec_ioctl_sc_emerg_t io;
+    ec_slave_config_t *sc;
+    int ret;
+
+    if (unlikely(!ctx->requested))
+        return -EPERM;
+
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io)))
+        return -EFAULT;
+
+    if (down_interruptible(&master->master_sem)) {
+        return -EINTR;
+    }
+
+    if (!(sc = ec_master_get_config(master, io.config_index))) {
+        up(&master->master_sem);
+        return -ENOENT;
+    }
+
+    ret = ecrt_slave_config_emerg_size(sc, io.size);
+
+    up(&master->master_sem);
+
+    return ret;
+}
+
+/*****************************************************************************/
+
+/** Get an emergency message from the ring.
+ */
+static int ec_ioctl_sc_emerg_pop(
+        ec_master_t *master, /**< EtherCAT master. */
+        void *arg, /**< ioctl() argument. */
+        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
+        )
+{
+    ec_ioctl_sc_emerg_t io;
+    ec_slave_config_t *sc;
+    u8 msg[EC_COE_EMERGENCY_MSG_SIZE];
+    int ret;
+
+    if (unlikely(!ctx->requested))
+        return -EPERM;
+
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io)))
+        return -EFAULT;
+
+    if (down_interruptible(&master->master_sem)) {
+        return -EINTR;
+    }
+
+    if (!(sc = ec_master_get_config(master, io.config_index))) {
+        up(&master->master_sem);
+        return -ENOENT;
+    }
+
+    ret = ecrt_slave_config_emerg_pop(sc, msg);
+
+    up(&master->master_sem);
+
+    if (ret < 0) {
+        return ret;
+    }
+
+    if (copy_to_user((void __user *) io.target, msg, sizeof(msg))) {
+        return -EFAULT;
+    }
+
+    return ret;
+}
+
+/*****************************************************************************/
+
+/** Clear the emergency ring.
+ */
+static int ec_ioctl_sc_emerg_clear(
+        ec_master_t *master, /**< EtherCAT master. */
+        void *arg, /**< ioctl() argument. */
+        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
+        )
+{
+    ec_ioctl_sc_emerg_t io;
+    ec_slave_config_t *sc;
+    int ret;
+
+    if (unlikely(!ctx->requested))
+        return -EPERM;
+
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io)))
+        return -EFAULT;
+
+    if (down_interruptible(&master->master_sem)) {
+        return -EINTR;
+    }
+
+    if (!(sc = ec_master_get_config(master, io.config_index))) {
+        up(&master->master_sem);
+        return -ENOENT;
+    }
+
+    ret = ecrt_slave_config_emerg_clear(sc);
+
+    up(&master->master_sem);
+
+    return ret;
+}
+
+/*****************************************************************************/
+
+/** Get the number of emergency overruns.
+ */
+static int ec_ioctl_sc_emerg_overruns(
+        ec_master_t *master, /**< EtherCAT master. */
+        void *arg, /**< ioctl() argument. */
+        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
+        )
+{
+    ec_ioctl_sc_emerg_t io;
+    ec_slave_config_t *sc;
+    int ret;
+
+    if (unlikely(!ctx->requested))
+        return -EPERM;
+
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io)))
+        return -EFAULT;
+
+    if (down_interruptible(&master->master_sem)) {
+        return -EINTR;
+    }
+
+    if (!(sc = ec_master_get_config(master, io.config_index))) {
+        up(&master->master_sem);
+        return -ENOENT;
+    }
+
+    ret = ecrt_slave_config_emerg_overruns(sc);
+
+    up(&master->master_sem);
+
+    if (ret < 0) {
+        return ret;
+    }
+
+    io.overruns = ret;
+
+    if (copy_to_user((void __user *) arg, &io, sizeof(io))) {
+        return -EFAULT;
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
+
 /** Create an SDO request.
  */
 static int ec_ioctl_sc_create_sdo_request(
@@ -3677,6 +3840,34 @@ long EC_IOCTL(ec_master_t *master, ec_ioctl_context_t *ctx,
                 break;
             }
             ret = ec_ioctl_sc_sdo(master, arg, ctx);
+            break;
+        case EC_IOCTL_SC_EMERG_SIZE:
+            if (!ctx->writable) {
+                ret = -EPERM;
+                break;
+            }
+            ret = ec_ioctl_sc_emerg_size(master, arg, ctx);
+            break;
+        case EC_IOCTL_SC_EMERG_POP:
+            if (!ctx->writable) {
+                ret = -EPERM;
+                break;
+            }
+            ret = ec_ioctl_sc_emerg_pop(master, arg, ctx);
+            break;
+        case EC_IOCTL_SC_EMERG_CLEAR:
+            if (!ctx->writable) {
+                ret = -EPERM;
+                break;
+            }
+            ret = ec_ioctl_sc_emerg_clear(master, arg, ctx);
+            break;
+        case EC_IOCTL_SC_EMERG_OVERRUNS:
+            if (!ctx->writable) {
+                ret = -EPERM;
+                break;
+            }
+            ret = ec_ioctl_sc_emerg_overruns(master, arg, ctx);
             break;
         case EC_IOCTL_SC_SDO_REQUEST:
             if (!ctx->writable) {

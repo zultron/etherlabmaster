@@ -56,7 +56,7 @@
  *
  * Increment this when changing the ioctl interface!
  */
-#define EC_IOCTL_VERSION_MAGIC 20
+#define EC_IOCTL_VERSION_MAGIC 21
 
 // Command-line tool
 #define EC_IOCTL_MODULE                EC_IOR(0x00, ec_ioctl_module_t)
@@ -117,28 +117,32 @@
 #define EC_IOCTL_SC_REG_PDO_ENTRY     EC_IOWR(0x33, ec_ioctl_reg_pdo_entry_t)
 #define EC_IOCTL_SC_DC                 EC_IOW(0x34, ec_ioctl_config_t)
 #define EC_IOCTL_SC_SDO                EC_IOW(0x35, ec_ioctl_sc_sdo_t)
-#define EC_IOCTL_SC_SDO_REQUEST       EC_IOWR(0x36, ec_ioctl_sdo_request_t)
-#define EC_IOCTL_SC_VOE               EC_IOWR(0x37, ec_ioctl_voe_t)
-#define EC_IOCTL_SC_STATE             EC_IOWR(0x38, ec_ioctl_sc_state_t)
-#define EC_IOCTL_SC_IDN                EC_IOW(0x39, ec_ioctl_sc_idn_t)
-#define EC_IOCTL_DOMAIN_OFFSET          EC_IO(0x3a)
-#define EC_IOCTL_DOMAIN_PROCESS         EC_IO(0x3b)
-#define EC_IOCTL_DOMAIN_QUEUE           EC_IO(0x3c)
-#define EC_IOCTL_DOMAIN_STATE         EC_IOWR(0x3d, ec_ioctl_domain_state_t)
-#define EC_IOCTL_SDO_REQUEST_INDEX    EC_IOWR(0x3e, ec_ioctl_sdo_request_t)
-#define EC_IOCTL_SDO_REQUEST_TIMEOUT  EC_IOWR(0x3f, ec_ioctl_sdo_request_t)
-#define EC_IOCTL_SDO_REQUEST_STATE    EC_IOWR(0x40, ec_ioctl_sdo_request_t)
-#define EC_IOCTL_SDO_REQUEST_READ     EC_IOWR(0x41, ec_ioctl_sdo_request_t)
-#define EC_IOCTL_SDO_REQUEST_WRITE    EC_IOWR(0x42, ec_ioctl_sdo_request_t)
-#define EC_IOCTL_SDO_REQUEST_DATA     EC_IOWR(0x43, ec_ioctl_sdo_request_t)
-#define EC_IOCTL_VOE_SEND_HEADER       EC_IOW(0x44, ec_ioctl_voe_t)
-#define EC_IOCTL_VOE_REC_HEADER       EC_IOWR(0x45, ec_ioctl_voe_t)
-#define EC_IOCTL_VOE_READ              EC_IOW(0x46, ec_ioctl_voe_t)
-#define EC_IOCTL_VOE_READ_NOSYNC       EC_IOW(0x47, ec_ioctl_voe_t)
-#define EC_IOCTL_VOE_WRITE            EC_IOWR(0x48, ec_ioctl_voe_t)
-#define EC_IOCTL_VOE_EXEC             EC_IOWR(0x49, ec_ioctl_voe_t)
-#define EC_IOCTL_VOE_DATA             EC_IOWR(0x4a, ec_ioctl_voe_t)
-#define EC_IOCTL_SET_SEND_INTERVAL     EC_IOW(0x4b, size_t)
+#define EC_IOCTL_SC_EMERG_SIZE         EC_IOW(0x36, ec_ioctl_sc_emerg_t)
+#define EC_IOCTL_SC_EMERG_POP         EC_IOWR(0x37, ec_ioctl_sc_emerg_t)
+#define EC_IOCTL_SC_EMERG_CLEAR        EC_IOW(0x38, ec_ioctl_sc_emerg_t)
+#define EC_IOCTL_SC_EMERG_OVERRUNS    EC_IOWR(0x39, ec_ioctl_sc_emerg_t)
+#define EC_IOCTL_SC_SDO_REQUEST       EC_IOWR(0x3a, ec_ioctl_sdo_request_t)
+#define EC_IOCTL_SC_VOE               EC_IOWR(0x3b, ec_ioctl_voe_t)
+#define EC_IOCTL_SC_STATE             EC_IOWR(0x3c, ec_ioctl_sc_state_t)
+#define EC_IOCTL_SC_IDN                EC_IOW(0x3d, ec_ioctl_sc_idn_t)
+#define EC_IOCTL_DOMAIN_OFFSET          EC_IO(0x3e)
+#define EC_IOCTL_DOMAIN_PROCESS         EC_IO(0x3f)
+#define EC_IOCTL_DOMAIN_QUEUE           EC_IO(0x40)
+#define EC_IOCTL_DOMAIN_STATE         EC_IOWR(0x41, ec_ioctl_domain_state_t)
+#define EC_IOCTL_SDO_REQUEST_INDEX    EC_IOWR(0x42, ec_ioctl_sdo_request_t)
+#define EC_IOCTL_SDO_REQUEST_TIMEOUT  EC_IOWR(0x43, ec_ioctl_sdo_request_t)
+#define EC_IOCTL_SDO_REQUEST_STATE    EC_IOWR(0x44, ec_ioctl_sdo_request_t)
+#define EC_IOCTL_SDO_REQUEST_READ     EC_IOWR(0x45, ec_ioctl_sdo_request_t)
+#define EC_IOCTL_SDO_REQUEST_WRITE    EC_IOWR(0x46, ec_ioctl_sdo_request_t)
+#define EC_IOCTL_SDO_REQUEST_DATA     EC_IOWR(0x47, ec_ioctl_sdo_request_t)
+#define EC_IOCTL_VOE_SEND_HEADER       EC_IOW(0x48, ec_ioctl_voe_t)
+#define EC_IOCTL_VOE_REC_HEADER       EC_IOWR(0x49, ec_ioctl_voe_t)
+#define EC_IOCTL_VOE_READ              EC_IOW(0x4a, ec_ioctl_voe_t)
+#define EC_IOCTL_VOE_READ_NOSYNC       EC_IOW(0x4b, ec_ioctl_voe_t)
+#define EC_IOCTL_VOE_WRITE            EC_IOWR(0x4c, ec_ioctl_voe_t)
+#define EC_IOCTL_VOE_EXEC             EC_IOWR(0x4d, ec_ioctl_voe_t)
+#define EC_IOCTL_VOE_DATA             EC_IOWR(0x4e, ec_ioctl_voe_t)
+#define EC_IOCTL_SET_SEND_INTERVAL     EC_IOW(0x4f, size_t)
 
 /*****************************************************************************/
 
@@ -616,6 +620,18 @@ typedef struct {
     size_t size;
     uint8_t complete_access;
 } ec_ioctl_sc_sdo_t;
+
+/*****************************************************************************/
+
+typedef struct {
+    // inputs
+    uint32_t config_index;
+    size_t size;
+    uint8_t *target;
+
+    // outputs
+    int32_t overruns;
+} ec_ioctl_sc_emerg_t;
 
 /*****************************************************************************/
 
