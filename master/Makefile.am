@@ -30,6 +30,7 @@
 # using HEADERS to enable tags target
 noinst_HEADERS = \
 	cdev.c cdev.h \
+	coe_emerg_ring.c coe_emerg_ring.h \
 	datagram.c datagram.h \
 	datagram_pair.c datagram_pair.h \
 	debug.c debug.h \

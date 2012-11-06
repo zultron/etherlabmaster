@@ -48,6 +48,10 @@
  *   redundancy features.
  * - Added ecrt_sdo_request_index() to change SDO index and subindex after
  *   handler creation.
+ * - Added interface for retrieving CoE emergency messages, i. e.
+ *   ecrt_slave_config_emerg_size(), ecrt_slave_config_emerg_pop(),
+ *   ecrt_slave_config_emerg_clear(), ecrt_slave_config_emerg_overruns() and
+ *   the defines EC_HAVE_EMERGENCY and EC_COE_EMERGENCY_MSG_SIZE.
  *
  * Changes in version 1.5:
  *
@@ -140,6 +144,12 @@
  */
 #define EC_HAVE_REDUNDANCY
 
+/** Defined, if the CoE emergency ring feature is available.
+ *
+ * I. e. if the ecrt_slave_config_emerg_*() methods are available.
+ */
+#define EC_HAVE_EMERGENCY
+
 /*****************************************************************************/
 
 /** End of list marker.
@@ -171,6 +181,12 @@
  */
 #define EC_TIMEVAL2NANO(TV) \
     (((TV).tv_sec - 946684800ULL) * 1000000000ULL + (TV).tv_usec * 1000ULL)
+
+/** Size of a CoE emergency message in byte.
+ *
+ * \see ecrt_slave_config_emerg_pop().
+ */
+#define EC_COE_EMERGENCY_MSG_SIZE 8
 
 /******************************************************************************
  * Data types
@@ -1281,6 +1297,55 @@ int ecrt_slave_config_complete_sdo(
         uint16_t index, /**< Index of the SDO to configure. */
         const uint8_t *data, /**< Pointer to the data. */
         size_t size /**< Size of the \a data. */
+        );
+
+/** Set the size of the CoE emergency ring buffer.
+ *
+ * The initial size is zero, so all messages will be dropped. This method can
+ * be called even after master activation, but it will clear the ring buffer!
+ *
+ * \return 0 on success, or negative error code.
+ */
+int ecrt_slave_config_emerg_size(
+        ec_slave_config_t *sc, /**< Slave configuration. */
+        size_t elements /**< Number of records of the CoE emergency ring. */
+        );
+
+/** Read and remove one record from the CoE emergency ring buffer.
+ *
+ * A record consists of 8 bytes:
+ *
+ * Byte 0-1: Error code (little endian)
+ * Byte   2: Error register
+ * Byte 3-7: Data
+ *
+ * \return 0 on success (record popped), or negative error code (i. e.
+ * -ENOENT, if ring is empty).
+ */
+int ecrt_slave_config_emerg_pop(
+        ec_slave_config_t *sc, /**< Slave configuration. */
+        uint8_t *target /**< Pointer to target memory (at least
+                          EC_COE_EMERGENCY_MSG_SIZE bytes). */
+        );
+
+/** Clears CoE emergency ring buffer and the overrun counter.
+ *
+ * \return 0 on success, or negative error code.
+ */
+int ecrt_slave_config_emerg_clear(
+        ec_slave_config_t *sc /**< Slave configuration. */
+        );
+
+/** Read the number of CoE emergency overruns.
+ *
+ * The overrun counter will be incremented when a CoE emergency message could
+ * not be stored in the ring buffer and had to be dropped. Call
+ * ecrt_slave_config_emerg_clear() to reset the counter.
+ *
+ * \return Number of overruns since last clear, or negative error code.
+ */
+int ecrt_slave_config_emerg_overruns(
+        ec_slave_config_t *sc /**< Slave configuration. */
         );
 
 /** Create an SDO request to exchange SDOs during realtime operation.

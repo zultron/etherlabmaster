@@ -88,6 +88,8 @@ void ec_slave_config_init(
     INIT_LIST_HEAD(&sc->sdo_requests);
     INIT_LIST_HEAD(&sc->voe_handlers);
     INIT_LIST_HEAD(&sc->soe_configs);
+
+    ec_coe_emerg_ring_init(&sc->emerg_ring, sc);
 }
 
 /*****************************************************************************/
@@ -138,6 +140,8 @@ void ec_slave_config_clear(
         ec_soe_request_clear(soe);
         kfree(soe);
     }
+
+    ec_coe_emerg_ring_clear(&sc->emerg_ring);
 }
 
 /*****************************************************************************/
@@ -881,6 +885,34 @@ int ecrt_slave_config_complete_sdo(ec_slave_config_t *sc, uint16_t index,
 
 /*****************************************************************************/
 
+int ecrt_slave_config_emerg_size(ec_slave_config_t *sc, size_t elements)
+{
+    return ec_coe_emerg_ring_size(&sc->emerg_ring, elements);
+}
+
+/*****************************************************************************/
+
+int ecrt_slave_config_emerg_pop(ec_slave_config_t *sc, uint8_t *target)
+{
+    return ec_coe_emerg_ring_pop(&sc->emerg_ring, target);
+}
+
+/*****************************************************************************/
+
+int ecrt_slave_config_emerg_clear(ec_slave_config_t *sc)
+{
+    return ec_coe_emerg_ring_clear_ring(&sc->emerg_ring);
+}
+
+/*****************************************************************************/
+
+int ecrt_slave_config_emerg_overruns(ec_slave_config_t *sc)
+{
+    return ec_coe_emerg_ring_overruns(&sc->emerg_ring);
+}
+
+/*****************************************************************************/
+
 /** Same as ecrt_slave_config_create_sdo_request(), but with ERR_PTR() return
  * value.
  */
@@ -1063,6 +1095,10 @@ EXPORT_SYMBOL(ecrt_slave_config_sdo8);
 EXPORT_SYMBOL(ecrt_slave_config_sdo16);
 EXPORT_SYMBOL(ecrt_slave_config_sdo32);
 EXPORT_SYMBOL(ecrt_slave_config_complete_sdo);
+EXPORT_SYMBOL(ecrt_slave_config_emerg_size);
+EXPORT_SYMBOL(ecrt_slave_config_emerg_pop);
+EXPORT_SYMBOL(ecrt_slave_config_emerg_clear);
+EXPORT_SYMBOL(ecrt_slave_config_emerg_overruns);
 EXPORT_SYMBOL(ecrt_slave_config_create_sdo_request);
 EXPORT_SYMBOL(ecrt_slave_config_create_voe_handler);
 EXPORT_SYMBOL(ecrt_slave_config_state);

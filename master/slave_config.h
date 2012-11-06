@@ -43,6 +43,7 @@
 #include "slave.h"
 #include "sync_config.h"
 #include "fmmu_config.h"
+#include "coe_emerg_ring.h"
 
 /*****************************************************************************/
 
@@ -141,6 +142,8 @@ struct ec_slave_config {
     struct list_head sdo_requests; /**< List of SDO requests. */
     struct list_head voe_handlers; /**< List of VoE handlers. */
     struct list_head soe_configs; /**< List of SoE configurations. */
+
+    ec_coe_emerg_ring_t emerg_ring; /**< CoE emergency ring buffer. */
 };
 
 /*****************************************************************************/

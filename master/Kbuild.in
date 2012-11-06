@@ -35,6 +35,7 @@ obj-m := ec_master.o
 
 ec_master-objs := \
 	cdev.o \
+	coe_emerg_ring.o \
 	datagram.o \
 	datagram_pair.o \
 	device.o \
