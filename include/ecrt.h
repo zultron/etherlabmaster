@@ -1517,7 +1517,7 @@ void ecrt_domain_state(
 /** Set the SDO index and subindex.
  *
  * \attention If the SDO index and/or subindex is changed while
- * ecrt_sdo_request_state() returns EC_SDO_REQUEST_BUSY, this may lead to
+ * ecrt_sdo_request_state() returns EC_REQUEST_BUSY, this may lead to
  * unexpected results.
  */
 void ecrt_sdo_request_index(
@@ -1596,7 +1596,7 @@ ec_request_state_t ecrt_sdo_request_state(
 /** Schedule an SDO write operation.
  *
  * \attention This method may not be called while ecrt_sdo_request_state()
- * returns EC_SDO_REQUEST_BUSY.
+ * returns EC_REQUEST_BUSY.
  */
 void ecrt_sdo_request_write(
         ec_sdo_request_t *req /**< SDO request. */
@@ -1605,11 +1605,11 @@ void ecrt_sdo_request_write(
 /** Schedule an SDO read operation.
  *
  * \attention This method may not be called while ecrt_sdo_request_state()
- * returns EC_SDO_REQUEST_BUSY.
+ * returns EC_REQUEST_BUSY.
  *
  * \attention After calling this function, the return value of
  * ecrt_sdo_request_data() must be considered as invalid while
- * ecrt_sdo_request_state() returns EC_SDO_REQUEST_BUSY.
+ * ecrt_sdo_request_state() returns EC_REQUEST_BUSY.
  */
 void ecrt_sdo_request_read(
         ec_sdo_request_t *req /**< SDO request. */
