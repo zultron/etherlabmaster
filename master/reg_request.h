@@ -2,7 +2,7 @@
  *
  *  $Id$
  *
- *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2012  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -29,53 +29,38 @@
 
 /**
    \file
-   EtherCAT slave request state machine.
+   EtherCAT register request structure.
 */
 
 /*****************************************************************************/
 
-#ifndef __EC_FSM_SLAVE_H__
-#define __EC_FSM_SLAVE_H__
+#ifndef __EC_REG_REQUEST_H__
+#define __EC_REG_REQUEST_H__
+
+#include <linux/list.h>
 
 #include "globals.h"
-#include "datagram.h"
-#include "sdo_request.h"
-#include "reg_request.h"
-#include "fsm_coe.h"
-#include "fsm_foe.h"
-#include "fsm_soe.h"
 
 /*****************************************************************************/
 
-typedef struct ec_fsm_slave ec_fsm_slave_t; /**< \see ec_fsm_slave */
-
-/** Finite state machine of an EtherCAT slave.
+/** Register request.
  */
-struct ec_fsm_slave {
-    ec_slave_t *slave; /**< slave the FSM runs on */
-    ec_datagram_t *datagram; /**< datagram used in the state machine */
-
-    void (*state)(ec_fsm_slave_t *); /**< master state function */
-    ec_sdo_request_t *sdo_request; /**< SDO request to process. */
-    ec_reg_request_t *reg_request; /**< Register request to process. */
-    ec_foe_request_t *foe_request; /**< FoE request to process. */
-    off_t foe_index; /**< index to FoE write request data */
-    ec_soe_request_t *soe_request; /**< SoE request to process. */
-
-    ec_fsm_coe_t fsm_coe; /**< CoE state machine */
-    ec_fsm_foe_t fsm_foe; /**< FoE state machine */
-    ec_fsm_soe_t fsm_soe; /**< SoE state machine */
+struct ec_reg_request {
+    struct list_head list; /**< List item. */
+    size_t mem_size; /**< Size of data memory. */
+    uint8_t *data; /**< Pointer to data memory. */
+    ec_direction_t dir; /**< Direction. EC_DIR_OUTPUT means writing to the
+                          slave, EC_DIR_INPUT means reading from the slave. */
+    uint16_t address; /**< Register address. */
+    size_t transfer_size; /*< Size of the data to transfer. */
+    ec_internal_request_state_t state; /**< Request state. */
 };
 
 /*****************************************************************************/
 
-void ec_fsm_slave_init(ec_fsm_slave_t *, ec_slave_t *, ec_datagram_t *);
-void ec_fsm_slave_clear(ec_fsm_slave_t *);
-
-void ec_fsm_slave_exec(ec_fsm_slave_t *);
-void ec_fsm_slave_ready(ec_fsm_slave_t *);
+int ec_reg_request_init(ec_reg_request_t *, size_t);
+void ec_reg_request_clear(ec_reg_request_t *);
 
 /*****************************************************************************/
 
-
-#endif // __EC_FSM_SLAVE_H__
+#endif

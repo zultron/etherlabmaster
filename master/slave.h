@@ -2,7 +2,7 @@
  *
  *  $Id$
  *
- *  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -226,6 +226,9 @@ struct ec_slave
 
     struct list_head slave_sdo_requests; /**< SDO access requests. */
     wait_queue_head_t sdo_queue; /**< Wait queue for SDO access requests
+                                   from user space. */
+    struct list_head reg_requests; /**< Register access requests. */
+    wait_queue_head_t reg_queue; /**< Wait queue for register access requests
                                    from user space. */
     struct list_head foe_requests; /**< FoE write requests. */
     wait_queue_head_t foe_queue; /**< Wait queue for FoE requests from user

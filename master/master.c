@@ -208,9 +208,6 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     INIT_LIST_HEAD(&master->sii_requests);
     init_waitqueue_head(&master->sii_queue);
 
-    INIT_LIST_HEAD(&master->reg_requests);
-    init_waitqueue_head(&master->reg_queue);
-
     // init devices
     ret = ec_device_init(&master->devices[EC_DEVICE_MAIN], master);
     if (ret < 0)
@@ -427,16 +424,6 @@ void ec_master_clear_slaves(ec_master_t *master)
                 " to be deleted.\n", request->slave->ring_position);
         request->state = EC_INT_REQUEST_FAILURE;
         wake_up(&master->sii_queue);
-    }
-
-    while (!list_empty(&master->reg_requests)) {
-        ec_reg_request_t *request =
-            list_entry(master->reg_requests.next, ec_reg_request_t, list);
-        list_del_init(&request->list); // dequeue
-        EC_MASTER_WARN(master, "Discarding register request, slave %u"
-                " about to be deleted.\n", request->slave->ring_position);
-        request->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&master->reg_queue);
     }
 
     for (slave = master->slaves;
@@ -874,8 +861,8 @@ void ec_master_queue_datagram(
     list_for_each_entry(queued_datagram, &master->datagram_queue, queue) {
         if (queued_datagram == datagram) {
             datagram->skip_count++;
-            EC_MASTER_DBG(master, 1, "Skipping re-initialized datagram %p.\n",
-                    datagram);
+            EC_MASTER_DBG(master, 1,
+                    "Datagram %p already queued (skipping).\n", datagram);
             datagram->state = EC_DATAGRAM_QUEUED;
             return;
         }

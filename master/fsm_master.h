@@ -2,7 +2,7 @@
  *
  *  $Id$
  *
- *  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -58,20 +58,6 @@ typedef struct {
     const uint16_t *words; /**< Pointer to the data words. */
     ec_internal_request_state_t state; /**< State of the request. */
 } ec_sii_write_request_t;
-
-/*****************************************************************************/
-
-/** Register request.
- */
-typedef struct {
-    struct list_head list; /**< List head. */
-    ec_slave_t *slave; /**< EtherCAT slave. */
-    ec_direction_t dir; /**< Direction. */
-    uint16_t offset; /**< Register address. */
-    size_t length; /**< Number of bytes. */
-    uint8_t *data; /**< Data to write / memory for read data. */
-    ec_internal_request_state_t state; /**< State of the request. */
-} ec_reg_request_t;
 
 /*****************************************************************************/
 
@@ -132,7 +118,6 @@ struct ec_fsm_master {
     ec_sii_write_request_t *sii_request; /**< SII write request */
     off_t sii_index; /**< index to SII write request data */
     ec_sdo_request_t *sdo_request; /**< SDO request to process. */
-    ec_reg_request_t *reg_request; /**< Register request to process. */
 
     ec_fsm_coe_t fsm_coe; /**< CoE state machine */
     ec_fsm_pdo_t fsm_pdo; /**< PDO configuration state machine. */

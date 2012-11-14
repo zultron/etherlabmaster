@@ -276,9 +276,6 @@ struct ec_master {
     struct list_head sii_requests; /**< SII write requests. */
     wait_queue_head_t sii_queue; /**< Wait queue for SII
                                       write requests from user space. */
-
-    struct list_head reg_requests; /**< Register requests. */
-    wait_queue_head_t reg_queue; /**< Wait queue for register requests. */
 };
 
 /*****************************************************************************/

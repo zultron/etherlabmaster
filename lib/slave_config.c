@@ -37,6 +37,7 @@
 #include "slave_config.h"
 #include "domain.h"
 #include "sdo_request.h"
+#include "reg_request.h"
 #include "voe_handler.h"
 #include "master.h"
 
@@ -45,6 +46,7 @@
 void ec_slave_config_clear(ec_slave_config_t *sc)
 {
     ec_sdo_request_t *r, *next_r;
+    ec_reg_request_t *e, *next_e;
     ec_voe_handler_t *v, *next_v;
 
     r = sc->first_sdo_request;
@@ -54,6 +56,12 @@ void ec_slave_config_clear(ec_slave_config_t *sc)
         r = next_r;
     }
 
+    e = sc->first_reg_request;
+    while (e) {
+        next_e = e->next;
+        ec_reg_request_clear(e);
+        e = next_e;
+    }
 
     v = sc->first_voe_handler;
     while (v) {
@@ -547,6 +555,71 @@ ec_sdo_request_t *ecrt_slave_config_create_sdo_request(ec_slave_config_t *sc,
     ec_slave_config_add_sdo_request(sc, req);
 
     return req;
+}
+
+/*****************************************************************************/
+
+void ec_slave_config_add_reg_request(ec_slave_config_t *sc,
+        ec_reg_request_t *reg)
+{
+    if (sc->first_reg_request) {
+        ec_reg_request_t *r = sc->first_reg_request;
+        while (r->next) {
+            r = r->next;
+        }
+        r->next = reg;
+    } else {
+        sc->first_reg_request = reg;
+    }
+}
+
+/*****************************************************************************/
+
+ec_reg_request_t *ecrt_slave_config_create_reg_request(ec_slave_config_t *sc,
+        size_t size)
+{
+    ec_ioctl_reg_request_t io;
+    ec_reg_request_t *reg;
+    int ret;
+
+    reg = malloc(sizeof(ec_reg_request_t));
+    if (!reg) {
+        fprintf(stderr, "Failed to allocate memory.\n");
+        return NULL;
+    }
+
+    if (size) {
+        reg->data = malloc(size);
+        if (!reg->data) {
+            fprintf(stderr, "Failed to allocate %u bytes of register data"
+                    " memory.\n", size);
+            free(reg);
+            return 0;
+        }
+    } else {
+        reg->data = NULL;
+    }
+
+    io.config_index = sc->index;
+    io.mem_size = size;
+
+    ret = ioctl(sc->master->fd, EC_IOCTL_SC_REG_REQUEST, &io);
+    if (EC_IOCTL_IS_ERROR(ret)) {
+        fprintf(stderr, "Failed to create register request: %s\n",
+                strerror(EC_IOCTL_ERRNO(ret)));
+        ec_reg_request_clear(reg);
+        free(reg);
+        return NULL;
+    }
+
+    reg->next = NULL;
+    reg->config = sc;
+    reg->index = io.request_index;
+    reg->mem_size = size;
+
+    ec_slave_config_add_reg_request(sc, reg);
+
+    return reg;
 }
 
 /*****************************************************************************/

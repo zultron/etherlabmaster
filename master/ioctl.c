@@ -977,51 +977,48 @@ static int ec_ioctl_slave_reg_read(
         void *arg /**< ioctl() argument. */
         )
 {
-    ec_ioctl_slave_reg_t data;
+    ec_ioctl_slave_reg_t io;
     ec_slave_t *slave;
-    uint8_t *contents;
     ec_reg_request_t request;
+    int ret;
 
-    if (copy_from_user(&data, (void __user *) arg, sizeof(data))) {
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io))) {
         return -EFAULT;
     }
 
-    if (!data.length)
+    if (!io.size) {
         return 0;
-
-    if (!(contents = kmalloc(data.length, GFP_KERNEL))) {
-        EC_MASTER_ERR(master, "Failed to allocate %u bytes"
-                " for register data.\n", data.length);
-        return -ENOMEM;
-    }
-
-    if (down_interruptible(&master->master_sem))
-        return -EINTR;
-
-    if (!(slave = ec_master_find_slave(
-                    master, 0, data.slave_position))) {
-        up(&master->master_sem);
-        EC_MASTER_ERR(master, "Slave %u does not exist!\n",
-                data.slave_position);
-        return -EINVAL;
     }
 
     // init register request
-    INIT_LIST_HEAD(&request.list);
-    request.slave = slave;
-    request.dir = EC_DIR_INPUT;
-    request.data = contents;
-    request.offset = data.offset;
-    request.length = data.length;
-    request.state = EC_INT_REQUEST_QUEUED;
+    ret = ec_reg_request_init(&request, io.size);
+    if (ret) {
+        return ret;
+    }
+
+    ecrt_reg_request_read(&request, io.address, io.size);
+
+    if (down_interruptible(&master->master_sem)) {
+        ec_reg_request_clear(&request);
+        return -EINTR;
+    }
+
+    if (!(slave = ec_master_find_slave(
+                    master, 0, io.slave_position))) {
+        up(&master->master_sem);
+        ec_reg_request_clear(&request);
+        EC_MASTER_ERR(master, "Slave %u does not exist!\n",
+                io.slave_position);
+        return -EINVAL;
+    }
 
     // schedule request.
-    list_add_tail(&request.list, &master->reg_requests);
+    list_add_tail(&request.list, &slave->reg_requests);
 
     up(&master->master_sem);
 
     // wait for processing through FSM
-    if (wait_event_interruptible(master->reg_queue,
+    if (wait_event_interruptible(slave->reg_queue,
                 request.state != EC_INT_REQUEST_QUEUED)) {
         // interrupted by signal
         down(&master->master_sem);
@@ -1029,20 +1026,21 @@ static int ec_ioctl_slave_reg_read(
             // abort request
             list_del(&request.list);
             up(&master->master_sem);
-            kfree(contents);
+            ec_reg_request_clear(&request);
             return -EINTR;
         }
         up(&master->master_sem);
     }
 
     // wait until master FSM has finished processing
-    wait_event(master->reg_queue, request.state != EC_INT_REQUEST_BUSY);
+    wait_event(slave->reg_queue, request.state != EC_INT_REQUEST_BUSY);
 
     if (request.state == EC_INT_REQUEST_SUCCESS) {
-        if (copy_to_user((void __user *) data.data, contents, data.length))
+        if (copy_to_user((void __user *) io.data, request.data, io.size)) {
             return -EFAULT;
+        }
     }
-    kfree(contents);
+    ec_reg_request_clear(&request);
 
     return request.state == EC_INT_REQUEST_SUCCESS ? 0 : -EIO;
 }
@@ -1056,57 +1054,53 @@ static int ec_ioctl_slave_reg_write(
         void *arg /**< ioctl() argument. */
         )
 {
-    ec_ioctl_slave_reg_t data;
+    ec_ioctl_slave_reg_t io;
     ec_slave_t *slave;
-    uint8_t *contents;
     ec_reg_request_t request;
+    int ret;
 
-    if (copy_from_user(&data, (void __user *) arg, sizeof(data))) {
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io))) {
         return -EFAULT;
     }
 
-    if (!data.length)
+    if (!io.size) {
         return 0;
-
-    if (!(contents = kmalloc(data.length, GFP_KERNEL))) {
-        EC_MASTER_ERR(master, "Failed to allocate %u bytes"
-                " for register data.\n", data.length);
-        return -ENOMEM;
-    }
-
-    if (copy_from_user(contents, (void __user *) data.data, data.length)) {
-        kfree(contents);
-        return -EFAULT;
-    }
-
-    if (down_interruptible(&master->master_sem))
-        return -EINTR;
-
-    if (!(slave = ec_master_find_slave(
-                    master, 0, data.slave_position))) {
-        up(&master->master_sem);
-        EC_MASTER_ERR(master, "Slave %u does not exist!\n",
-                data.slave_position);
-        kfree(contents);
-        return -EINVAL;
     }
 
     // init register request
-    INIT_LIST_HEAD(&request.list);
-    request.slave = slave;
-    request.dir = EC_DIR_OUTPUT;
-    request.data = contents;
-    request.offset = data.offset;
-    request.length = data.length;
-    request.state = EC_INT_REQUEST_QUEUED;
+    ret = ec_reg_request_init(&request, io.size);
+    if (ret) {
+        return ret;
+    }
+
+    if (copy_from_user(request.data, (void __user *) io.data, io.size)) {
+        ec_reg_request_clear(&request);
+        return -EFAULT;
+    }
+
+    ecrt_reg_request_write(&request, io.address, io.size);
+
+    if (down_interruptible(&master->master_sem)) {
+        ec_reg_request_clear(&request);
+        return -EINTR;
+    }
+
+    if (!(slave = ec_master_find_slave(
+                    master, 0, io.slave_position))) {
+        up(&master->master_sem);
+        ec_reg_request_clear(&request);
+        EC_MASTER_ERR(master, "Slave %u does not exist!\n",
+                io.slave_position);
+        return -EINVAL;
+    }
 
     // schedule request.
-    list_add_tail(&request.list, &master->reg_requests);
+    list_add_tail(&request.list, &slave->reg_requests);
 
     up(&master->master_sem);
 
     // wait for processing through FSM
-    if (wait_event_interruptible(master->reg_queue,
+    if (wait_event_interruptible(slave->reg_queue,
                 request.state != EC_INT_REQUEST_QUEUED)) {
         // interrupted by signal
         down(&master->master_sem);
@@ -1114,16 +1108,16 @@ static int ec_ioctl_slave_reg_write(
             // abort request
             list_del(&request.list);
             up(&master->master_sem);
-            kfree(contents);
+            ec_reg_request_clear(&request);
             return -EINTR;
         }
         up(&master->master_sem);
     }
 
     // wait until master FSM has finished processing
-    wait_event(master->reg_queue, request.state != EC_INT_REQUEST_BUSY);
+    wait_event(slave->reg_queue, request.state != EC_INT_REQUEST_BUSY);
 
-    kfree(contents);
+    ec_reg_request_clear(&request);
 
     return request.state == EC_INT_REQUEST_SUCCESS ? 0 : -EIO;
 }
@@ -1608,7 +1602,7 @@ static int ec_ioctl_activate(
 
         /* Set the memory as external process data memory for the
          * domains.
-		 */
+         */
         offset = 0;
         list_for_each_entry(domain, &master->domains, list) {
             ecrt_domain_external_memory(domain,
@@ -1617,10 +1611,10 @@ static int ec_ioctl_activate(
         }
 
 #ifdef EC_IOCTL_RTDM
-		/* RTDM uses a different approach for memory-mapping, which has to be
-		 * initiated by the kernel.
-		 */
-		ret = ec_rtdm_mmap(ctx, &io.process_data);
+        /* RTDM uses a different approach for memory-mapping, which has to be
+         * initiated by the kernel.
+         */
+        ret = ec_rtdm_mmap(ctx, &io.process_data);
         if (ret < 0) {
             EC_MASTER_ERR(master, "Failed to map process data"
                     " memory to user space (code %i).\n", ret);
@@ -2488,6 +2482,58 @@ static int ec_ioctl_sc_create_sdo_request(
 
 /*****************************************************************************/
 
+/** Create a register request.
+ */
+static int ec_ioctl_sc_create_reg_request(
+        ec_master_t *master, /**< EtherCAT master. */
+        void *arg, /**< ioctl() argument. */
+        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
+        )
+{
+    ec_ioctl_reg_request_t io;
+    ec_slave_config_t *sc;
+    ec_reg_request_t *reg;
+
+    if (unlikely(!ctx->requested)) {
+        return -EPERM;
+    }
+
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io))) {
+        return -EFAULT;
+    }
+
+    io.request_index = 0;
+
+    if (down_interruptible(&master->master_sem)) {
+        return -EINTR;
+    }
+
+    sc = ec_master_get_config(master, io.config_index);
+    if (!sc) {
+        up(&master->master_sem);
+        return -ENOENT;
+    }
+
+    list_for_each_entry(reg, &sc->reg_requests, list) {
+        io.request_index++;
+    }
+
+    up(&master->master_sem); /** \fixme sc could be invalidated */
+
+    reg = ecrt_slave_config_create_reg_request_err(sc, io.mem_size);
+    if (IS_ERR(reg)) {
+        return PTR_ERR(reg);
+    }
+
+    if (copy_to_user((void __user *) arg, &io, sizeof(io))) {
+        return -EFAULT;
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
+
 /** Create a VoE handler.
  */
 static int ec_ioctl_sc_create_voe_handler(
@@ -2974,6 +3020,181 @@ static int ec_ioctl_sdo_request_data(
                 ecrt_sdo_request_data_size(req)))
         return -EFAULT;
 
+    return 0;
+}
+
+/*****************************************************************************/
+
+/** Read register data.
+ */
+static int ec_ioctl_reg_request_data(
+        ec_master_t *master, /**< EtherCAT master. */
+        void *arg, /**< ioctl() argument. */
+        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
+        )
+{
+    ec_ioctl_reg_request_t io;
+    ec_slave_config_t *sc;
+    ec_reg_request_t *reg;
+
+    if (unlikely(!ctx->requested)) {
+        return -EPERM;
+    }
+
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io))) {
+        return -EFAULT;
+    }
+
+    if (io.mem_size <= 0) {
+        return 0;
+    }
+
+    /* no locking of master_sem needed, because neither sc nor reg will not be
+     * deleted in the meantime. */
+
+    if (!(sc = ec_master_get_config(master, io.config_index))) {
+        return -ENOENT;
+    }
+
+    if (!(reg = ec_slave_config_find_reg_request(sc, io.request_index))) {
+        return -ENOENT;
+    }
+
+    if (copy_to_user((void __user *) io.data, ecrt_reg_request_data(reg),
+                min(reg->mem_size, io.mem_size))) {
+        return -EFAULT;
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
+
+/** Gets an register request's state.
+ */
+static int ec_ioctl_reg_request_state(
+        ec_master_t *master, /**< EtherCAT master. */
+        void *arg, /**< ioctl() argument. */
+        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
+        )
+{
+    ec_ioctl_reg_request_t io;
+    ec_slave_config_t *sc;
+    ec_reg_request_t *reg;
+
+    if (unlikely(!ctx->requested)) {
+        return -EPERM;
+    }
+
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io))) {
+        return -EFAULT;
+    }
+
+    /* no locking of master_sem needed, because neither sc nor reg will not be
+     * deleted in the meantime. */
+
+    if (!(sc = ec_master_get_config(master, io.config_index))) {
+        return -ENOENT;
+    }
+
+    if (!(reg = ec_slave_config_find_reg_request(sc, io.request_index))) {
+        return -ENOENT;
+    }
+
+    io.state = ecrt_reg_request_state(reg);
+    io.new_data = io.state == EC_REQUEST_SUCCESS && reg->dir == EC_DIR_INPUT;
+
+    if (copy_to_user((void __user *) arg, &io, sizeof(io))) {
+        return -EFAULT;
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
+
+/** Starts an register write operation.
+ */
+static int ec_ioctl_reg_request_write(
+        ec_master_t *master, /**< EtherCAT master. */
+        void *arg, /**< ioctl() argument. */
+        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
+        )
+{
+    ec_ioctl_reg_request_t io;
+    ec_slave_config_t *sc;
+    ec_reg_request_t *reg;
+
+    if (unlikely(!ctx->requested)) {
+        return -EPERM;
+    }
+
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io))) {
+        return -EFAULT;
+    }
+
+    /* no locking of master_sem needed, because neither sc nor reg will not be
+     * deleted in the meantime. */
+
+    if (!(sc = ec_master_get_config(master, io.config_index))) {
+        return -ENOENT;
+    }
+
+    if (!(reg = ec_slave_config_find_reg_request(sc, io.request_index))) {
+        return -ENOENT;
+    }
+
+    if (io.transfer_size > reg->mem_size) {
+        return -EOVERFLOW;
+    }
+
+    if (copy_from_user(reg->data, (void __user *) io.data,
+                io.transfer_size)) {
+        return -EFAULT;
+    }
+
+    ecrt_reg_request_write(reg, io.address, io.transfer_size);
+    return 0;
+}
+
+/*****************************************************************************/
+
+/** Starts an register read operation.
+ */
+static int ec_ioctl_reg_request_read(
+        ec_master_t *master, /**< EtherCAT master. */
+        void *arg, /**< ioctl() argument. */
+        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
+        )
+{
+    ec_ioctl_reg_request_t io;
+    ec_slave_config_t *sc;
+    ec_reg_request_t *reg;
+
+    if (unlikely(!ctx->requested)) {
+        return -EPERM;
+    }
+
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io))) {
+        return -EFAULT;
+    }
+
+    /* no locking of master_sem needed, because neither sc nor reg will not be
+     * deleted in the meantime. */
+
+    if (!(sc = ec_master_get_config(master, io.config_index))) {
+        return -ENOENT;
+    }
+
+    if (!(reg = ec_slave_config_find_reg_request(sc, io.request_index))) {
+        return -ENOENT;
+    }
+
+    if (io.transfer_size > reg->mem_size) {
+        return -EOVERFLOW;
+    }
+
+    ecrt_reg_request_read(reg, io.address, io.transfer_size);
     return 0;
 }
 
@@ -3548,7 +3769,7 @@ static int ec_ioctl_slave_soe_write(
 /** Called when an ioctl() command is issued.
  */
 long EC_IOCTL(ec_master_t *master, ec_ioctl_context_t *ctx,
-		unsigned int cmd, void *arg)
+        unsigned int cmd, void *arg)
 {
 #if DEBUG_LATENCY
     cycles_t a = get_cycles(), b;
@@ -3876,6 +4097,13 @@ long EC_IOCTL(ec_master_t *master, ec_ioctl_context_t *ctx,
             }
             ret = ec_ioctl_sc_create_sdo_request(master, arg, ctx);
             break;
+        case EC_IOCTL_SC_REG_REQUEST:
+            if (!ctx->writable) {
+                ret = -EPERM;
+                break;
+            }
+            ret = ec_ioctl_sc_create_reg_request(master, arg, ctx);
+            break;
         case EC_IOCTL_SC_VOE:
             if (!ctx->writable) {
                 ret = -EPERM;
@@ -3946,6 +4174,26 @@ long EC_IOCTL(ec_master_t *master, ec_ioctl_context_t *ctx,
             break;
         case EC_IOCTL_SDO_REQUEST_DATA:
             ret = ec_ioctl_sdo_request_data(master, arg, ctx);
+            break;
+        case EC_IOCTL_REG_REQUEST_DATA:
+            ret = ec_ioctl_reg_request_data(master, arg, ctx);
+            break;
+        case EC_IOCTL_REG_REQUEST_STATE:
+            ret = ec_ioctl_reg_request_state(master, arg, ctx);
+            break;
+        case EC_IOCTL_REG_REQUEST_WRITE:
+            if (!ctx->writable) {
+                ret = -EPERM;
+                break;
+            }
+            ret = ec_ioctl_reg_request_write(master, arg, ctx);
+            break;
+        case EC_IOCTL_REG_REQUEST_READ:
+            if (!ctx->writable) {
+                ret = -EPERM;
+                break;
+            }
+            ret = ec_ioctl_reg_request_read(master, arg, ctx);
             break;
         case EC_IOCTL_VOE_SEND_HEADER:
             if (!ctx->writable) {
