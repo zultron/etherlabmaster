@@ -865,23 +865,6 @@ void ec_master_queue_datagram(
 {
     ec_datagram_t *queued_datagram;
 
-    switch (datagram->state) {
-        case EC_DATAGRAM_QUEUED:
-            datagram->skip_count++;
-            EC_MASTER_DBG(master, 1, "Skipping already queued datagram %p.\n",
-                    datagram);
-            break;
-
-        case EC_DATAGRAM_SENT:
-            datagram->skip_count++;
-            EC_MASTER_DBG(master, 1, "Skipping already sent datagram %p.\n",
-                    datagram);
-            break;
-
-        default:
-            break;
-    }
-
     /* It is possible, that a datagram in the queue is re-initialized with the
      * ec_datagram_<type>() methods and then shall be queued with this method.
      * In that case, the state is already reset to EC_DATAGRAM_INIT. Check if
