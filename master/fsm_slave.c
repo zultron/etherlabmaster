@@ -234,7 +234,7 @@ void ec_fsm_slave_state_sdo_request(
         request->state = EC_INT_REQUEST_FAILURE;
         wake_up(&slave->sdo_queue);
         fsm->sdo_request = NULL;
-        fsm->state = ec_fsm_slave_state_idle;
+        fsm->state = ec_fsm_slave_state_ready;
         return;
     }
 
@@ -250,9 +250,9 @@ void ec_fsm_slave_state_sdo_request(
 
 /*****************************************************************************/
 
-/** Check for pending FOE requests and process one.
+/** Check for pending FoE requests and process one.
  *
- * \return non-zero, if an FOE request is processed.
+ * \return non-zero, if an FoE request is processed.
  */
 int ec_fsm_slave_action_process_foe(
         ec_fsm_slave_t *fsm /**< Slave state machine. */
@@ -264,7 +264,7 @@ int ec_fsm_slave_action_process_foe(
     // search the first request to be processed
     list_for_each_entry_safe(request, next, &slave->foe_requests, list) {
         if (slave->current_state & EC_SLAVE_STATE_ACK_ERR) {
-            EC_SLAVE_WARN(slave, "Aborting FOE request,"
+            EC_SLAVE_WARN(slave, "Aborting FoE request,"
                     " slave has error flag set.\n");
             request->req.state = EC_INT_REQUEST_FAILURE;
             wake_up(&slave->sdo_queue);
@@ -308,7 +308,7 @@ void ec_fsm_slave_state_foe_request(
         request->state = EC_INT_REQUEST_FAILURE;
         wake_up(&slave->foe_queue);
         fsm->foe_request = NULL;
-        fsm->state = ec_fsm_slave_state_idle;
+        fsm->state = ec_fsm_slave_state_ready;
         return;
     }
 
@@ -394,7 +394,7 @@ void ec_fsm_slave_state_soe_request(
         request->state = EC_INT_REQUEST_FAILURE;
         wake_up(&slave->soe_queue);
         fsm->soe_request = NULL;
-        fsm->state = ec_fsm_slave_state_idle;
+        fsm->state = ec_fsm_slave_state_ready;
         return;
     }
 
