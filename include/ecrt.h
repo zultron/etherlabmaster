@@ -52,6 +52,10 @@
  *   ecrt_slave_config_emerg_size(), ecrt_slave_config_emerg_pop(),
  *   ecrt_slave_config_emerg_clear(), ecrt_slave_config_emerg_overruns() and
  *   the defines EC_HAVE_EMERGENCY and EC_COE_EMERGENCY_MSG_SIZE.
+ * - Added interface for direct EtherCAT register access: Added data type
+ *   ec_reg_request_t and methods ecrt_slave_config_create_reg_request(),
+ *   ecrt_reg_request_data(), ecrt_reg_request_state(),
+ *   ecrt_reg_request_write() and ecrt_reg_request_read().
  *
  * Changes in version 1.5:
  *
@@ -206,6 +210,9 @@ typedef struct ec_sdo_request ec_sdo_request_t; /**< \see ec_sdo_request. */
 
 struct ec_voe_handler;
 typedef struct ec_voe_handler ec_voe_handler_t; /**< \see ec_voe_handler. */
+
+struct ec_reg_request;
+typedef struct ec_reg_request ec_reg_request_t; /**< \see ec_sdo_request. */
 
 /*****************************************************************************/
 
@@ -1375,6 +1382,20 @@ ec_voe_handler_t *ecrt_slave_config_create_voe_handler(
         size_t size /**< Data size to reserve. */
         );
 
+/** Create a register request to exchange EtherCAT register contents during
+ * realtime operation.
+ *
+ * This interface should not be used to take over master functionality,
+ * instead it is intended for debugging and monitoring reasons.
+ *
+ * The created register request object is freed automatically when the master
+ * is released.
+ */
+ec_reg_request_t *ecrt_slave_config_create_reg_request(
+        ec_slave_config_t *sc, /**< Slave configuration. */
+        size_t size /**< Data size to reserve. */
+        );
+
 /** Outputs the state of the slave configuration.
  *
  * Stores the state information in the given \a state structure. The state
@@ -1744,6 +1765,75 @@ void ecrt_voe_handler_read_nosync(
 ec_request_state_t ecrt_voe_handler_execute(
     ec_voe_handler_t *voe /**< VoE handler. */
     );
+
+/*****************************************************************************
+ * Register request methods.
+ ****************************************************************************/
+
+/** Access to the register request's data.
+ *
+ * This function returns a pointer to the request's internal memory.
+ *
+ * - After a read operation was successful, integer data can be evaluated using
+ *   the EC_READ_*() macros as usual. Example:
+ *   \code
+ *   uint16_t value = EC_READ_U16(ecrt_reg_request_data(reg_request)));
+ *   \endcode
+ * - If a write operation shall be triggered, the data have to be written to
+ *   the internal memory. Use the EC_WRITE_*() macros, if you are writing
+ *   integer data. Be sure, that the data fit into the memory. The memory size
+ *   is a parameter of ecrt_slave_config_create_reg_request().
+ *   \code
+ *   EC_WRITE_U16(ecrt_reg_request_data(reg_request), 0xFFFF);
+ *   \endcode
+ *
+ * \return Pointer to the internal memory.
+ */
+uint8_t *ecrt_reg_request_data(
+        ec_reg_request_t *req /**< Register request. */
+        );
+
+/** Get the current state of the register request.
+ *
+ * \return Request state.
+ */
+#ifdef __KERNEL__
+ec_request_state_t ecrt_reg_request_state(
+        const ec_reg_request_t *req /**< Register request. */
+    );
+#else
+ec_request_state_t ecrt_reg_request_state(
+        ec_reg_request_t *req /**< Register request. */
+    );
+#endif
+
+/** Schedule an register write operation.
+ *
+ * \attention This method may not be called while ecrt_reg_request_state()
+ * returns EC_REQUEST_BUSY.
+ *
+ * \attention The \a size parameter is truncated to the size given at request
+ * creation.
+ */
+void ecrt_reg_request_write(
+        ec_reg_request_t *req, /**< Register request. */
+        uint16_t address, /**< Register address. */
+        size_t size /**< Size to write. */
+        );
+
+/** Schedule a register read operation.
+ *
+ * \attention This method may not be called while ecrt_reg_request_state()
+ * returns EC_REQUEST_BUSY.
+ *
+ * \attention The \a size parameter is truncated to the size given at request
+ * creation.
+ */
+void ecrt_reg_request_read(
+        ec_reg_request_t *req, /**< Register request. */
+        uint16_t address, /**< Register address. */
+        size_t size /**< Size to write. */
+        );
 
 /*****************************************************************************/
 

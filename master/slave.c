@@ -2,7 +2,7 @@
  *
  *  $Id$
  *
- *  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -155,6 +155,9 @@ void ec_slave_init(
     INIT_LIST_HEAD(&slave->slave_sdo_requests);
     init_waitqueue_head(&slave->sdo_queue);
 
+    INIT_LIST_HEAD(&slave->reg_requests);
+    init_waitqueue_head(&slave->reg_queue);
+
     INIT_LIST_HEAD(&slave->foe_requests);
     init_waitqueue_head(&slave->foe_queue);
 
@@ -202,6 +205,16 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
         wake_up(&slave->sdo_queue);
     }
 
+    while (!list_empty(&slave->reg_requests)) {
+        ec_reg_request_t *reg =
+            list_entry(slave->reg_requests.next, ec_reg_request_t, list);
+        list_del_init(&reg->list); // dequeue
+        EC_SLAVE_WARN(slave, "Discarding register request,"
+                " slave about to be deleted.\n");
+        reg->state = EC_INT_REQUEST_FAILURE;
+        wake_up(&slave->reg_queue);
+    }
+
     while (!list_empty(&slave->foe_requests)) {
         ec_master_foe_request_t *request =
             list_entry(slave->foe_requests.next,
@@ -224,8 +237,9 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
         wake_up(&slave->soe_queue);
     }
 
-    if (slave->config)
+    if (slave->config) {
         ec_slave_config_detach(slave->config);
+    }
 
     // free all SDOs
     list_for_each_entry_safe(sdo, next_sdo, &slave->sdo_dictionary, list) {
@@ -251,8 +265,10 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
         kfree(pdo);
     }
 
-    if (slave->sii_words)
+    if (slave->sii_words) {
         kfree(slave->sii_words);
+    }
+
     ec_fsm_slave_clear(&slave->fsm);
     ec_datagram_clear(&slave->fsm_datagram);
 }

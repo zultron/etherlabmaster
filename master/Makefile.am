@@ -60,6 +60,7 @@ noinst_HEADERS = \
 	pdo.c pdo.h \
 	pdo_entry.c pdo_entry.h \
 	pdo_list.c pdo_list.h \
+	reg_request.c reg_request.h \
 	rtdm-ioctl.c \
 	rtdm.c rtdm.h \
 	sdo.c sdo.h \

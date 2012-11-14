@@ -2,7 +2,7 @@
  *
  *  $Id$
  *
- *  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -86,6 +86,7 @@ void ec_slave_config_init(
 
     INIT_LIST_HEAD(&sc->sdo_configs);
     INIT_LIST_HEAD(&sc->sdo_requests);
+    INIT_LIST_HEAD(&sc->reg_requests);
     INIT_LIST_HEAD(&sc->voe_handlers);
     INIT_LIST_HEAD(&sc->soe_configs);
 
@@ -105,6 +106,7 @@ void ec_slave_config_clear(
     unsigned int i;
     ec_sdo_request_t *req, *next_req;
     ec_voe_handler_t *voe, *next_voe;
+    ec_reg_request_t *reg, *next_reg;
     ec_soe_request_t *soe, *next_soe;
 
     ec_slave_config_detach(sc);
@@ -125,6 +127,13 @@ void ec_slave_config_clear(
         list_del(&req->list);
         ec_sdo_request_clear(req);
         kfree(req);
+    }
+
+    // free all register requests
+    list_for_each_entry_safe(reg, next_reg, &sc->reg_requests, list) {
+        list_del(&reg->list);
+        ec_reg_request_clear(reg);
+        kfree(reg);
     }
 
     // free all VoE handlers
@@ -429,7 +438,7 @@ const ec_soe_request_t *ec_slave_config_get_idn_by_pos_const(
 
 /*****************************************************************************/
 
-/** Finds a VoE handler via its position in the list.
+/** Finds a CoE handler via its position in the list.
  */
 ec_sdo_request_t *ec_slave_config_find_sdo_request(
         ec_slave_config_t *sc, /**< Slave configuration. */
@@ -442,6 +451,26 @@ ec_sdo_request_t *ec_slave_config_find_sdo_request(
         if (pos--)
             continue;
         return req;
+    }
+
+    return NULL;
+}
+
+/*****************************************************************************/
+
+/** Finds a register handler via its position in the list.
+ */
+ec_reg_request_t *ec_slave_config_find_reg_request(
+        ec_slave_config_t *sc, /**< Slave configuration. */
+        unsigned int pos /**< Position in the list. */
+        )
+{
+    ec_reg_request_t *reg;
+
+    list_for_each_entry(reg, &sc->reg_requests, list) {
+        if (pos--)
+            continue;
+        return reg;
     }
 
     return NULL;
@@ -965,6 +994,49 @@ ec_sdo_request_t *ecrt_slave_config_create_sdo_request(
 
 /*****************************************************************************/
 
+/** Same as ecrt_slave_config_create_reg_request(), but with ERR_PTR() return
+ * value.
+ */
+ec_reg_request_t *ecrt_slave_config_create_reg_request_err(
+        ec_slave_config_t *sc, size_t size)
+{
+    ec_reg_request_t *reg;
+    int ret;
+
+    EC_CONFIG_DBG(sc, 1, "%s(sc = 0x%p, size = %zu)\n",
+            __func__, sc, size);
+
+    if (!(reg = (ec_reg_request_t *)
+                kmalloc(sizeof(ec_reg_request_t), GFP_KERNEL))) {
+        EC_CONFIG_ERR(sc, "Failed to allocate register request memory!\n");
+        return ERR_PTR(-ENOMEM);
+    }
+
+    ret = ec_reg_request_init(reg, size);
+    if (ret) {
+        kfree(reg);
+        return ERR_PTR(ret);
+    }
+
+    down(&sc->master->master_sem);
+    list_add_tail(&reg->list, &sc->reg_requests);
+    up(&sc->master->master_sem);
+
+    return reg;
+}
+
+/*****************************************************************************/
+
+ec_reg_request_t *ecrt_slave_config_create_reg_request(
+        ec_slave_config_t *sc, size_t size)
+{
+    ec_reg_request_t *reg =
+        ecrt_slave_config_create_reg_request_err(sc, size);
+    return IS_ERR(reg) ? NULL : reg;
+}
+
+/*****************************************************************************/
+
 /** Same as ecrt_slave_config_create_voe_handler(), but with ERR_PTR() return
  * value.
  */
@@ -1101,6 +1173,7 @@ EXPORT_SYMBOL(ecrt_slave_config_emerg_clear);
 EXPORT_SYMBOL(ecrt_slave_config_emerg_overruns);
 EXPORT_SYMBOL(ecrt_slave_config_create_sdo_request);
 EXPORT_SYMBOL(ecrt_slave_config_create_voe_handler);
+EXPORT_SYMBOL(ecrt_slave_config_create_reg_request);
 EXPORT_SYMBOL(ecrt_slave_config_state);
 EXPORT_SYMBOL(ecrt_slave_config_idn);
 

@@ -2,7 +2,7 @@
  *
  *  $Id$
  *
- *  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -65,7 +65,6 @@ void ec_fsm_master_state_dc_write_offset(ec_fsm_master_t *);
 void ec_fsm_master_state_write_sii(ec_fsm_master_t *);
 void ec_fsm_master_state_sdo_dictionary(ec_fsm_master_t *);
 void ec_fsm_master_state_sdo_request(ec_fsm_master_t *);
-void ec_fsm_master_state_reg_request(ec_fsm_master_t *);
 
 void ec_fsm_master_enter_clear_addresses(ec_fsm_master_t *);
 void ec_fsm_master_enter_write_system_times(ec_fsm_master_t *);
@@ -404,62 +403,6 @@ int ec_fsm_master_action_process_sii(
 
 /*****************************************************************************/
 
-/** Check for pending register requests and process one.
- *
- * \return non-zero, if a register request is processed.
- */
-int ec_fsm_master_action_process_register(
-        ec_fsm_master_t *fsm /**< Master state machine. */
-        )
-{
-    ec_master_t *master = fsm->master;
-    ec_reg_request_t *request;
-
-    // search the first request to be processed
-    while (!list_empty(&master->reg_requests)) {
-
-        // get first request
-        request = list_entry(master->reg_requests.next,
-                ec_reg_request_t, list);
-        list_del_init(&request->list); // dequeue
-        request->state = EC_INT_REQUEST_BUSY;
-
-        // found pending request; process it!
-        EC_SLAVE_DBG(request->slave, 1, "Processing register request, "
-                "offset 0x%04x, length %zu...\n",
-                request->offset, request->length);
-
-        if (request->length > fsm->datagram->mem_size) {
-            EC_MASTER_ERR(master, "Request length (%zu) exceeds maximum "
-                    "datagram size (%zu)!\n", request->length,
-                    fsm->datagram->mem_size);
-            request->state = EC_INT_REQUEST_FAILURE;
-            wake_up(&master->reg_queue);
-            continue;
-        }
-
-        fsm->reg_request = request;
-
-        if (request->dir == EC_DIR_INPUT) {
-            ec_datagram_fprd(fsm->datagram, request->slave->station_address,
-                    request->offset, request->length);
-            ec_datagram_zero(fsm->datagram);
-        } else {
-            ec_datagram_fpwr(fsm->datagram, request->slave->station_address,
-                    request->offset, request->length);
-            memcpy(fsm->datagram->data, request->data, request->length);
-        }
-        fsm->datagram->device_index = request->slave->device_index;
-        fsm->retries = EC_FSM_RETRIES;
-        fsm->state = ec_fsm_master_state_reg_request;
-        return 1;
-    }
-
-    return 0;
-}
-
-/*****************************************************************************/
-
 /** Check for pending SDO requests and process one.
  *
  * \return non-zero, if an SDO request is processed.
@@ -508,7 +451,6 @@ int ec_fsm_master_action_process_sdo(
     }
     return 0;
 }
-
 
 /*****************************************************************************/
 
@@ -563,12 +505,9 @@ void ec_fsm_master_action_idle(
     }
 
     // check for pending SII write operations.
-    if (ec_fsm_master_action_process_sii(fsm))
+    if (ec_fsm_master_action_process_sii(fsm)) {
         return; // SII write request found
-
-    // check for pending register requests.
-    if (ec_fsm_master_action_process_register(fsm))
-        return; // register request processing
+	}
 
     ec_fsm_master_restart(fsm);
 }
@@ -1276,62 +1215,9 @@ void ec_fsm_master_state_sdo_request(
     EC_SLAVE_DBG(fsm->slave, 1, "Finished internal SDO request.\n");
 
     // check for another SDO request
-    if (ec_fsm_master_action_process_sdo(fsm))
+    if (ec_fsm_master_action_process_sdo(fsm)) {
         return; // processing another request
-
-    ec_fsm_master_restart(fsm);
-}
-
-/*****************************************************************************/
-
-/** Master state: REG REQUEST.
- */
-void ec_fsm_master_state_reg_request(
-        ec_fsm_master_t *fsm /**< Master state machine. */
-        )
-{
-    ec_master_t *master = fsm->master;
-    ec_datagram_t *datagram = fsm->datagram;
-    ec_reg_request_t *request = fsm->reg_request;
-
-    if (datagram->state != EC_DATAGRAM_RECEIVED) {
-        EC_MASTER_ERR(master, "Failed to receive register"
-                " request datagram: ");
-        ec_datagram_print_state(datagram);
-        request->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&master->reg_queue);
-        ec_fsm_master_restart(fsm);
-        return;
     }
-
-    if (datagram->working_counter == 1) {
-        if (request->dir == EC_DIR_INPUT) { // read request
-            if (request->data)
-                kfree(request->data);
-            request->data = kmalloc(request->length, GFP_KERNEL);
-            if (!request->data) {
-                EC_MASTER_ERR(master, "Failed to allocate %zu bytes"
-                        " of memory for register data.\n", request->length);
-                request->state = EC_INT_REQUEST_FAILURE;
-                wake_up(&master->reg_queue);
-                ec_fsm_master_restart(fsm);
-                return;
-            }
-            memcpy(request->data, datagram->data, request->length);
-        }
-
-        request->state = EC_INT_REQUEST_SUCCESS;
-        EC_SLAVE_DBG(request->slave, 1, "Register request successful.\n");
-    } else {
-        request->state = EC_INT_REQUEST_FAILURE;
-        EC_MASTER_ERR(master, "Register request failed.\n");
-    }
-
-    wake_up(&master->reg_queue);
-
-    // check for another register request
-    if (ec_fsm_master_action_process_register(fsm))
-        return; // processing another request
 
     ec_fsm_master_restart(fsm);
 }

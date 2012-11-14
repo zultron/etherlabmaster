@@ -60,6 +60,7 @@ ec_master-objs := \
 	pdo.o \
 	pdo_entry.o \
 	pdo_list.o \
+	reg_request.o \
 	sdo.o \
 	sdo_entry.o \
 	sdo_request.o \

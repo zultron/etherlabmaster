@@ -2,7 +2,7 @@
  *
  *  $Id$
  *
- *  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -36,6 +36,7 @@
 #include "globals.h"
 #include "master.h"
 #include "mailbox.h"
+#include "slave_config.h"
 
 #include "fsm_slave.h"
 
@@ -45,6 +46,8 @@ void ec_fsm_slave_state_idle(ec_fsm_slave_t *);
 void ec_fsm_slave_state_ready(ec_fsm_slave_t *);
 int ec_fsm_slave_action_process_sdo(ec_fsm_slave_t *);
 void ec_fsm_slave_state_sdo_request(ec_fsm_slave_t *);
+int ec_fsm_slave_action_process_reg(ec_fsm_slave_t *);
+void ec_fsm_slave_state_reg_request(ec_fsm_slave_t *);
 int ec_fsm_slave_action_process_foe(ec_fsm_slave_t *);
 void ec_fsm_slave_state_foe_request(ec_fsm_slave_t *);
 int ec_fsm_slave_action_process_soe(ec_fsm_slave_t *);
@@ -137,7 +140,6 @@ void ec_fsm_slave_state_idle(
     // do nothing
 }
 
-
 /*****************************************************************************/
 
 /** Slave state: READY.
@@ -148,6 +150,11 @@ void ec_fsm_slave_state_ready(
 {
     // Check for pending external SDO requests
     if (ec_fsm_slave_action_process_sdo(fsm)) {
+        return;
+    }
+
+    // Check for pending external register requests
+    if (ec_fsm_slave_action_process_reg(fsm)) {
         return;
     }
 
@@ -176,7 +183,8 @@ int ec_fsm_slave_action_process_sdo(
     ec_master_sdo_request_t *request, *next;
 
     // search the first external request to be processed
-    list_for_each_entry_safe(request, next, &slave->slave_sdo_requests, list) {
+    list_for_each_entry_safe(request, next,
+            &slave->slave_sdo_requests, list) {
 
         list_del_init(&request->list); // dequeue
         if (slave->current_state & EC_SLAVE_STATE_ACK_ERR) {
@@ -229,6 +237,7 @@ void ec_fsm_slave_state_sdo_request(
         ec_master_queue_external_datagram(fsm->slave->master, fsm->datagram);
         return;
     }
+
     if (!ec_fsm_coe_success(&fsm->fsm_coe)) {
         EC_SLAVE_ERR(slave, "Failed to process SDO request.\n");
         request->state = EC_INT_REQUEST_FAILURE;
@@ -245,6 +254,114 @@ void ec_fsm_slave_state_sdo_request(
     wake_up(&slave->sdo_queue);
 
     fsm->sdo_request = NULL;
+    fsm->state = ec_fsm_slave_state_ready;
+}
+
+/*****************************************************************************/
+
+/** Check for pending register requests and process one.
+ *
+ * \return non-zero, if a register request is processed.
+ */
+int ec_fsm_slave_action_process_reg(
+        ec_fsm_slave_t *fsm /**< Slave state machine. */
+        )
+{
+    ec_slave_t *slave = fsm->slave;
+    ec_reg_request_t *reg, *next;
+
+    fsm->reg_request = NULL;
+
+    if (slave->config) {
+        // search the first internal register request to be processed
+        list_for_each_entry(reg, &slave->config->reg_requests, list) {
+            if (reg->state == EC_INT_REQUEST_QUEUED) {
+                fsm->reg_request = reg;
+                break;
+            }
+        }
+    }
+
+    if (!fsm->reg_request) {
+        // search the first external request to be processed
+        list_for_each_entry_safe(reg, next, &slave->reg_requests, list) {
+            list_del_init(&reg->list); // dequeue
+            fsm->reg_request = reg;
+            break;
+        }
+    }
+
+    if (!fsm->reg_request) { // no register request to process
+        return 0;
+    }
+
+    if (slave->current_state & EC_SLAVE_STATE_ACK_ERR) {
+        EC_SLAVE_WARN(slave, "Aborting register request,"
+                " slave has error flag set.\n");
+        reg->state = EC_INT_REQUEST_FAILURE;
+        wake_up(&slave->reg_queue);
+        fsm->state = ec_fsm_slave_state_idle;
+        return 1;
+    }
+
+    // Found pending register request. Execute it!
+    EC_SLAVE_DBG(slave, 1, "Processing register request...\n");
+
+    reg->state = EC_INT_REQUEST_BUSY;
+
+    // Start register access
+    if (reg->dir == EC_DIR_INPUT) {
+        ec_datagram_fprd(fsm->datagram, slave->station_address,
+                reg->address, reg->transfer_size);
+        ec_datagram_zero(fsm->datagram);
+    } else {
+        ec_datagram_fpwr(fsm->datagram, slave->station_address,
+                reg->address, reg->transfer_size);
+        memcpy(fsm->datagram->data, reg->data, reg->transfer_size);
+    }
+    fsm->datagram->device_index = slave->device_index;
+    ec_master_queue_external_datagram(slave->master, fsm->datagram);
+    fsm->state = ec_fsm_slave_state_reg_request;
+    return 1;
+}
+
+/*****************************************************************************/
+
+/** Slave state: Register request.
+ */
+void ec_fsm_slave_state_reg_request(
+        ec_fsm_slave_t *fsm /**< Slave state machine. */
+        )
+{
+    ec_slave_t *slave = fsm->slave;
+    ec_reg_request_t *reg = fsm->reg_request;
+
+    if (fsm->datagram->state != EC_DATAGRAM_RECEIVED) {
+        EC_SLAVE_ERR(slave, "Failed to receive register"
+                " request datagram: ");
+        ec_datagram_print_state(fsm->datagram);
+        reg->state = EC_INT_REQUEST_FAILURE;
+        wake_up(&slave->reg_queue);
+        fsm->state = ec_fsm_slave_state_ready;
+        return;
+    }
+
+    if (fsm->datagram->working_counter == 1) {
+        if (reg->dir == EC_DIR_INPUT) { // read request
+            memcpy(reg->data, fsm->datagram->data, reg->transfer_size);
+        }
+
+        reg->state = EC_INT_REQUEST_SUCCESS;
+        EC_SLAVE_DBG(slave, 1, "Register request successful.\n");
+    } else {
+        reg->state = EC_INT_REQUEST_FAILURE;
+        ec_datagram_print_state(fsm->datagram);
+        EC_SLAVE_ERR(slave, "Register request failed"
+                " (working counter is %u).\n",
+                fsm->datagram->working_counter);
+    }
+
+    wake_up(&slave->reg_queue);
     fsm->state = ec_fsm_slave_state_ready;
 }
 
