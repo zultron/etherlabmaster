@@ -106,6 +106,8 @@ void ec_fsm_slave_exec(
     }
 
     fsm->state(fsm);
+
+    ec_datagram_output_stats(fsm->datagram);
 }
 
 /*****************************************************************************/
