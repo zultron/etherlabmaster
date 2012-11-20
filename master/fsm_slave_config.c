@@ -49,7 +49,7 @@
  * Wait for DC time difference to drop under this absolute value before
  * requesting SAFEOP.
  */
-#define EC_DC_MAX_SYNC_DIFF_NS 5000
+#define EC_DC_MAX_SYNC_DIFF_NS 10000
 
 /** Maximum time (in ms) to wait for clock discipline.
  */
