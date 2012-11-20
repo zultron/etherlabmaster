@@ -1562,6 +1562,45 @@ static int ec_ioctl_create_slave_config(
 
 /*****************************************************************************/
 
+/** Select the DC reference clock.
+ */
+static int ec_ioctl_select_ref_clock(
+        ec_master_t *master, /**< EtherCAT master. */
+        void *arg, /**< ioctl() argument. */
+        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
+        )
+{
+    uint32_t config_index = (uint32_t) arg;
+    ec_slave_config_t *sc = NULL;
+    int ret = 0;
+
+    if (unlikely(!ctx->requested)) {
+        ret = -EPERM;
+        goto out_return;
+    }
+
+    if (down_interruptible(&master->master_sem)) {
+        ret = -EINTR;
+        goto out_return;
+    }
+
+    if (config_index != 0xFFFFFFFF) {
+        if (!(sc = ec_master_get_config(master, config_index))) {
+            ret = -ENOENT;
+            goto out_up;
+        }
+    }
+
+    ecrt_master_select_reference_clock(master, sc);
+
+out_up:
+    up(&master->master_sem);
+out_return:
+    return ret;
+}
+
+/*****************************************************************************/
+
 /** Activates the master.
  */
 static int ec_ioctl_activate(
@@ -1837,6 +1876,35 @@ static int ec_ioctl_sync_slaves(
     down(&master->io_sem);
     ecrt_master_sync_slave_clocks(master);
     up(&master->io_sem);
+    return 0;
+}
+
+/*****************************************************************************/
+
+/** Get the system time of the reference clock.
+ */
+static int ec_ioctl_ref_clock_time(
+        ec_master_t *master, /**< EtherCAT master. */
+        void *arg, /**< ioctl() argument. */
+        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
+        )
+{
+    uint32_t time;
+    int ret;
+
+    if (unlikely(!ctx->requested)) {
+        return -EPERM;
+    }
+
+    ret = ecrt_master_reference_clock_time(master, &time);
+    if (ret) {
+        return ret;
+    }
+
+    if (copy_to_user((void __user *) arg, &time, sizeof(time))) {
+        return -EFAULT;
+    }
+
     return 0;
 }
 
@@ -3923,6 +3991,13 @@ long EC_IOCTL(ec_master_t *master, ec_ioctl_context_t *ctx,
             }
             ret = ec_ioctl_create_slave_config(master, arg, ctx);
             break;
+        case EC_IOCTL_SELECT_REF_CLOCK:
+            if (!ctx->writable) {
+                ret = -EPERM;
+                break;
+            }
+            ret = ec_ioctl_select_ref_clock(master, arg, ctx);
+            break;
         case EC_IOCTL_ACTIVATE:
             if (!ctx->writable) {
                 ret = -EPERM;
@@ -3977,6 +4052,13 @@ long EC_IOCTL(ec_master_t *master, ec_ioctl_context_t *ctx,
                 break;
             }
             ret = ec_ioctl_sync_slaves(master, arg, ctx);
+            break;
+        case EC_IOCTL_REF_CLOCK_TIME:
+            if (!ctx->writable) {
+                ret = -EPERM;
+                break;
+            }
+            ret = ec_ioctl_ref_clock_time(master, arg, ctx);
             break;
         case EC_IOCTL_SYNC_MON_QUEUE:
             if (!ctx->writable) {

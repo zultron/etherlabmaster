@@ -200,6 +200,31 @@ ec_slave_config_t *ecrt_master_slave_config(ec_master_t *master,
     return sc;
 }
 
+/*****************************************************************************/
+
+int ecrt_master_select_reference_clock(ec_master_t *master,
+        ec_slave_config_t *sc)
+{
+    uint32_t config_index;
+    int ret;
+
+    if (sc) {
+        config_index = sc->index;
+    }
+    else {
+        config_index = 0xFFFFFFFF;
+    }
+
+    ret = ioctl(master->fd, EC_IOCTL_SELECT_REF_CLOCK, config_index);
+    if (EC_IOCTL_IS_ERROR(ret)) {
+        fprintf(stderr, "Failed to select reference clock: %s\n",
+                strerror(EC_IOCTL_ERRNO(ret)));
+        return -EC_IOCTL_ERRNO(ret);
+    }
+
+    return 0;
+}
+
 /****************************************************************************/
 
 int ecrt_master(ec_master_t *master, ec_master_info_t *master_info)
@@ -679,6 +704,21 @@ void ecrt_master_sync_slave_clocks(ec_master_t *master)
         fprintf(stderr, "Failed to sync slave clocks: %s\n",
                 strerror(EC_IOCTL_ERRNO(ret)));
     }
+}
+
+/*****************************************************************************/
+
+int ecrt_master_reference_clock_time(ec_master_t *master, uint32_t *time)
+{
+    int ret;
+
+    ret = ioctl(master->fd, EC_IOCTL_REF_CLOCK_TIME, time);
+    if (EC_IOCTL_IS_ERROR(ret)) {
+        fprintf(stderr, "Failed to get reference clock time: %s\n",
+                strerror(EC_IOCTL_ERRNO(ret)));
+    }
+
+    return ret;
 }
 
 /****************************************************************************/

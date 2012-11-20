@@ -804,6 +804,7 @@ AC_CONFIG_FILES([
         examples/rtai/Kbuild
         examples/rtai/Makefile
         examples/rtai_rtdm/Makefile
+        examples/rtai_rtdm_dc/Makefile
         examples/tty/Kbuild
         examples/tty/Makefile
         examples/user/Makefile

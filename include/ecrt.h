@@ -57,6 +57,13 @@
  *   ecrt_reg_request_data(), ecrt_reg_request_state(),
  *   ecrt_reg_request_write(), ecrt_reg_request_read() and the feature flag
  *   EC_HAVE_REG_ACCESS.
+ * - Added method to select the reference clock,
+ *   ecrt_master_select_reference_clock() and the feature flag
+ *   EC_HAVE_SELECT_REF_CLOCK to check, if the method is available.
+ * - Added method to get the reference clock time,
+ *   ecrt_master_reference_clock_time() and the feature flag
+ *   EC_HAVE_REF_CLOCK_TIME to have the possibility to synchronize the master
+ *   clock to the reference clock.
  *
  * Changes in version 1.5:
  *
@@ -162,6 +169,14 @@
  * and ecrt_reg_request_read() are available.
  */
 #define EC_HAVE_REG_ACCESS
+
+/* Defined if the method ecrt_master_select_reference_clock() is available.
+ */
+#define EC_HAVE_SELECT_REF_CLOCK
+
+/* Defined if the method ecrt_master_reference_clock_time() is available.
+ */
+#define EC_HAVE_REF_CLOCK_TIME
 
 /*****************************************************************************/
 
@@ -664,6 +679,20 @@ ec_slave_config_t *ecrt_master_slave_config(
         uint32_t product_code /**< Expected product code. */
         );
 
+/** Selects the reference clock for distributed clocks.
+ *
+ * If this method is not called for a certain master, or if the slave
+ * configuration pointer is NULL, then the first slave with DC functionality
+ * will provide the reference clock.
+ *
+ * \return 0 on success, otherwise negative error code.
+ */
+int ecrt_master_select_reference_clock(
+        ec_master_t *master, /**< EtherCAT master. */
+        ec_slave_config_t *sc /**< Slave config of the slave to use as the
+                               * reference slave (or NULL). */
+        );
+
 /** Obtains master information.
  *
  * No memory is allocated on the heap in
@@ -987,6 +1016,27 @@ void ecrt_master_sync_reference_clock(
  */
 void ecrt_master_sync_slave_clocks(
         ec_master_t *master /**< EtherCAT master. */
+        );
+
+/** Get the lower 32 bit of the reference clock system time.
+ *
+ * This method can be used to synchronize the master to the reference clock.
+ *
+ * The reference clock system time is queried via the
+ * ecrt_master_sync_slave_clocks() method, that reads the system time of the
+ * reference clock and writes it to the slave clocks (so be sure to call it
+ * cyclically to get valid data).
+ *
+ * \attention The returned time is the system time of the reference clock
+ * minus the transmission delay of the reference clock.
+ *
+ * \retval 0 success, system time was written into \a time.
+ * \retval -ENXIO No reference clock found.
+ * \retval -EIO Slave synchronization datagram was not received.
+ */
+int ecrt_master_reference_clock_time(
+        ec_master_t *master, /**< EtherCAT master. */
+        uint32_t *time /**< Pointer to store the queried system time. */
         );
 
 /** Queues the DC synchrony monitoring datagram for sending.

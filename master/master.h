@@ -224,6 +224,8 @@ struct ec_master {
                                    compensation. */
     ec_datagram_t sync_mon_datagram; /**< Datagram used for DC synchronisation
                                        monitoring. */
+    ec_slave_config_t *dc_ref_config; /**< Application-selected DC reference
+                                        clock slave config. */
     ec_slave_t *dc_ref_clock; /**< DC reference clock slave. */
 
     unsigned int scan_busy; /**< Current scan state. */

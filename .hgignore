@@ -102,6 +102,8 @@ examples/rtai/Makefile
 examples/rtai/Makefile.in
 examples/rtai_rtdm/.libs
 examples/rtai_rtdm/ec_rtai_rtdm_example
+examples/rtai_rtdm_dc/.libs
+examples/rtai_rtdm_dc/ec_rtai_rtdm_dc_example
 examples/user/.deps
 examples/user/.libs
 examples/user/Makefile
