@@ -15,9 +15,9 @@
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General
 #  Public License for more details.
 #
-#  You should have received a copy of the GNU General Public License along
-#  with the IgH EtherCAT Master; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+#  You should have received a copy of the GNU General Public License along with
+#  the IgH EtherCAT Master; if not, write to the Free Software Foundation,
+#  Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #
 #  ---
 #
@@ -27,49 +27,17 @@
 #
 #------------------------------------------------------------------------------
 
-SUBDIRS =
+noinst_PROGRAMS = ec_rtai_rtdm_dc_example
 
-if ENABLE_USERLIB
-SUBDIRS += \
-	dc_user \
-	user
-endif
+ec_rtai_rtdm_dc_example_SOURCES = main.c
 
-if ENABLE_TTY
-SUBDIRS += \
-	tty
-endif
+ec_rtai_rtdm_dc_example_CFLAGS = \
+	-Wall \
+	-I$(top_srcdir)/include \
+	$(RTAI_LXRT_CFLAGS)
 
-if ENABLE_RTDM
-if ENABLE_XENOMAI
-SUBDIRS += \
-	xenomai \
-	xenomai_posix
-endif
-
-if ENABLE_RTAI
-SUBDIRS += \
-	rtai_rtdm \
-	rtai_rtdm_dc
-endif
-endif
-
-DIST_SUBDIRS = \
-	dc_rtai \
-	dc_user \
-	mini \
-	rtai \
-	rtai_rtdm \
-	rtai_rtdm_dc \
-	tty \
-	user \
-	xenomai \
-	xenomai_posix
-
-EXTRA_DIST = \
-	Kbuild.in
-
-BUILT_SOURCES = \
-	Kbuild
+ec_rtai_rtdm_dc_example_LDFLAGS = \
+	$(RTAI_LXRT_LDFLAGS) -llxrt -lrtdm \
+	-L$(top_builddir)/lib/.libs -lethercat_rtdm
 
 #------------------------------------------------------------------------------

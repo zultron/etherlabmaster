@@ -234,7 +234,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     ec_datagram_init(&master->ref_sync_datagram);
     snprintf(master->ref_sync_datagram.name, EC_DATAGRAM_NAME_SIZE,
             "refsync");
-    ret = ec_datagram_apwr(&master->ref_sync_datagram, 0, 0x0910, 8);
+    ret = ec_datagram_prealloc(&master->ref_sync_datagram, 4);
     if (ret < 0) {
         ec_datagram_clear(&master->ref_sync_datagram);
         EC_MASTER_ERR(master, "Failed to allocate reference"
@@ -265,7 +265,8 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
         goto out_clear_sync;
     }
 
-    ec_master_find_dc_ref_clock(master);
+    master->dc_ref_config = NULL;
+    master->dc_ref_clock = NULL;
 
     // init character device
     ret = ec_cdev_init(&master->cdev, master, device_number);
@@ -394,6 +395,8 @@ void ec_master_clear_eoe_handlers(
 void ec_master_clear_slave_configs(ec_master_t *master)
 {
     ec_slave_config_t *sc, *next;
+
+    master->dc_ref_config = NULL;
 
     list_for_each_entry_safe(sc, next, &master->configs, list) {
         list_del(&sc->list);
@@ -1872,18 +1875,52 @@ void ec_master_find_dc_ref_clock(
 {
     ec_slave_t *slave, *ref = NULL;
 
-    for (slave = master->slaves;
-            slave < master->slaves + master->slave_count;
-            slave++) {
-        if (slave->base_dc_supported && slave->has_dc_system_time) {
-            ref = slave;
-            break;
+    if (master->dc_ref_config) {
+        // Use application-selected reference clock
+        slave = master->dc_ref_config->slave;
+
+        if (slave) {
+            if (slave->base_dc_supported && slave->has_dc_system_time) {
+                ref = slave;
+            }
+            else {
+                EC_MASTER_WARN(master, "Slave %u can not act as a"
+                        " DC reference clock!", slave->ring_position);
+            }
         }
+        else {
+            EC_MASTER_WARN(master, "DC reference clock config (%u-%u)"
+                    " has no slave attached!\n", master->dc_ref_config->alias,
+                    master->dc_ref_config->position);
+        }
+    }
+    else {
+        // Use first slave with DC support as reference clock
+        for (slave = master->slaves;
+                slave < master->slaves + master->slave_count;
+                slave++) {
+            if (slave->base_dc_supported && slave->has_dc_system_time) {
+                ref = slave;
+                break;
+            }
+        }
+
     }
 
     master->dc_ref_clock = ref;
 
-    // This call always succeeds, because the datagram has been pre-allocated.
+    if (ref) {
+        EC_MASTER_INFO(master, "Using slave %u as DC reference clock.\n",
+                ref->ring_position);
+    }
+    else {
+        EC_MASTER_INFO(master, "No DC reference clock found.\n");
+    }
+
+    // These calls always succeed, because the
+    // datagrams have been pre-allocated.
+    ec_datagram_fpwr(&master->ref_sync_datagram,
+            ref ? ref->station_address : 0xffff, 0x0910, 4);
     ec_datagram_frmw(&master->sync_datagram,
             ref ? ref->station_address : 0xffff, 0x0910, 4);
 }
@@ -2392,6 +2429,26 @@ ec_slave_config_t *ecrt_master_slave_config(ec_master_t *master,
 
 /*****************************************************************************/
 
+int ecrt_master_select_reference_clock(ec_master_t *master,
+        ec_slave_config_t *sc)
+{
+    if (sc) {
+        ec_slave_t *slave = sc->slave;
+
+        // output an early warning
+        if (slave &&
+                (!slave->base_dc_supported || !slave->has_dc_system_time)) {
+            EC_MASTER_WARN(master, "Slave %u can not act as"
+                    " a reference clock!", slave->ring_position);
+        }
+    }
+
+    master->dc_ref_config = sc;
+    return 0;
+}
+
+/*****************************************************************************/
+
 int ecrt_master(ec_master_t *master, ec_master_info_t *master_info)
 {
     EC_MASTER_DBG(master, 1, "ecrt_master(master = 0x%p,"
@@ -2521,6 +2578,25 @@ void ecrt_master_application_time(ec_master_t *master, uint64_t app_time)
         master->app_start_time = app_time;
         master->has_app_time = 1;
     }
+}
+
+/*****************************************************************************/
+
+int ecrt_master_reference_clock_time(ec_master_t *master, uint32_t *time)
+{
+    if (!master->dc_ref_clock) {
+        return -ENXIO;
+    }
+
+    if (master->sync_datagram.state != EC_DATAGRAM_RECEIVED) {
+        return -EIO;
+    }
+
+    // Get returned datagram time, transmission delay removed.
+    *time = EC_READ_U32(master->sync_datagram.data) -
+        master->dc_ref_clock->transmission_delay;
+
+    return 0;
 }
 
 /*****************************************************************************/
@@ -2985,11 +3061,13 @@ EXPORT_SYMBOL(ecrt_master_callbacks);
 EXPORT_SYMBOL(ecrt_master);
 EXPORT_SYMBOL(ecrt_master_get_slave);
 EXPORT_SYMBOL(ecrt_master_slave_config);
+EXPORT_SYMBOL(ecrt_master_select_reference_clock);
 EXPORT_SYMBOL(ecrt_master_state);
 EXPORT_SYMBOL(ecrt_master_link_state);
 EXPORT_SYMBOL(ecrt_master_application_time);
 EXPORT_SYMBOL(ecrt_master_sync_reference_clock);
 EXPORT_SYMBOL(ecrt_master_sync_slave_clocks);
+EXPORT_SYMBOL(ecrt_master_reference_clock_time);
 EXPORT_SYMBOL(ecrt_master_sync_monitor_queue);
 EXPORT_SYMBOL(ecrt_master_sync_monitor_process);
 EXPORT_SYMBOL(ecrt_master_sdo_download);
