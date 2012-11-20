@@ -55,7 +55,8 @@
  * - Added interface for direct EtherCAT register access: Added data type
  *   ec_reg_request_t and methods ecrt_slave_config_create_reg_request(),
  *   ecrt_reg_request_data(), ecrt_reg_request_state(),
- *   ecrt_reg_request_write() and ecrt_reg_request_read().
+ *   ecrt_reg_request_write(), ecrt_reg_request_read() and the feature flag
+ *   EC_HAVE_REG_ACCESS.
  *
  * Changes in version 1.5:
  *
@@ -153,6 +154,14 @@
  * I. e. if the ecrt_slave_config_emerg_*() methods are available.
  */
 #define EC_HAVE_EMERGENCY
+
+/** Defined, if the register access interface is available.
+ *
+ * I. e. if the methods ecrt_slave_config_create_reg_request(),
+ * ecrt_reg_request_data(), ecrt_reg_request_state(), ecrt_reg_request_write()
+ * and ecrt_reg_request_read() are available.
+ */
+#define EC_HAVE_REG_ACCESS
 
 /*****************************************************************************/
 
