@@ -306,8 +306,8 @@ typedef struct {
 typedef enum {
     EC_PORT_NOT_IMPLEMENTED, /**< Port is not implemented. */
     EC_PORT_NOT_CONFIGURED, /**< Port is not configured. */
-    EC_PORT_EBUS, /**< Port is an e-bus. */
-    EC_PORT_MII /**< Port is a mii. */
+    EC_PORT_EBUS, /**< Port is an E-Bus. */
+    EC_PORT_MII /**< Port is a MII. */
 } ec_slave_port_desc_t;
 
 /*****************************************************************************/
@@ -601,7 +601,7 @@ void ecrt_master_callbacks(
         ec_master_t *master, /**< EtherCAT master */
         void (*send_cb)(void *), /**< Datagram sending callback. */
         void (*receive_cb)(void *), /**< Receive callback. */
-        void *cb_data /**< Arbitraty pointer passed to the callback functions.
+        void *cb_data /**< Arbitrary pointer passed to the callback functions.
                        */
         );
 
@@ -980,23 +980,23 @@ void ecrt_master_sync_slave_clocks(
         ec_master_t *master /**< EtherCAT master. */
         );
 
-/** Queues the DC synchonity monitoring datagram for sending.
+/** Queues the DC synchrony monitoring datagram for sending.
  *
  * The datagram broadcast-reads all "System time difference" registers (\a
- * 0x092c) to get an upper estiomation of the DC synchony. The result can be
+ * 0x092c) to get an upper estimation of the DC synchrony. The result can be
  * checked with the ecrt_master_sync_monitor_process() method.
  */
 void ecrt_master_sync_monitor_queue(
         ec_master_t *master /**< EtherCAT master. */
         );
 
-/** Processes the DC synchonity monitoring datagram.
+/** Processes the DC synchrony monitoring datagram.
  *
  * If the sync monitoring datagram was sent before with
  * ecrt_master_sync_monitor_queue(), the result can be queried with this
  * method.
  *
- * \return Upper estination of the maximum time difference in ns.
+ * \return Upper estimation of the maximum time difference in ns.
  */
 uint32_t ecrt_master_sync_monitor_process(
         ec_master_t *master /**< EtherCAT master. */
@@ -1039,7 +1039,7 @@ void ecrt_slave_config_watchdog(
         uint16_t watchdog_divider, /**< Number of 40 ns intervals. Used as a
                                      base unit for all slave watchdogs. If set
                                      to zero, the value is not written, so the
-                                     default ist used. */
+                                     default is used. */
         uint16_t watchdog_intervals /**< Number of base intervals for process
                                       data watchdog. If set to zero, the value
                                       is not written, so the default is used.
@@ -1418,7 +1418,7 @@ void ecrt_slave_config_state(
  * activation, but can be repeated subsequently, for example after the slave's
  * power supply failed.
  *
- * The \a idn parameter can be separated into serveral sections:
+ * The \a idn parameter can be separated into several sections:
  *  - Bit 15: Standard data (0) or Product data (1)
  *  - Bit 14 - 12: Parameter set (0 - 7)
  *  - Bit 11 - 0: Data block number (0 - 4095)
