@@ -64,6 +64,8 @@
  *   ecrt_master_reference_clock_time() and the feature flag
  *   EC_HAVE_REF_CLOCK_TIME to have the possibility to synchronize the master
  *   clock to the reference clock.
+ * - Changed the datatypes of the shift times in ecrt_slave_config_dc() to
+ *   int32_t to correctly display negative shift times.
  *
  * Changes in version 1.5:
  *
@@ -1266,14 +1268,16 @@ int ecrt_slave_config_reg_pdo_entry(
  * The AssignActivate word is vendor-specific and can be taken from the XML
  * device description file (Device -> Dc -> AssignActivate). Set this to zero,
  * if the slave shall be operated without distributed clocks (default).
+ *
+ * \attention The \a sync1_shift time is ignored.
  */
 void ecrt_slave_config_dc(
         ec_slave_config_t *sc, /**< Slave configuration. */
         uint16_t assign_activate, /**< AssignActivate word. */
         uint32_t sync0_cycle, /**< SYNC0 cycle time [ns]. */
-        uint32_t sync0_shift, /**< SYNC0 shift time [ns]. */
+        int32_t sync0_shift, /**< SYNC0 shift time [ns]. */
         uint32_t sync1_cycle, /**< SYNC1 cycle time [ns]. */
-        uint32_t sync1_shift /**< SYNC1 shift time [ns]. */
+        int32_t sync1_shift /**< SYNC1 shift time [ns]. */
         );
 
 /** Add an SDO configuration.

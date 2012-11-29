@@ -1305,7 +1305,7 @@ void ec_fsm_slave_config_state_dc_sync_check(
             EC_SLAVE_DBG(slave, 1, "      app_time=%llu\n", master->app_time);
             EC_SLAVE_DBG(slave, 1, "    start_time=%llu\n", start_time);
             EC_SLAVE_DBG(slave, 1, "    cycle_time=%u\n", sync0->cycle_time);
-            EC_SLAVE_DBG(slave, 1, "    shift_time=%u\n", sync0->shift_time);
+            EC_SLAVE_DBG(slave, 1, "    shift_time=%i\n", sync0->shift_time);
             EC_SLAVE_DBG(slave, 1, "     remainder=%u\n", remainder);
             EC_SLAVE_DBG(slave, 1, "         start=%llu\n", start);
             start_time = start;

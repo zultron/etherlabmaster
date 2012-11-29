@@ -182,7 +182,7 @@ typedef enum {
  */
 typedef struct {
     uint32_t cycle_time; /**< Cycle time [ns]. */
-    uint32_t shift_time; /**< Shift time [ns]. */
+    int32_t shift_time; /**< Shift time [ns]. */
 } ec_sync_signal_t;
 
 /** Access states for SDO entries.

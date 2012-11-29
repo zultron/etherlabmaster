@@ -79,10 +79,10 @@ void ec_slave_config_init(
 
     sc->used_fmmus = 0;
     sc->dc_assign_activate = 0x0000;
-    sc->dc_sync[0].cycle_time = 0x00000000;
-    sc->dc_sync[1].cycle_time = 0x00000000;
-    sc->dc_sync[0].shift_time = 0x00000000;
-    sc->dc_sync[1].shift_time = 0x00000000;
+    sc->dc_sync[0].cycle_time = 0U;
+    sc->dc_sync[1].cycle_time = 0;
+    sc->dc_sync[0].shift_time = 0U;
+    sc->dc_sync[1].shift_time = 0;
 
     INIT_LIST_HEAD(&sc->sdo_configs);
     INIT_LIST_HEAD(&sc->sdo_requests);
@@ -771,12 +771,12 @@ int ecrt_slave_config_reg_pdo_entry(
 /*****************************************************************************/
 
 void ecrt_slave_config_dc(ec_slave_config_t *sc, uint16_t assign_activate,
-        uint32_t sync0_cycle_time, uint32_t sync0_shift_time,
-        uint32_t sync1_cycle_time, uint32_t sync1_shift_time)
+        uint32_t sync0_cycle_time, int32_t sync0_shift_time,
+        uint32_t sync1_cycle_time, int32_t sync1_shift_time)
 {
     EC_CONFIG_DBG(sc, 1, "%s(sc = 0x%p, assign_activate = 0x%04X,"
-            " sync0_cycle = %u, sync0_shift = %u,"
-            " sync1_cycle = %u, sync1_shift = %u\n",
+            " sync0_cycle = %u, sync0_shift = %i,"
+            " sync1_cycle = %u, sync1_shift = %i\n",
             __func__, sc, assign_activate, sync0_cycle_time, sync0_shift_time,
             sync1_cycle_time, sync1_shift_time);
 
