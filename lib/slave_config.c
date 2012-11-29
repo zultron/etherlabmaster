@@ -306,8 +306,8 @@ int ecrt_slave_config_reg_pdo_entry(
 /*****************************************************************************/
 
 void ecrt_slave_config_dc(ec_slave_config_t *sc, uint16_t assign_activate,
-        uint32_t sync0_cycle_time, uint32_t sync0_shift_time,
-        uint32_t sync1_cycle_time, uint32_t sync1_shift_time)
+        uint32_t sync0_cycle_time, int32_t sync0_shift_time,
+        uint32_t sync1_cycle_time, int32_t sync1_shift_time)
 {
     ec_ioctl_config_t data;
     int ret;
@@ -321,7 +321,7 @@ void ecrt_slave_config_dc(ec_slave_config_t *sc, uint16_t assign_activate,
 
     ret = ioctl(sc->master->fd, EC_IOCTL_SC_DC, &data);
     if (EC_IOCTL_IS_ERROR(ret)) {
-        fprintf(stderr, "Failed to set assign_activate word: %s\n",
+        fprintf(stderr, "Failed to set DC parameters: %s\n",
                 strerror(EC_IOCTL_ERRNO(ret)));
     }
 }
