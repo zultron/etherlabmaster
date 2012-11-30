@@ -64,7 +64,6 @@ typedef enum {
 typedef struct {
     ec_debug_frame_dir_t dir;
     struct timeval t;
-    unsigned int addr;
     uint8_t data[EC_MAX_DATA_SIZE];
     unsigned int data_size;
 } ec_debug_frame_t;
