@@ -81,10 +81,12 @@ int ec_device_init(
     device->tx_ring_index = 0;
 
 #ifdef EC_DEBUG_IF
-    if (device == &master->main_device)
+    if (device == &master->devices[EC_DEVICE_MAIN]) {
         mb = 'm';
-    else if (device == &master->backup_device)
+    }
+    else {
         mb = 'b';
+    }
 
     sprintf(ifname, "ecdbg%c%u", mb, master->index);
 
@@ -136,7 +138,9 @@ void ec_device_clear(
 {
     unsigned int i;
 
-    if (device->open) ec_device_close(device);
+    if (device->open) {
+        ec_device_close(device);
+    }
     for (i = 0; i < EC_TX_RING_SIZE; i++)
         dev_kfree_skb(device->tx_skb[i]);
 #ifdef EC_DEBUG_IF
@@ -541,6 +545,7 @@ int ecdev_open(ec_device_t *device /**< EtherCAT device */)
 {
     int ret;
     ec_master_t *master = device->master;
+    unsigned int all_open = 1, dev_idx;
 
     ret = ec_device_open(device);
     if (ret) {
@@ -548,9 +553,15 @@ int ecdev_open(ec_device_t *device /**< EtherCAT device */)
         return ret;
     }
 
-    if (master->devices[EC_DEVICE_MAIN].open &&
-            (ec_mac_is_zero(master->macs[EC_DEVICE_BACKUP]) ||
-             master->devices[EC_DEVICE_BACKUP].open)) {
+    for (dev_idx = EC_DEVICE_MAIN;
+            dev_idx < ec_master_num_devices(device->master); dev_idx++) {
+        if (!master->devices[dev_idx].open) {
+            all_open = 0;
+            break;
+        }
+    }
+
+    if (all_open) {
         ret = ec_master_enter_idle_phase(device->master);
         if (ret) {
             EC_MASTER_ERR(device->master, "Failed to enter IDLE phase!\n");

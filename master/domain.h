@@ -65,8 +65,7 @@ struct ec_domain
                                      process data. */
     struct list_head datagram_pairs; /**< Datagrams pairs (main/backup) for
                                        process data exchange. */
-
-    uint16_t working_counter[EC_NUM_DEVICES]; /**< Last working counter
+    uint16_t working_counter[EC_MAX_NUM_DEVICES]; /**< Last working counter
                                                 values. */
     uint16_t expected_working_counter; /**< Expected working counter. */
     unsigned int working_counter_changes; /**< Working counter changes

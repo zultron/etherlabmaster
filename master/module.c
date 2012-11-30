@@ -453,7 +453,7 @@ size_t ec_state_string(uint8_t states, /**< slave states */
 
 /** Device names.
  */
-const char *ec_device_names[EC_NUM_DEVICES] = {
+const char *ec_device_names[2] = {
     "main",
     "backup"
 };
@@ -476,29 +476,34 @@ ec_device_t *ecdev_offer(
 {
     ec_master_t *master;
     char str[EC_MAX_MAC_STRING_SIZE];
-    unsigned int i, j;
+    unsigned int i, dev_idx;
 
     for (i = 0; i < master_count; i++) {
         master = &masters[i];
         ec_mac_print(net_dev->dev_addr, str);
 
-        down(&master->device_sem);
+        if (down_interruptible(&master->device_sem)) {
+            EC_MASTER_WARN(master, "%s() interrupted!\n", __func__);
+            return NULL;
+        }
 
-        for (j = 0; j < EC_NUM_DEVICES; j++) {
-            if (!master->devices[j].dev
-                && (ec_mac_equal(master->macs[j], net_dev->dev_addr)
-                    || ec_mac_is_broadcast(master->macs[j]))) {
+        for (dev_idx = EC_DEVICE_MAIN;
+                dev_idx < ec_master_num_devices(master); dev_idx++) {
+            if (!master->devices[dev_idx].dev
+                && (ec_mac_equal(master->macs[dev_idx], net_dev->dev_addr)
+                    || ec_mac_is_broadcast(master->macs[dev_idx]))) {
 
                 EC_INFO("Accepting %s as %s device for master %u.\n",
-                        str, ec_device_names[j], master->index);
+                        str, ec_device_names[dev_idx != 0], master->index);
 
-                ec_device_attach(&master->devices[j], net_dev, poll, module);
+                ec_device_attach(&master->devices[dev_idx],
+                        net_dev, poll, module);
                 up(&master->device_sem);
 
                 snprintf(net_dev->name, IFNAMSIZ, "ec%c%u",
-                        ec_device_names[j][0], master->index);
+                        ec_device_names[dev_idx != 0][0], master->index);
 
-                return &master->devices[j]; // offer accepted
+                return &master->devices[dev_idx]; // offer accepted
             }
         }
 
@@ -523,7 +528,7 @@ ec_master_t *ecrt_request_master_err(
         )
 {
     ec_master_t *master, *errptr = NULL;
-    unsigned int i, got_modules = 0;
+    unsigned int dev_idx = EC_DEVICE_MAIN;
 
     EC_INFO("Requesting master %u...\n", master_index);
 
@@ -560,17 +565,14 @@ ec_master_t *ecrt_request_master_err(
         goto out_release;
     }
 
-    for (i = 0; i < EC_NUM_DEVICES; i++) {
-        ec_device_t *device = &master->devices[i];
-        if (device->dev) {
-            if (!try_module_get(device->module)) {
-                up(&master->device_sem);
-                EC_MASTER_ERR(master, "Device module is unloading!\n");
-                errptr = ERR_PTR(-ENODEV);
-                goto out_module_put;
-            }
+    for (; dev_idx < ec_master_num_devices(master); dev_idx++) {
+        ec_device_t *device = &master->devices[dev_idx];
+        if (!try_module_get(device->module)) {
+            up(&master->device_sem);
+            EC_MASTER_ERR(master, "Device module is unloading!\n");
+            errptr = ERR_PTR(-ENODEV);
+            goto out_module_put;
         }
-        got_modules++;
     }
 
     up(&master->device_sem);
@@ -585,11 +587,9 @@ ec_master_t *ecrt_request_master_err(
     return master;
 
  out_module_put:
-    for (; got_modules > 0; got_modules--) {
-        ec_device_t *device = &master->devices[i - 1];
-        if (device->dev) {
-            module_put(device->module);
-        }
+    for (; dev_idx > 0; dev_idx--) {
+        ec_device_t *device = &master->devices[dev_idx - 1];
+        module_put(device->module);
     }
  out_release:
     master->reserved = 0;
@@ -609,7 +609,7 @@ ec_master_t *ecrt_request_master(unsigned int master_index)
 
 void ecrt_release_master(ec_master_t *master)
 {
-    unsigned int i;
+    unsigned int dev_idx;
 
     EC_MASTER_INFO(master, "Releasing master...\n");
 
@@ -621,10 +621,9 @@ void ecrt_release_master(ec_master_t *master)
 
     ec_master_leave_operation_phase(master);
 
-    for (i = 0; i < EC_NUM_DEVICES; i++) {
-        if (master->devices[i].dev) {
-            module_put(master->devices[i].module);
-        }
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < ec_master_num_devices(master);
+            dev_idx++) {
+        module_put(master->devices[dev_idx].module);
     }
 
     master->reserved = 0;

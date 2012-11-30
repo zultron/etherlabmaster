@@ -56,7 +56,7 @@
  *
  * Increment this when changing the ioctl interface!
  */
-#define EC_IOCTL_VERSION_MAGIC 23
+#define EC_IOCTL_VERSION_MAGIC 24
 
 // Command-line tool
 #define EC_IOCTL_MODULE                EC_IOR(0x00, ec_ioctl_module_t)
@@ -187,7 +187,8 @@ typedef struct {
         int32_t rx_frame_rates[EC_RATE_COUNT];
         int32_t tx_byte_rates[EC_RATE_COUNT];
         int32_t rx_byte_rates[EC_RATE_COUNT];
-    } devices[EC_NUM_DEVICES];
+    } devices[EC_MAX_NUM_DEVICES];
+    uint32_t num_devices;
     uint64_t tx_count;
     uint64_t rx_count;
     uint64_t tx_bytes;
@@ -304,7 +305,7 @@ typedef struct {
     // outputs
     uint32_t data_size;
     uint32_t logical_base_address;
-    uint16_t working_counter[EC_NUM_DEVICES];
+    uint16_t working_counter[EC_MAX_NUM_DEVICES];
     uint16_t expected_working_counter;
     uint32_t fmmu_count;
 } ec_ioctl_domain_t;

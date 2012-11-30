@@ -58,29 +58,34 @@ int ec_datagram_pair_init(
     INIT_LIST_HEAD(&pair->list);
     pair->domain = domain;
 
-    for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+    for (dev_idx = EC_DEVICE_MAIN;
+            dev_idx < ec_master_num_devices(domain->master); dev_idx++) {
         ec_datagram_init(&pair->datagrams[dev_idx]);
         snprintf(pair->datagrams[dev_idx].name,
                 EC_DATAGRAM_NAME_SIZE, "domain%u-%u-%s", domain->index,
-                logical_offset, ec_device_names[dev_idx]);
+                logical_offset, ec_device_names[dev_idx != 0]);
         pair->datagrams[dev_idx].device_index = dev_idx;
     }
 
     pair->expected_working_counter = 0U;
 
-    /* backup datagram has its own memory */
-    ret = ec_datagram_prealloc(&pair->datagrams[EC_DEVICE_BACKUP],
-            data_size);
-    if (ret) {
-        goto out_datagrams;
+    for (dev_idx = EC_DEVICE_BACKUP;
+            dev_idx < ec_master_num_devices(domain->master); dev_idx++) {
+        /* backup datagrams have their own memory */
+        ret = ec_datagram_prealloc(&pair->datagrams[dev_idx], data_size);
+        if (ret) {
+            goto out_datagrams;
+        }
     }
 
+#if EC_MAX_NUM_DEVICES > 1
     if (!(pair->send_buffer = kmalloc(data_size, GFP_KERNEL))) {
         EC_MASTER_ERR(domain->master,
                 "Failed to allocate domain send buffer!\n");
         ret = -ENOMEM;
         goto out_datagrams;
     }
+#endif
 
     /* The ec_datagram_lxx() calls below can not fail, because either the
      * datagram has external memory or it is preallocated. */
@@ -88,8 +93,12 @@ int ec_datagram_pair_init(
     if (used[EC_DIR_OUTPUT] && used[EC_DIR_INPUT]) { // inputs and outputs
         ec_datagram_lrw_ext(&pair->datagrams[EC_DEVICE_MAIN],
                 logical_offset, data_size, data);
-        ec_datagram_lrw(&pair->datagrams[EC_DEVICE_BACKUP],
-                logical_offset, data_size);
+
+        for (dev_idx = EC_DEVICE_BACKUP;
+                dev_idx < ec_master_num_devices(domain->master); dev_idx++) {
+            ec_datagram_lrw(&pair->datagrams[dev_idx],
+                    logical_offset, data_size);
+        }
 
         // If LRW is used, output FMMUs increment the working counter by 2,
         // while input FMMUs increment it by 1.
@@ -98,27 +107,35 @@ int ec_datagram_pair_init(
     } else if (used[EC_DIR_OUTPUT]) { // outputs only
         ec_datagram_lwr_ext(&pair->datagrams[EC_DEVICE_MAIN],
                 logical_offset, data_size, data);
-        ec_datagram_lwr(&pair->datagrams[EC_DEVICE_BACKUP],
-                logical_offset, data_size);
+        for (dev_idx = EC_DEVICE_BACKUP;
+                dev_idx < ec_master_num_devices(domain->master); dev_idx++) {
+            ec_datagram_lwr(&pair->datagrams[dev_idx],
+                    logical_offset, data_size);
+        }
 
         pair->expected_working_counter = used[EC_DIR_OUTPUT];
     } else { // inputs only (or nothing)
         ec_datagram_lrd_ext(&pair->datagrams[EC_DEVICE_MAIN],
                 logical_offset, data_size, data);
-        ec_datagram_lrd(&pair->datagrams[EC_DEVICE_BACKUP],
-                logical_offset, data_size);
+        for (dev_idx = EC_DEVICE_BACKUP;
+                dev_idx < ec_master_num_devices(domain->master); dev_idx++) {
+            ec_datagram_lrd(&pair->datagrams[dev_idx], logical_offset,
+                    data_size);
+        }
 
         pair->expected_working_counter = used[EC_DIR_INPUT];
     }
 
-    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+    for (dev_idx = EC_DEVICE_MAIN;
+            dev_idx < ec_master_num_devices(domain->master); dev_idx++) {
         ec_datagram_zero(&pair->datagrams[dev_idx]);
     }
 
     return 0;
 
 out_datagrams:
-    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+    for (dev_idx = EC_DEVICE_MAIN;
+            dev_idx < ec_master_num_devices(domain->master); dev_idx++) {
         ec_datagram_clear(&pair->datagrams[dev_idx]);
     }
 
@@ -135,13 +152,17 @@ void ec_datagram_pair_clear(
 {
     unsigned int dev_idx;
 
-    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+    for (dev_idx = EC_DEVICE_MAIN;
+            dev_idx < ec_master_num_devices(pair->domain->master);
+            dev_idx++) {
         ec_datagram_clear(&pair->datagrams[dev_idx]);
     }
 
+#if EC_MAX_NUM_DEVICES > 1
     if (pair->send_buffer) {
         kfree(pair->send_buffer);
     }
+#endif
 }
 
 /*****************************************************************************/
@@ -150,13 +171,14 @@ void ec_datagram_pair_clear(
  */
 uint16_t ec_datagram_pair_process(
         ec_datagram_pair_t *pair, /**< Datagram pair. */
-        uint16_t wc_sum[EC_NUM_DEVICES] /**< Working counter sums. */
+        uint16_t wc_sum[] /**< Working counter sums. */
         )
 {
     unsigned int dev_idx;
     uint16_t pair_wc = 0;
 
-    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+    for (dev_idx = 0; dev_idx < ec_master_num_devices(pair->domain->master);
+            dev_idx++) {
         ec_datagram_t *datagram = &pair->datagrams[dev_idx];
 
         ec_datagram_output_stats(datagram);

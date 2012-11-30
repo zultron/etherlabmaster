@@ -467,19 +467,17 @@ Command::ConfigList Command::selectedConfigs(MasterDevice &m)
 
 /****************************************************************************/
 
-Command::DomainList Command::selectedDomains(MasterDevice &m)
+Command::DomainList Command::selectedDomains(MasterDevice &m,
+        const ec_ioctl_master_t &io)
 {
-    ec_ioctl_master_t master;
     DomainList list;
 
-    m.getMaster(&master);
-
-    PositionParser pp(master.domain_count);
+    PositionParser pp(io.domain_count);
     NumberListParser::List domList = pp.parse(domains.c_str());
     NumberListParser::List::const_iterator di;
 
     for (di = domList.begin(); di != domList.end(); di++) {
-        if (*di < master.domain_count) {
+        if (*di < io.domain_count) {
             ec_ioctl_domain_t d;
             m.getDomain(&d, *di);
             list.push_back(d);
