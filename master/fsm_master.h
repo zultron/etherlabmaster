@@ -105,15 +105,15 @@ struct ec_fsm_master {
                                 */
     int idle; /**< state machine is in idle phase */
     unsigned long scan_jiffies; /**< beginning of slave scanning */
-    uint8_t link_state[EC_NUM_DEVICES]; /**< Last link state for every device.
-                                         */
-    unsigned int slaves_responding[EC_NUM_DEVICES]; /**< Number of responding
-                                                      slaves for every device.
-                                                     */
+    uint8_t link_state[EC_MAX_NUM_DEVICES]; /**< Last link state for every
+                                              device. */
+    unsigned int slaves_responding[EC_MAX_NUM_DEVICES]; /**< Number of
+                                                          responding slaves
+                                                          for every device. */
     unsigned int rescan_required; /**< A bus rescan is required. */
-    ec_slave_state_t slave_states[EC_NUM_DEVICES]; /**< AL states of
-                                                     responding slaves for
-                                                     every device. */
+    ec_slave_state_t slave_states[EC_MAX_NUM_DEVICES]; /**< AL states of
+                                                         responding slaves for
+                                                         every device. */
     ec_slave_t *slave; /**< current slave */
     ec_sii_write_request_t *sii_request; /**< SII write request */
     off_t sii_index; /**< index to SII write request data */

@@ -59,6 +59,8 @@ void ec_domain_init(
         unsigned int index /**< Index. */
         )
 {
+    unsigned int dev_idx;
+
     domain->master = master;
     domain->index = index;
     INIT_LIST_HEAD(&domain->fmmu_configs);
@@ -67,8 +69,10 @@ void ec_domain_init(
     domain->data_origin = EC_ORIG_INTERNAL;
     domain->logical_base_address = 0x00000000;
     INIT_LIST_HEAD(&domain->datagram_pairs);
-    domain->working_counter[EC_DEVICE_MAIN] = 0x0000;
-    domain->working_counter[EC_DEVICE_BACKUP] = 0x0000;
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < ec_master_num_devices(master);
+            dev_idx++) {
+        domain->working_counter[dev_idx] = 0x0000;
+    }
     domain->expected_working_counter = 0x0000;
     domain->working_counter_changes = 0;
     domain->redundancy_active = 0;
@@ -355,6 +359,8 @@ const ec_fmmu_config_t *ec_domain_find_fmmu(
 
 /*****************************************************************************/
 
+#if EC_MAX_NUM_DEVICES > 1
+
 /** Process received data.
  */
 int data_changed(
@@ -376,6 +382,8 @@ int data_changed(
 
     return 0;
 }
+
+#endif
 
 /******************************************************************************
  *  Application interface
@@ -443,15 +451,17 @@ uint8_t *ecrt_domain_data(ec_domain_t *domain)
 
 void ecrt_domain_process(ec_domain_t *domain)
 {
-    uint16_t wc_sum[EC_NUM_DEVICES] = {};
+    uint16_t wc_sum[EC_MAX_NUM_DEVICES] = {}, redundant_wc, wc_total;
     ec_datagram_pair_t *pair;
-    ec_datagram_t *main_datagram, *backup_datagram;
+    ec_datagram_t *main_datagram;
     uint32_t logical_datagram_address;
     size_t datagram_size;
     uint16_t datagram_pair_wc;
-    unsigned int datagram_offset;
+    unsigned int dev_idx, wc_change;
+#if EC_MAX_NUM_DEVICES > 1
     ec_fmmu_config_t *fmmu =
         list_first_entry(&domain->fmmu_configs, ec_fmmu_config_t, list);
+#endif
     unsigned int redundancy;
 
 #if DEBUG_REDUNDANCY
@@ -461,7 +471,6 @@ void ecrt_domain_process(ec_domain_t *domain)
     list_for_each_entry(pair, &domain->datagram_pairs, list) {
 
         main_datagram = &pair->datagrams[EC_DEVICE_MAIN];
-        backup_datagram = &pair->datagrams[EC_DEVICE_BACKUP];
         logical_datagram_address = EC_READ_U32(main_datagram->address);
         datagram_size = main_datagram->data_size;
 
@@ -472,8 +481,16 @@ void ecrt_domain_process(ec_domain_t *domain)
 
         datagram_pair_wc = ec_datagram_pair_process(pair, wc_sum);
 
-        /* Go through all FMMU configs to detect data changes. */
+#if EC_MAX_NUM_DEVICES > 1
+        if (ec_master_num_devices(domain->master) < 2) {
+            continue;
+        }
+
+        /* Redundancy: Go through all FMMU configs to detect data changes. */
         list_for_each_entry_from(fmmu, &domain->fmmu_configs, list) {
+            unsigned int datagram_offset;
+            ec_datagram_t *backup_datagram =
+                &pair->datagrams[EC_DEVICE_BACKUP];
 
             if (fmmu->dir != EC_DIR_INPUT) {
                 continue;
@@ -533,9 +550,16 @@ void ecrt_domain_process(ec_domain_t *domain)
 #endif
             }
         }
+#endif // EC_MAX_NUM_DEVICES > 1
     }
 
-    redundancy = wc_sum[EC_DEVICE_BACKUP] > 0;
+    redundant_wc = 0;
+    for (dev_idx = EC_DEVICE_BACKUP;
+            dev_idx < ec_master_num_devices(domain->master); dev_idx++) {
+        redundant_wc += wc_sum[dev_idx];
+    }
+
+    redundancy = redundant_wc > 0;
     if (redundancy != domain->redundancy_active) {
         if (redundancy) {
             EC_MASTER_WARN(domain->master,
@@ -549,12 +573,19 @@ void ecrt_domain_process(ec_domain_t *domain)
         domain->redundancy_active = redundancy;
     }
 
-    if ((wc_sum[EC_DEVICE_MAIN] != domain->working_counter[EC_DEVICE_MAIN])
-            || (wc_sum[EC_DEVICE_BACKUP]
-                != domain->working_counter[EC_DEVICE_BACKUP])) {
+    wc_change = 0;
+    wc_total = 0;
+    for (dev_idx = EC_DEVICE_MAIN;
+            dev_idx < ec_master_num_devices(domain->master); dev_idx++) {
+        if (wc_sum[dev_idx] != domain->working_counter[dev_idx]) {
+            wc_change = 1;
+            domain->working_counter[dev_idx] = wc_sum[dev_idx];
+        }
+        wc_total += wc_sum[dev_idx];
+    }
+
+    if (wc_change) {
         domain->working_counter_changes++;
-        domain->working_counter[EC_DEVICE_MAIN] = wc_sum[EC_DEVICE_MAIN];
-        domain->working_counter[EC_DEVICE_BACKUP] = wc_sum[EC_DEVICE_BACKUP];
     }
 
     if (domain->working_counter_changes &&
@@ -562,20 +593,28 @@ void ecrt_domain_process(ec_domain_t *domain)
         domain->notify_jiffies = jiffies;
         if (domain->working_counter_changes == 1) {
             EC_MASTER_INFO(domain->master, "Domain %u: Working counter"
-                    " changed to %u/%u (%u+%u).\n", domain->index,
-                    domain->working_counter[EC_DEVICE_MAIN] +
-                    domain->working_counter[EC_DEVICE_BACKUP],
-                    domain->expected_working_counter,
-                    wc_sum[EC_DEVICE_MAIN], wc_sum[EC_DEVICE_BACKUP]);
+                    " changed to %u/%u", domain->index,
+                    wc_total, domain->expected_working_counter);
         } else {
             EC_MASTER_INFO(domain->master, "Domain %u: %u working counter"
-                    " changes - now %u/%u (%u+%u).\n", domain->index,
+                    " changes - now %u/%u", domain->index,
                     domain->working_counter_changes,
-                    domain->working_counter[EC_DEVICE_MAIN] +
-                    domain->working_counter[EC_DEVICE_BACKUP],
-                    domain->expected_working_counter,
-                    wc_sum[EC_DEVICE_MAIN], wc_sum[EC_DEVICE_BACKUP]);
+                    wc_total, domain->expected_working_counter);
         }
+        if (ec_master_num_devices(domain->master) > 1) {
+            printk(" (");
+            for (dev_idx = EC_DEVICE_MAIN;
+                    dev_idx < ec_master_num_devices(domain->master);
+                    dev_idx++) {
+                printk("%u", domain->working_counter[dev_idx]);
+                if (dev_idx + 1 < ec_master_num_devices(domain->master)) {
+                    printk("+");
+                }
+            }
+            printk(")");
+        }
+        printk(".\n");
+
         domain->working_counter_changes = 0;
     }
 }
@@ -589,17 +628,21 @@ void ecrt_domain_queue(ec_domain_t *domain)
 
     list_for_each_entry(datagram_pair, &domain->datagram_pairs, list) {
 
+#if EC_MAX_NUM_DEVICES > 1
         /* copy main data to send buffer */
         memcpy(datagram_pair->send_buffer,
                 datagram_pair->datagrams[EC_DEVICE_MAIN].data,
                 datagram_pair->datagrams[EC_DEVICE_MAIN].data_size);
+#endif
+        ec_master_queue_datagram(domain->master,
+                &datagram_pair->datagrams[EC_DEVICE_MAIN]);
 
         /* copy main data to backup datagram */
-        memcpy(datagram_pair->datagrams[EC_DEVICE_BACKUP].data,
-                datagram_pair->datagrams[EC_DEVICE_MAIN].data,
-                datagram_pair->datagrams[EC_DEVICE_MAIN].data_size);
-
-        for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        for (dev_idx = EC_DEVICE_BACKUP;
+                dev_idx < ec_master_num_devices(domain->master); dev_idx++) {
+            memcpy(datagram_pair->datagrams[dev_idx].data,
+                    datagram_pair->datagrams[EC_DEVICE_MAIN].data,
+                    datagram_pair->datagrams[EC_DEVICE_MAIN].data_size);
             ec_master_queue_datagram(domain->master,
                     &datagram_pair->datagrams[dev_idx]);
         }
@@ -610,9 +653,15 @@ void ecrt_domain_queue(ec_domain_t *domain)
 
 void ecrt_domain_state(const ec_domain_t *domain, ec_domain_state_t *state)
 {
-    state->working_counter =
-        domain->working_counter[EC_DEVICE_MAIN]
-        + domain->working_counter[EC_DEVICE_BACKUP];
+    unsigned int dev_idx;
+    uint16_t wc = 0;
+
+    for (dev_idx = EC_DEVICE_MAIN;
+            dev_idx < ec_master_num_devices(domain->master); dev_idx++) {
+        wc += domain->working_counter[dev_idx];
+    }
+
+    state->working_counter = wc;
 
     if (state->working_counter) {
         if (state->working_counter == domain->expected_working_counter) {

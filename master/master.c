@@ -136,14 +136,28 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
         )
 {
     int ret;
+    unsigned int dev_idx;
 
     master->index = index;
     master->reserved = 0;
 
     sema_init(&master->master_sem, 1);
 
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_MAX_NUM_DEVICES; dev_idx++) {
+        master->macs[dev_idx] = NULL;
+    }
+
     master->macs[EC_DEVICE_MAIN] = main_mac;
+
+#if EC_MAX_NUM_DEVICES > 1
     master->macs[EC_DEVICE_BACKUP] = backup_mac;
+    master->num_devices = 1 + !ec_mac_is_zero(backup_mac);
+#else
+    if (!ec_mac_is_zero(backup_mac)) {
+        EC_MASTER_WARN(master, "Ignoring backup MAC address!");
+    }
+#endif
+
     ec_master_clear_device_stats(master);
 
     sema_init(&master->device_sem, 1);
@@ -209,13 +223,13 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     init_waitqueue_head(&master->sii_queue);
 
     // init devices
-    ret = ec_device_init(&master->devices[EC_DEVICE_MAIN], master);
-    if (ret < 0)
-        goto out_return;
-
-    ret = ec_device_init(&master->devices[EC_DEVICE_BACKUP], master);
-    if (ret < 0)
-        goto out_clear_main;
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < ec_master_num_devices(master);
+            dev_idx++) {
+        ret = ec_device_init(&master->devices[dev_idx], master);
+        if (ret < 0) {
+            goto out_clear_devices;
+        }
+    }
 
     // init state machine datagram
     ec_datagram_init(&master->fsm_datagram);
@@ -224,7 +238,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     if (ret < 0) {
         ec_datagram_clear(&master->fsm_datagram);
         EC_MASTER_ERR(master, "Failed to allocate FSM datagram.\n");
-        goto out_clear_backup;
+        goto out_clear_devices;
     }
 
     // create state machine object
@@ -325,11 +339,10 @@ out_clear_ref_sync:
 out_clear_fsm:
     ec_fsm_master_clear(&master->fsm);
     ec_datagram_clear(&master->fsm_datagram);
-out_clear_backup:
-    ec_device_clear(&master->devices[EC_DEVICE_BACKUP]);
-out_clear_main:
-    ec_device_clear(&master->devices[EC_DEVICE_MAIN]);
-out_return:
+out_clear_devices:
+    for (; dev_idx > 0; dev_idx--) {
+        ec_device_clear(&master->devices[dev_idx - 1]);
+    }
     return ret;
 }
 
@@ -341,6 +354,8 @@ void ec_master_clear(
         ec_master_t *master /**< EtherCAT master */
         )
 {
+    unsigned int dev_idx;
+
 #ifdef EC_RTDM
     ec_rtdm_dev_clear(&master->rtdm_dev);
 #endif
@@ -365,8 +380,11 @@ void ec_master_clear(
     ec_datagram_clear(&master->ref_sync_datagram);
     ec_fsm_master_clear(&master->fsm);
     ec_datagram_clear(&master->fsm_datagram);
-    ec_device_clear(&master->devices[EC_DEVICE_BACKUP]);
-    ec_device_clear(&master->devices[EC_DEVICE_MAIN]);
+
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < ec_master_num_devices(master);
+            dev_idx++) {
+        ec_device_clear(&master->devices[dev_idx]);
+    }
 }
 
 /*****************************************************************************/
@@ -575,7 +593,8 @@ int ec_master_enter_idle_phase(
     master->phase = EC_IDLE;
 
     // reset number of responding slaves to trigger scanning
-    for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < ec_master_num_devices(master);
+            dev_idx++) {
         master->fsm.slaves_responding[dev_idx] = 0;
     }
 
@@ -1222,7 +1241,7 @@ void ec_master_update_device_stats(
     ec_device_stats_t *s = &master->device_stats;
     s32 tx_frame_rate, rx_frame_rate, tx_byte_rate, rx_byte_rate, loss_rate;
     u64 loss;
-    unsigned int i;
+    unsigned int i, dev_idx;
 
     // frame statistics
     if (likely(jiffies - s->jiffies < HZ)) {
@@ -1255,8 +1274,10 @@ void ec_master_update_device_stats(
     s->last_rx_bytes = s->rx_bytes;
     s->last_loss = loss;
 
-    ec_device_update_stats(&master->devices[EC_DEVICE_MAIN]);
-    ec_device_update_stats(&master->devices[EC_DEVICE_BACKUP]);
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < ec_master_num_devices(master);
+            dev_idx++) {
+        ec_device_update_stats(&master->devices[dev_idx]);
+    }
 
     s->jiffies = jiffies;
 }
@@ -2265,7 +2286,8 @@ void ecrt_master_send(ec_master_t *master)
 
     ec_master_inject_external_datagrams(master);
 
-    for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < ec_master_num_devices(master);
+            dev_idx++) {
         if (unlikely(!master->devices[dev_idx].link_state)) {
             // link is down, no datagram can be sent
             list_for_each_entry_safe(datagram, n,
@@ -2297,12 +2319,13 @@ void ecrt_master_send(ec_master_t *master)
 
 void ecrt_master_receive(ec_master_t *master)
 {
+    unsigned int dev_idx;
     ec_datagram_t *datagram, *next;
 
     // receive datagrams
-    ec_device_poll(&master->devices[EC_DEVICE_MAIN]);
-    if (master->devices[EC_DEVICE_BACKUP].dev) {
-        ec_device_poll(&master->devices[EC_DEVICE_BACKUP]);
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < ec_master_num_devices(master);
+            dev_idx++) {
+        ec_device_poll(&master->devices[dev_idx]);
     }
     ec_master_update_device_stats(master);
 
@@ -2540,7 +2563,8 @@ void ecrt_master_state(const ec_master_t *master, ec_master_state_t *state)
     state->al_states = 0;
     state->link_up = 0U;
 
-    for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < ec_master_num_devices(master);
+            dev_idx++) {
         /* Announce sum of responding slaves on all links. */
         state->slaves_responding += master->fsm.slaves_responding[dev_idx];
 
@@ -2557,7 +2581,7 @@ void ecrt_master_state(const ec_master_t *master, ec_master_state_t *state)
 int ecrt_master_link_state(const ec_master_t *master, unsigned int dev_idx,
         ec_master_link_state_t *state)
 {
-    if (dev_idx >= EC_NUM_DEVICES) {
+    if (dev_idx >= ec_master_num_devices(master)) {
         return -EINVAL;
     }
 

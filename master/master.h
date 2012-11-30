@@ -172,6 +172,12 @@ typedef struct {
 
 /*****************************************************************************/
 
+#if EC_MAX_NUM_DEVICES < 1
+#error Invalid number of devices
+#endif
+
+/*****************************************************************************/
+
 /** EtherCAT master.
  *
  * Manages slaves, domains and IO.
@@ -193,8 +199,13 @@ struct ec_master {
 
     struct semaphore master_sem; /**< Master semaphore. */
 
-    ec_device_t devices[EC_NUM_DEVICES]; /**< EtherCAT devices. */
-    const uint8_t *macs[EC_NUM_DEVICES]; /**< Device MAC addresses. */
+    ec_device_t devices[EC_MAX_NUM_DEVICES]; /**< EtherCAT devices. */
+    const uint8_t *macs[EC_MAX_NUM_DEVICES]; /**< Device MAC addresses. */
+#if EC_MAX_NUM_DEVICES > 1
+    unsigned int num_devices; /**< Number of devices. Access this always via
+                                ec_master_num_devices(), because it may be
+                                optimized! */
+#endif
     struct semaphore device_sem; /**< Device semaphore. */
     ec_device_stats_t device_stats; /**< Device statistics. */
 
@@ -289,6 +300,12 @@ void ec_master_init_static(void);
 int ec_master_init(ec_master_t *, unsigned int, const uint8_t *,
         const uint8_t *, dev_t, struct class *, unsigned int);
 void ec_master_clear(ec_master_t *);
+
+#if EC_MAX_NUM_DEVICES > 1
+#define ec_master_num_devices(MASTER) ((MASTER)->num_devices)
+#else
+#define ec_master_num_devices(MASTER) 1
+#endif
 
 // phase transitions
 int ec_master_enter_idle_phase(ec_master_t *);

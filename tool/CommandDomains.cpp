@@ -108,16 +108,18 @@ void CommandDomains::execute(const StringVector &args)
     MasterIndexList::const_iterator mi;
     for (mi = masterIndices.begin();
             mi != masterIndices.end(); mi++) {
+        ec_ioctl_master_t io;
         MasterDevice m(*mi);
         m.open(MasterDevice::Read);
-        domains = selectedDomains(m);
+        m.getMaster(&io);
+        domains = selectedDomains(m, io);
 
         if (domains.size() && doIndent) {
             cout << "Master" << dec << *mi << endl;
         }
 
         for (di = domains.begin(); di != domains.end(); di++) {
-            showDomain(m, *di, doIndent);
+            showDomain(m, io, *di, doIndent);
         }
     }
 }
@@ -126,6 +128,7 @@ void CommandDomains::execute(const StringVector &args)
 
 void CommandDomains::showDomain(
         MasterDevice &m,
+        const ec_ioctl_master_t &master,
         const ec_ioctl_domain_t &domain,
         bool doIndent
         )
@@ -138,7 +141,7 @@ void CommandDomains::showDomain(
     string indent(doIndent ? "  " : "");
     unsigned int wc_sum = 0, dev_idx;
 
-    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < master.num_devices; dev_idx++) {
         wc_sum += domain.working_counter[dev_idx];
     }
 
@@ -151,10 +154,16 @@ void CommandDomains::showDomain(
         << ", WorkingCounter "
         << wc_sum << "/"
         << domain.expected_working_counter;
-    if (EC_NUM_DEVICES == 2) {
-        cout << " (" << domain.working_counter[EC_DEVICE_MAIN]
-            << "+" << domain.working_counter[EC_DEVICE_BACKUP]
-            << ")";
+    if (master.num_devices > 1) {
+        cout << " (";
+        for (dev_idx = EC_DEVICE_MAIN; dev_idx < master.num_devices;
+                dev_idx++) {
+            cout << domain.working_counter[dev_idx];
+            if (dev_idx + 1 < master.num_devices) {
+                cout << "+";
+            }
+        }
+        cout << ")";
     }
     cout << endl;
 

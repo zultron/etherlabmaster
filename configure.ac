@@ -782,6 +782,38 @@ if test "x${wildcards}" = "x1"; then
 fi
 
 #------------------------------------------------------------------------------
+# Redundancy (number of devices)
+#------------------------------------------------------------------------------
+
+AC_ARG_WITH([devices],
+    AC_HELP_STRING(
+        [--with-devices=<NUMBER>],
+        [Number of Ethernet devices per master. Default: 1]
+    ),
+    [
+        devices=[$withval]
+    ],
+    [
+        devices=1
+    ]
+)
+
+AC_MSG_CHECKING([for number of Ethernet devices])
+
+if test "${devices}" -lt 1; then
+    AC_MSG_ERROR([Number must be greater zero!])
+else
+    if test "${devices}" -gt 1; then
+        AC_MSG_RESULT([$devices (Redundancy enabled)])
+    else
+        AC_MSG_RESULT([$devices (Redundancy disabled)])
+    fi
+fi
+
+AC_DEFINE_UNQUOTED([EC_MAX_NUM_DEVICES], $devices,
+    [Max. number of Ethernet devices per master])
+
+#------------------------------------------------------------------------------
 
 AC_CONFIG_FILES([
         Doxyfile

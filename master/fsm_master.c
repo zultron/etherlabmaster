@@ -86,7 +86,8 @@ void ec_fsm_master_init(
     fsm->state = ec_fsm_master_state_start;
     fsm->idle = 0;
     fsm->dev_idx = EC_DEVICE_MAIN;
-    for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+    for (dev_idx = EC_DEVICE_MAIN; dev_idx < ec_master_num_devices(master);
+            dev_idx++) {
         fsm->link_state[dev_idx] = 0;
         fsm->slaves_responding[dev_idx] = 0;
         fsm->slave_states[dev_idx] = EC_SLAVE_STATE_UNKNOWN;
@@ -209,7 +210,7 @@ void ec_fsm_master_state_broadcast(
         fsm->slaves_responding[fsm->dev_idx] = datagram->working_counter;
         EC_MASTER_INFO(master, "%u slave(s) responding on %s device.\n",
                 fsm->slaves_responding[fsm->dev_idx],
-                ec_device_names[fsm->dev_idx]);
+                ec_device_names[fsm->dev_idx != 0]);
     }
 
     if (fsm->link_state[fsm->dev_idx] &&
@@ -218,7 +219,7 @@ void ec_fsm_master_state_broadcast(
 
         EC_MASTER_DBG(master, 1, "Master state machine detected "
                 "link down on %s device. Clearing slave list.\n",
-                ec_device_names[fsm->dev_idx]);
+                ec_device_names[fsm->dev_idx != 0]);
 
 #ifdef EC_EOE
         ec_master_eoe_stop(master);
@@ -226,7 +227,8 @@ void ec_fsm_master_state_broadcast(
 #endif
         ec_master_clear_slaves(master);
 
-        for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+        for (dev_idx = EC_DEVICE_MAIN;
+                dev_idx < ec_master_num_devices(master); dev_idx++) {
             fsm->slave_states[dev_idx] = 0x00;
             fsm->slaves_responding[dev_idx] = 0; /* Reset to trigger rescan on
                                                     next link up. */
@@ -243,14 +245,14 @@ void ec_fsm_master_state_broadcast(
             fsm->slave_states[fsm->dev_idx] = states;
             ec_state_string(states, state_str, 1);
             EC_MASTER_INFO(master, "Slave states on %s device: %s.\n",
-                    ec_device_names[fsm->dev_idx], state_str);
+                    ec_device_names[fsm->dev_idx != 0], state_str);
         }
     } else {
         fsm->slave_states[fsm->dev_idx] = 0x00;
     }
 
     fsm->dev_idx++;
-    if (fsm->dev_idx < EC_NUM_DEVICES) {
+    if (fsm->dev_idx < ec_master_num_devices(master)) {
         // check number of responding slaves on next device
         fsm->state = ec_fsm_master_state_start;
         fsm->state(fsm); // execute immediately
@@ -279,8 +281,8 @@ void ec_fsm_master_state_broadcast(
 #endif
             ec_master_clear_slaves(master);
 
-            for (dev_idx = EC_DEVICE_MAIN; dev_idx < EC_NUM_DEVICES;
-                    dev_idx++) {
+            for (dev_idx = EC_DEVICE_MAIN;
+                    dev_idx < ec_master_num_devices(master); dev_idx++) {
                 count += fsm->slaves_responding[dev_idx];
             }
 
@@ -708,7 +710,7 @@ void ec_fsm_master_state_clear_addresses(
     if (datagram->state != EC_DATAGRAM_RECEIVED) {
         EC_MASTER_ERR(master, "Failed to receive address"
                 " clearing datagram on %s link: ",
-                ec_device_names[fsm->dev_idx]);
+                ec_device_names[fsm->dev_idx != 0]);
         ec_datagram_print_state(datagram);
         master->scan_busy = 0;
         wake_up_interruptible(&master->scan_queue);
@@ -719,13 +721,13 @@ void ec_fsm_master_state_clear_addresses(
     if (datagram->working_counter != fsm->slaves_responding[fsm->dev_idx]) {
         EC_MASTER_WARN(master, "Failed to clear station addresses on %s link:"
                 " Cleared %u of %u",
-                ec_device_names[fsm->dev_idx], datagram->working_counter,
+                ec_device_names[fsm->dev_idx != 0], datagram->working_counter,
                 fsm->slaves_responding[fsm->dev_idx]);
     }
 
     EC_MASTER_DBG(master, 1, "Sending broadcast-write"
             " to measure transmission delays on %s link.\n",
-            ec_device_names[fsm->dev_idx]);
+            ec_device_names[fsm->dev_idx != 0]);
 
     ec_datagram_bwr(datagram, 0x0900, 1);
     ec_datagram_zero(datagram);
@@ -750,7 +752,7 @@ void ec_fsm_master_state_dc_measure_delays(
 
     if (datagram->state != EC_DATAGRAM_RECEIVED) {
         EC_MASTER_ERR(master, "Failed to receive delay measuring datagram"
-                " on %s link: ", ec_device_names[fsm->dev_idx]);
+                " on %s link: ", ec_device_names[fsm->dev_idx != 0]);
         ec_datagram_print_state(datagram);
         master->scan_busy = 0;
         wake_up_interruptible(&master->scan_queue);
@@ -760,13 +762,13 @@ void ec_fsm_master_state_dc_measure_delays(
 
     EC_MASTER_DBG(master, 1, "%u slaves responded to delay measuring"
             " on %s link.\n",
-            datagram->working_counter, ec_device_names[fsm->dev_idx]);
+            datagram->working_counter, ec_device_names[fsm->dev_idx != 0]);
 
     do {
         fsm->dev_idx++;
-    } while (fsm->dev_idx < EC_NUM_DEVICES &&
+    } while (fsm->dev_idx < ec_master_num_devices(master) &&
             !fsm->slaves_responding[fsm->dev_idx]);
-    if (fsm->dev_idx < EC_NUM_DEVICES) {
+    if (fsm->dev_idx < ec_master_num_devices(master)) {
         ec_fsm_master_enter_clear_addresses(fsm);
         return;
     }
@@ -777,7 +779,7 @@ void ec_fsm_master_state_dc_measure_delays(
     fsm->slave = master->slaves;
     EC_MASTER_DBG(master, 1, "Scanning slave %u on %s link.\n",
             fsm->slave->ring_position,
-            ec_device_names[fsm->slave->device_index]);
+            ec_device_names[fsm->slave->device_index != 0]);
     fsm->state = ec_fsm_master_state_scan_slave;
     ec_fsm_slave_scan_start(&fsm->fsm_slave_scan, fsm->slave);
     ec_fsm_slave_scan_exec(&fsm->fsm_slave_scan); // execute immediately
@@ -823,7 +825,7 @@ void ec_fsm_master_state_scan_slave(
     if (fsm->slave < master->slaves + master->slave_count) {
         EC_MASTER_DBG(master, 1, "Scanning slave %u on %s link.\n",
                 fsm->slave->ring_position,
-                ec_device_names[fsm->slave->device_index]);
+                ec_device_names[fsm->slave->device_index != 0]);
         ec_fsm_slave_scan_start(&fsm->fsm_slave_scan, fsm->slave);
         ec_fsm_slave_scan_exec(&fsm->fsm_slave_scan); // execute immediately
         fsm->datagram->device_index = fsm->slave->device_index;

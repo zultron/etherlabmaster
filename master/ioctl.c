@@ -93,80 +93,86 @@ static int ec_ioctl_master(
         void *arg /**< Userspace address to store the results. */
         )
 {
-    ec_ioctl_master_t data;
-    unsigned int i, j;
+    ec_ioctl_master_t io;
+    unsigned int dev_idx, j;
 
-    if (down_interruptible(&master->master_sem))
+    if (down_interruptible(&master->master_sem)) {
         return -EINTR;
+    }
 
-    data.slave_count = master->slave_count;
-    data.config_count = ec_master_config_count(master);
-    data.domain_count = ec_master_domain_count(master);
+    io.slave_count = master->slave_count;
+    io.config_count = ec_master_config_count(master);
+    io.domain_count = ec_master_domain_count(master);
 #ifdef EC_EOE
-    data.eoe_handler_count = ec_master_eoe_handler_count(master);
+    io.eoe_handler_count = ec_master_eoe_handler_count(master);
 #endif
-    data.phase = (uint8_t) master->phase;
-    data.active = (uint8_t) master->active;
-    data.scan_busy = master->scan_busy;
+    io.phase = (uint8_t) master->phase;
+    io.active = (uint8_t) master->active;
+    io.scan_busy = master->scan_busy;
 
     up(&master->master_sem);
 
-    if (down_interruptible(&master->device_sem))
+    if (down_interruptible(&master->device_sem)) {
         return -EINTR;
+    }
 
-    for (i = 0; i < EC_NUM_DEVICES; i++) {
-        ec_device_t *device = &master->devices[i];
+    for (dev_idx = EC_DEVICE_MAIN;
+            dev_idx < ec_master_num_devices(master); dev_idx++) {
+        ec_device_t *device = &master->devices[dev_idx];
 
         if (device->dev) {
-            memcpy(data.devices[i].address,
-                    device->dev->dev_addr, ETH_ALEN);
+            memcpy(io.devices[dev_idx].address, device->dev->dev_addr,
+                    ETH_ALEN);
         } else {
-            memcpy(data.devices[i].address, master->macs[i], ETH_ALEN);
+            memcpy(io.devices[dev_idx].address, master->macs[dev_idx],
+                    ETH_ALEN);
         }
-        data.devices[i].attached = device->dev ? 1 : 0;
-        data.devices[i].link_state = device->link_state ? 1 : 0;
-        data.devices[i].tx_count = device->tx_count;
-        data.devices[i].rx_count = device->rx_count;
-        data.devices[i].tx_bytes = device->tx_bytes;
-        data.devices[i].rx_bytes = device->rx_bytes;
-        data.devices[i].tx_errors = device->tx_errors;
+        io.devices[dev_idx].attached = device->dev ? 1 : 0;
+        io.devices[dev_idx].link_state = device->link_state ? 1 : 0;
+        io.devices[dev_idx].tx_count = device->tx_count;
+        io.devices[dev_idx].rx_count = device->rx_count;
+        io.devices[dev_idx].tx_bytes = device->tx_bytes;
+        io.devices[dev_idx].rx_bytes = device->rx_bytes;
+        io.devices[dev_idx].tx_errors = device->tx_errors;
         for (j = 0; j < EC_RATE_COUNT; j++) {
-            data.devices[i].tx_frame_rates[j] =
+            io.devices[dev_idx].tx_frame_rates[j] =
                 device->tx_frame_rates[j];
-            data.devices[i].rx_frame_rates[j] =
+            io.devices[dev_idx].rx_frame_rates[j] =
                 device->rx_frame_rates[j];
-            data.devices[i].tx_byte_rates[j] =
+            io.devices[dev_idx].tx_byte_rates[j] =
                 device->tx_byte_rates[j];
-            data.devices[i].rx_byte_rates[j] =
+            io.devices[dev_idx].rx_byte_rates[j] =
                 device->rx_byte_rates[j];
         }
     }
+    io.num_devices = ec_master_num_devices(master);
 
-    data.tx_count = master->device_stats.tx_count;
-    data.rx_count = master->device_stats.rx_count;
-    data.tx_bytes = master->device_stats.tx_bytes;
-    data.rx_bytes = master->device_stats.rx_bytes;
-    for (i = 0; i < EC_RATE_COUNT; i++) {
-        data.tx_frame_rates[i] =
-            master->device_stats.tx_frame_rates[i];
-        data.rx_frame_rates[i] =
-            master->device_stats.rx_frame_rates[i];
-        data.tx_byte_rates[i] =
-            master->device_stats.tx_byte_rates[i];
-        data.rx_byte_rates[i] =
-            master->device_stats.rx_byte_rates[i];
-        data.loss_rates[i] =
-            master->device_stats.loss_rates[i];
+    io.tx_count = master->device_stats.tx_count;
+    io.rx_count = master->device_stats.rx_count;
+    io.tx_bytes = master->device_stats.tx_bytes;
+    io.rx_bytes = master->device_stats.rx_bytes;
+    for (j = 0; j < EC_RATE_COUNT; j++) {
+        io.tx_frame_rates[j] =
+            master->device_stats.tx_frame_rates[j];
+        io.rx_frame_rates[j] =
+            master->device_stats.rx_frame_rates[j];
+        io.tx_byte_rates[j] =
+            master->device_stats.tx_byte_rates[j];
+        io.rx_byte_rates[j] =
+            master->device_stats.rx_byte_rates[j];
+        io.loss_rates[j] =
+            master->device_stats.loss_rates[j];
     }
 
     up(&master->device_sem);
 
-    data.app_time = master->app_time;
-    data.ref_clock =
+    io.app_time = master->app_time;
+    io.ref_clock =
         master->dc_ref_clock ? master->dc_ref_clock->ring_position : 0xffff;
 
-    if (copy_to_user((void __user *) arg, &data, sizeof(data)))
+    if (copy_to_user((void __user *) arg, &io, sizeof(io))) {
         return -EFAULT;
+    }
 
     return 0;
 }
@@ -459,7 +465,8 @@ static int ec_ioctl_domain(
 
     data.data_size = domain->data_size;
     data.logical_base_address = domain->logical_base_address;
-    for (dev_idx = 0; dev_idx < EC_NUM_DEVICES; dev_idx++) {
+    for (dev_idx = EC_DEVICE_MAIN;
+            dev_idx < ec_master_num_devices(domain->master); dev_idx++) {
         data.working_counter[dev_idx] = domain->working_counter[dev_idx];
     }
     data.expected_working_counter = domain->expected_working_counter;

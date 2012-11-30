@@ -8,6 +8,15 @@ vim700: spelllang=en spell
 
 -------------------------------------------------------------------------------
 
+Version 1.5.2:
+
+• Try redundancy with more then 2 devices.
+• Document --with-devices.
+• Document RTDM interface.
+• Set the "Cyclic Generation Start Time" based on the slave's
+  "System Time" register instead of using the application time.
+• Add ecrt_slave_config_reg_pdo_entry_by_pos().
+
 Future issues:
 
 * Fix link detection in generic driver.
@@ -19,7 +28,6 @@ Future issues:
 * Only output watchdog config if not default.
 * Implement CompleteAccess for SDO uploads.
 * Output warning when send_ext() is called in illegal context.
-* Change SDO index at runtime for SDO request.
 * Implement ecrt_slave_config_request_state().
 * Remove default buffer size in SDO upload.
 * Override sync manager size?
@@ -29,8 +37,6 @@ Future issues:
     - Skip setting system time offset when application detached.
     - How to use the SYNC1 shift time?
     - Do not output graph, if topology calculation failed.
-    - Set the "Cyclic Generation Start Time" based on the slave's
-      "System Time" register instead of using the application time.
     - Check if register 0x0980 is working, to avoid clearing it when
       configuring.
 * Mailbox protocol handlers.
@@ -43,7 +49,6 @@ Future issues:
 * Separate CoE debugging.
 * Evaluate EEPROM contents after writing.
 * Optimize alignment of process data.
-* Redundancy with 2 network adapters.
 * Interface/buffers for asynchronous domain IO.
 * Make scanning and configuration run parallel (each).
 * ethercat tool:

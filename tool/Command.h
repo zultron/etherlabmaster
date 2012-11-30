@@ -139,7 +139,7 @@ class Command
         typedef list<ec_ioctl_config_t> ConfigList;
         ConfigList selectedConfigs(MasterDevice &);
         typedef list<ec_ioctl_domain_t> DomainList;
-        DomainList selectedDomains(MasterDevice &);
+        DomainList selectedDomains(MasterDevice &, const ec_ioctl_master_t &);
 
         static string alStateString(uint8_t);
 
