@@ -72,13 +72,42 @@ int ec_device_init(
     char ifname[10];
     char mb = 'x';
 #endif
+
+    device->master = master;
+    device->dev = NULL;
+    device->poll = NULL;
+    device->module = NULL;
+    device->open = 0;
+    device->link_state = 0;
+    for (i = 0; i < EC_TX_RING_SIZE; i++) {
+        device->tx_skb[i] = NULL;
+    }
+    device->tx_ring_index = 0;
+#ifdef EC_HAVE_CYCLES
+    device->cycles_poll = 0;
+#endif
+#ifdef EC_DEBUG_RING
+    device->timeval_poll.tv_sec = 0;
+    device->timeval_poll.tv_usec = 0;
+#endif
+    device->jiffies_poll = 0;
+
+    ec_device_clear_stats(device);
+
+#ifdef EC_DEBUG_RING
+    for (i = 0; i < EC_DEBUG_RING_SIZE; i++) {
+        ec_debug_frame_t *df = &device->debug_frames[i];
+        df->dir = TX;
+        df->t.tv_sec = 0;
+        df->t.tv_usec = 0;
+        memset(df->data, 0, EC_MAX_DATA_SIZE);
+        df->data_size = 0;
+    }
+#endif
 #ifdef EC_DEBUG_RING
     device->debug_frame_index = 0;
     device->debug_frame_count = 0;
 #endif
-
-    device->master = master;
-    device->tx_ring_index = 0;
 
 #ifdef EC_DEBUG_IF
     if (device == &master->devices[EC_DEVICE_MAIN]) {
@@ -97,9 +126,6 @@ int ec_device_init(
     }
 #endif
 
-    for (i = 0; i < EC_TX_RING_SIZE; i++)
-        device->tx_skb[i] = NULL;
-
     for (i = 0; i < EC_TX_RING_SIZE; i++) {
         if (!(device->tx_skb[i] = dev_alloc_skb(ETH_FRAME_LEN))) {
             EC_MASTER_ERR(master, "Error allocating device socket buffer!\n");
@@ -114,13 +140,14 @@ int ec_device_init(
         memset(eth->h_dest, 0xFF, ETH_ALEN);
     }
 
-    ec_device_detach(device); // resets remaining fields
     return 0;
 
 out_tx_ring:
-    for (i = 0; i < EC_TX_RING_SIZE; i++)
-        if (device->tx_skb[i])
+    for (i = 0; i < EC_TX_RING_SIZE; i++) {
+        if (device->tx_skb[i]) {
             dev_kfree_skb(device->tx_skb[i]);
+        }
+    }
 #ifdef EC_DEBUG_IF
     ec_debug_clear(&device->dbg);
 out_return:
@@ -201,8 +228,9 @@ void ec_device_detach(
 
     ec_device_clear_stats(device);
 
-    for (i = 0; i < EC_TX_RING_SIZE; i++)
+    for (i = 0; i < EC_TX_RING_SIZE; i++) {
         device->tx_skb[i]->dev = NULL;
+    }
 }
 
 /*****************************************************************************/
@@ -383,10 +411,12 @@ void ec_device_debug_ring_append(
     ec_debug_frame_t *df = &device->debug_frames[device->debug_frame_index];
 
     df->dir = dir;
-    if (dir == TX)
+    if (dir == TX) {
         do_gettimeofday(&df->t);
-    else
+    }
+    else {
         df->t = device->timeval_poll;
+    }
     memcpy(df->data, data, size);
     df->data_size = size;
 
