@@ -112,7 +112,7 @@ void CommandMaster::execute(const StringVector &args)
                     && data.devices[i].address[3] == 0x00
                     && data.devices[i].address[4] == 0x00
                     && data.devices[i].address[5] == 0x00) {
-                cout << "None.";
+                cout << "None." << endl;
             } else {
                 cout << hex << setfill('0')
                     << setw(2) << (unsigned int) data.devices[i].address[0]
