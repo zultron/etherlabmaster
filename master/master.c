@@ -625,6 +625,8 @@ void ec_master_leave_idle_phase(ec_master_t *master /**< EtherCAT master */)
     down(&master->master_sem);
     ec_master_clear_slaves(master);
     up(&master->master_sem);
+
+    ec_fsm_master_reset(&master->fsm);
 }
 
 /*****************************************************************************/

@@ -79,20 +79,10 @@ void ec_fsm_master_init(
         ec_datagram_t *datagram /**< Datagram object to use. */
         )
 {
-    ec_device_index_t dev_idx;
-
     fsm->master = master;
     fsm->datagram = datagram;
-    fsm->state = ec_fsm_master_state_start;
-    fsm->idle = 0;
-    fsm->dev_idx = EC_DEVICE_MAIN;
-    for (dev_idx = EC_DEVICE_MAIN; dev_idx < ec_master_num_devices(master);
-            dev_idx++) {
-        fsm->link_state[dev_idx] = 0;
-        fsm->slaves_responding[dev_idx] = 0;
-        fsm->slave_states[dev_idx] = EC_SLAVE_STATE_UNKNOWN;
-    }
-    fsm->rescan_required = 0;
+
+    ec_fsm_master_reset(fsm);
 
     // init sub-state-machines
     ec_fsm_coe_init(&fsm->fsm_coe, fsm->datagram);
@@ -120,6 +110,30 @@ void ec_fsm_master_clear(
     ec_fsm_slave_config_clear(&fsm->fsm_slave_config);
     ec_fsm_slave_scan_clear(&fsm->fsm_slave_scan);
     ec_fsm_sii_clear(&fsm->fsm_sii);
+}
+
+/*****************************************************************************/
+
+/** Reset state machine.
+ */
+void ec_fsm_master_reset(
+        ec_fsm_master_t *fsm /**< Master state machine. */
+        )
+{
+    ec_device_index_t dev_idx;
+
+    fsm->state = ec_fsm_master_state_start;
+    fsm->idle = 0;
+    fsm->dev_idx = EC_DEVICE_MAIN;
+
+    for (dev_idx = EC_DEVICE_MAIN;
+            dev_idx < ec_master_num_devices(fsm->master); dev_idx++) {
+        fsm->link_state[dev_idx] = 0;
+        fsm->slaves_responding[dev_idx] = 0;
+        fsm->slave_states[dev_idx] = EC_SLAVE_STATE_UNKNOWN;
+    }
+
+    fsm->rescan_required = 0;
 }
 
 /*****************************************************************************/
@@ -611,8 +625,9 @@ void ec_fsm_master_state_read_state(
     ec_slave_t *slave = fsm->slave;
     ec_datagram_t *datagram = fsm->datagram;
 
-    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--)
+    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--) {
         return;
+    }
 
     if (datagram->state != EC_DATAGRAM_RECEIVED) {
         EC_SLAVE_ERR(slave, "Failed to receive AL state datagram: ");
@@ -747,8 +762,9 @@ void ec_fsm_master_state_dc_measure_delays(
     ec_master_t *master = fsm->master;
     ec_datagram_t *datagram = fsm->datagram;
 
-    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--)
+    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--) {
         return;
+    }
 
     if (datagram->state != EC_DATAGRAM_RECEIVED) {
         EC_MASTER_ERR(master, "Failed to receive delay measuring datagram"
