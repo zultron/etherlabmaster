@@ -267,7 +267,7 @@ int ec_fsm_slave_action_process_reg(
         )
 {
     ec_slave_t *slave = fsm->slave;
-    ec_reg_request_t *reg, *next;
+    ec_reg_request_t *reg;
 
     fsm->reg_request = NULL;
 
@@ -281,13 +281,11 @@ int ec_fsm_slave_action_process_reg(
         }
     }
 
-    if (!fsm->reg_request) {
-        // search the first external request to be processed
-        list_for_each_entry_safe(reg, next, &slave->reg_requests, list) {
-            list_del_init(&reg->list); // dequeue
-            fsm->reg_request = reg;
-            break;
-        }
+    if (!fsm->reg_request && !list_empty(&slave->reg_requests)) {
+        // take the first external request to be processed
+        fsm->reg_request =
+            list_entry(slave->reg_requests.next, ec_reg_request_t, list);
+        list_del_init(&fsm->reg_request->list); // dequeue
     }
 
     if (!fsm->reg_request) { // no register request to process
@@ -297,7 +295,7 @@ int ec_fsm_slave_action_process_reg(
     if (slave->current_state & EC_SLAVE_STATE_ACK_ERR) {
         EC_SLAVE_WARN(slave, "Aborting register request,"
                 " slave has error flag set.\n");
-        reg->state = EC_INT_REQUEST_FAILURE;
+        fsm->reg_request->state = EC_INT_REQUEST_FAILURE;
         wake_up(&slave->reg_queue);
         fsm->state = ec_fsm_slave_state_idle;
         return 1;
@@ -306,17 +304,18 @@ int ec_fsm_slave_action_process_reg(
     // Found pending register request. Execute it!
     EC_SLAVE_DBG(slave, 1, "Processing register request...\n");
 
-    reg->state = EC_INT_REQUEST_BUSY;
+    fsm->reg_request->state = EC_INT_REQUEST_BUSY;
 
     // Start register access
-    if (reg->dir == EC_DIR_INPUT) {
+    if (fsm->reg_request->dir == EC_DIR_INPUT) {
         ec_datagram_fprd(fsm->datagram, slave->station_address,
-                reg->address, reg->transfer_size);
+                fsm->reg_request->address, fsm->reg_request->transfer_size);
         ec_datagram_zero(fsm->datagram);
     } else {
         ec_datagram_fpwr(fsm->datagram, slave->station_address,
-                reg->address, reg->transfer_size);
-        memcpy(fsm->datagram->data, reg->data, reg->transfer_size);
+                fsm->reg_request->address, fsm->reg_request->transfer_size);
+        memcpy(fsm->datagram->data, fsm->reg_request->data,
+                fsm->reg_request->transfer_size);
     }
     fsm->datagram->device_index = slave->device_index;
     ec_master_queue_external_datagram(slave->master, fsm->datagram);
