@@ -3566,91 +3566,97 @@ static int ec_ioctl_slave_foe_read(
         void *arg /**< ioctl() argument. */
         )
 {
-    ec_ioctl_slave_foe_t data;
-    ec_master_foe_request_t request;
-    int retval;
+    ec_ioctl_slave_foe_t io;
+    ec_foe_request_t request;
+    ec_slave_t *slave;
+    int ret;
 
-    if (copy_from_user(&data, (void __user *) arg, sizeof(data))) {
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io))) {
         return -EFAULT;
     }
 
-    ec_foe_request_init(&request.req, data.file_name);
-    ec_foe_request_read(&request.req);
-    ec_foe_request_alloc(&request.req, 10000); // FIXME
+    ec_foe_request_init(&request, io.file_name);
+    ret = ec_foe_request_alloc(&request, 10000); // FIXME
+    if (ret) {
+        ec_foe_request_clear(&request);
+        return ret;
+    }
+
+    ec_foe_request_read(&request);
 
     if (down_interruptible(&master->master_sem)) {
-        ec_foe_request_clear(&request.req);
+        ec_foe_request_clear(&request);
         return -EINTR;
     }
 
-    if (!(request.slave = ec_master_find_slave(
-                    master, 0, data.slave_position))) {
+    if (!(slave = ec_master_find_slave(master, 0, io.slave_position))) {
         up(&master->master_sem);
-        ec_foe_request_clear(&request.req);
+        ec_foe_request_clear(&request);
         EC_MASTER_ERR(master, "Slave %u does not exist!\n",
-                data.slave_position);
+                io.slave_position);
         return -EINVAL;
     }
 
     // schedule request.
-    list_add_tail(&request.list, &request.slave->foe_requests);
+    list_add_tail(&request.list, &slave->foe_requests);
 
     up(&master->master_sem);
 
-    EC_SLAVE_DBG(request.slave, 1, "Scheduled FoE read request.\n");
+    EC_SLAVE_DBG(slave, 1, "Scheduled FoE read request.\n");
 
     // wait for processing through FSM
-    if (wait_event_interruptible(request.slave->foe_queue,
-                request.req.state != EC_INT_REQUEST_QUEUED)) {
+    if (wait_event_interruptible(slave->foe_queue,
+                request.state != EC_INT_REQUEST_QUEUED)) {
         // interrupted by signal
         down(&master->master_sem);
-        if (request.req.state == EC_INT_REQUEST_QUEUED) {
+        if (request.state == EC_INT_REQUEST_QUEUED) {
             list_del(&request.list);
             up(&master->master_sem);
-            ec_foe_request_clear(&request.req);
+            ec_foe_request_clear(&request);
             return -EINTR;
         }
         // request already processing: interrupt not possible.
         up(&master->master_sem);
     }
 
+    // FIXME slave may become invalid
+
     // wait until master FSM has finished processing
-    wait_event(request.slave->foe_queue,
-            request.req.state != EC_INT_REQUEST_BUSY);
+    wait_event(slave->foe_queue, request.state != EC_INT_REQUEST_BUSY);
 
-    data.result = request.req.result;
-    data.error_code = request.req.error_code;
+    io.result = request.result;
+    io.error_code = request.error_code;
 
-    EC_SLAVE_DBG(request.slave, 1, "Read %zd bytes via FoE"
-            " (result = 0x%x).\n", request.req.data_size, request.req.result);
+    EC_SLAVE_DBG(slave, 1, "Read %zd bytes via FoE (result = 0x%x).\n",
+            request.data_size, request.result);
 
-    if (request.req.state != EC_INT_REQUEST_SUCCESS) {
-        data.data_size = 0;
-        retval = -EIO;
+    if (request.state != EC_INT_REQUEST_SUCCESS) {
+        io.data_size = 0;
+        ret = -EIO;
     } else {
-        if (request.req.data_size > data.buffer_size) {
+        if (request.data_size > io.buffer_size) {
             EC_MASTER_ERR(master, "Buffer too small.\n");
-            ec_foe_request_clear(&request.req);
+            ec_foe_request_clear(&request);
             return -EOVERFLOW;
         }
-        data.data_size = request.req.data_size;
-        if (copy_to_user((void __user *) data.buffer,
-                    request.req.buffer, data.data_size)) {
-            ec_foe_request_clear(&request.req);
+        io.data_size = request.data_size;
+        if (copy_to_user((void __user *) io.buffer,
+                    request.buffer, io.data_size)) {
+            ec_foe_request_clear(&request);
             return -EFAULT;
         }
-        retval = 0;
+        ret = 0;
     }
 
-    if (__copy_to_user((void __user *) arg, &data, sizeof(data))) {
-        retval = -EFAULT;
+    if (__copy_to_user((void __user *) arg, &io, sizeof(io))) {
+        ret = -EFAULT;
     }
 
-    EC_SLAVE_DBG(request.slave, 1, "Finished FoE read request.\n");
+    EC_SLAVE_DBG(slave, 1, "Finished FoE read request.\n");
 
-    ec_foe_request_clear(&request.req);
+    ec_foe_request_clear(&request);
 
-    return retval;
+    return ret;
 }
 
 /*****************************************************************************/
@@ -3662,84 +3668,86 @@ static int ec_ioctl_slave_foe_write(
         void *arg /**< ioctl() argument. */
         )
 {
-    ec_ioctl_slave_foe_t data;
-    ec_master_foe_request_t request;
-    int retval;
+    ec_ioctl_slave_foe_t io;
+    ec_foe_request_t request;
+    ec_slave_t *slave;
+    int ret;
 
-    if (copy_from_user(&data, (void __user *) arg, sizeof(data))) {
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io))) {
         return -EFAULT;
     }
 
-    INIT_LIST_HEAD(&request.list);
+    ec_foe_request_init(&request, io.file_name);
 
-    ec_foe_request_init(&request.req, data.file_name);
-
-    if (ec_foe_request_alloc(&request.req, data.buffer_size)) {
-        ec_foe_request_clear(&request.req);
-        return -ENOMEM;
+    ret = ec_foe_request_alloc(&request, io.buffer_size);
+    if (ret) {
+        ec_foe_request_clear(&request);
+        return ret;
     }
-    if (copy_from_user(request.req.buffer,
-                (void __user *) data.buffer, data.buffer_size)) {
-        ec_foe_request_clear(&request.req);
+
+    if (copy_from_user(request.buffer,
+                (void __user *) io.buffer, io.buffer_size)) {
+        ec_foe_request_clear(&request);
         return -EFAULT;
     }
-    request.req.data_size = data.buffer_size;
-    ec_foe_request_write(&request.req);
+
+    request.data_size = io.buffer_size;
+    ec_foe_request_write(&request);
 
     if (down_interruptible(&master->master_sem)) {
-        ec_foe_request_clear(&request.req);
+        ec_foe_request_clear(&request);
         return -EINTR;
     }
 
-    if (!(request.slave = ec_master_find_slave(
-                    master, 0, data.slave_position))) {
+    if (!(slave = ec_master_find_slave(master, 0, io.slave_position))) {
         up(&master->master_sem);
         EC_MASTER_ERR(master, "Slave %u does not exist!\n",
-                data.slave_position);
-        ec_foe_request_clear(&request.req);
+                io.slave_position);
+        ec_foe_request_clear(&request);
         return -EINVAL;
     }
 
-    EC_SLAVE_DBG(request.slave, 1, "Scheduling FoE write request.\n");
+    EC_SLAVE_DBG(slave, 1, "Scheduling FoE write request.\n");
 
     // schedule FoE write request.
-    list_add_tail(&request.list, &request.slave->foe_requests);
+    list_add_tail(&request.list, &slave->foe_requests);
 
     up(&master->master_sem);
 
     // wait for processing through FSM
-    if (wait_event_interruptible(request.slave->foe_queue,
-                request.req.state != EC_INT_REQUEST_QUEUED)) {
+    if (wait_event_interruptible(slave->foe_queue,
+                request.state != EC_INT_REQUEST_QUEUED)) {
         // interrupted by signal
         down(&master->master_sem);
-        if (request.req.state == EC_INT_REQUEST_QUEUED) {
+        if (request.state == EC_INT_REQUEST_QUEUED) {
             // abort request
             list_del(&request.list);
             up(&master->master_sem);
-            ec_foe_request_clear(&request.req);
+            ec_foe_request_clear(&request);
             return -EINTR;
         }
         up(&master->master_sem);
     }
 
+    // FIXME slave may become invalid
+
     // wait until master FSM has finished processing
-    wait_event(request.slave->foe_queue,
-            request.req.state != EC_INT_REQUEST_BUSY);
+    wait_event(slave->foe_queue, request.state != EC_INT_REQUEST_BUSY);
 
-    data.result = request.req.result;
-    data.error_code = request.req.error_code;
+    io.result = request.result;
+    io.error_code = request.error_code;
 
-    retval = request.req.state == EC_INT_REQUEST_SUCCESS ? 0 : -EIO;
+    ret = request.state == EC_INT_REQUEST_SUCCESS ? 0 : -EIO;
 
-    if (__copy_to_user((void __user *) arg, &data, sizeof(data))) {
-        retval = -EFAULT;
+    if (__copy_to_user((void __user *) arg, &io, sizeof(io))) {
+        ret = -EFAULT;
     }
 
-    ec_foe_request_clear(&request.req);
+    ec_foe_request_clear(&request);
 
-    EC_SLAVE_DBG(request.slave, 1, "Finished FoE write request.\n");
+    EC_SLAVE_DBG(slave, 1, "Finished FoE write request.\n");
 
-    return retval;
+    return ret;
 }
 
 /*****************************************************************************/

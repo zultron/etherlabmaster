@@ -380,32 +380,34 @@ int ec_fsm_slave_action_process_foe(
         )
 {
     ec_slave_t *slave = fsm->slave;
-    ec_master_foe_request_t *request, *next;
+    ec_foe_request_t *request;
 
-    // search the first request to be processed
-    list_for_each_entry_safe(request, next, &slave->foe_requests, list) {
-        if (slave->current_state & EC_SLAVE_STATE_ACK_ERR) {
-            EC_SLAVE_WARN(slave, "Aborting FoE request,"
-                    " slave has error flag set.\n");
-            request->req.state = EC_INT_REQUEST_FAILURE;
-            wake_up(&slave->sdo_queue);
-            fsm->sdo_request = NULL;
-            fsm->state = ec_fsm_slave_state_idle;
-            return 0;
-        }
-        list_del_init(&request->list); // dequeue
-        request->req.state = EC_INT_REQUEST_BUSY;
-
-        EC_SLAVE_DBG(slave, 1, "Processing FoE request.\n");
-
-        fsm->foe_request = &request->req;
-        fsm->state = ec_fsm_slave_state_foe_request;
-        ec_fsm_foe_transfer(&fsm->fsm_foe, slave, &request->req);
-        ec_fsm_foe_exec(&fsm->fsm_foe);
-        ec_master_queue_external_datagram(fsm->slave->master, fsm->datagram);
-        return 1;
+    if (list_empty(&slave->foe_requests)) {
+        return 0;
     }
-    return 0;
+
+    // take the first request to be processed
+    request = list_entry(slave->foe_requests.next, ec_foe_request_t, list);
+    list_del_init(&request->list); // dequeue
+
+    if (slave->current_state & EC_SLAVE_STATE_ACK_ERR) {
+        EC_SLAVE_WARN(slave, "Aborting FoE request,"
+                " slave has error flag set.\n");
+        request->state = EC_INT_REQUEST_FAILURE;
+        wake_up(&slave->sdo_queue);
+        return 0;
+    }
+
+    request->state = EC_INT_REQUEST_BUSY;
+
+    EC_SLAVE_DBG(slave, 1, "Processing FoE request.\n");
+
+    fsm->foe_request = request;
+    fsm->state = ec_fsm_slave_state_foe_request;
+    ec_fsm_foe_transfer(&fsm->fsm_foe, slave, request);
+    ec_fsm_foe_exec(&fsm->fsm_foe);
+    ec_master_queue_external_datagram(fsm->slave->master, fsm->datagram);
+    return 1;
 }
 
 /*****************************************************************************/
