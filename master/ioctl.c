@@ -911,8 +911,9 @@ static int ec_ioctl_slave_sii_write(
         return -EFAULT;
     }
 
-    if (!data.nwords)
+    if (!data.nwords) {
         return 0;
+    }
 
     byte_size = sizeof(uint16_t) * data.nwords;
     if (!(words = kmalloc(byte_size, GFP_KERNEL))) {
@@ -927,8 +928,10 @@ static int ec_ioctl_slave_sii_write(
         return -EFAULT;
     }
 
-    if (down_interruptible(&master->master_sem))
+    if (down_interruptible(&master->master_sem)) {
+        kfree(words);
         return -EINTR;
+    }
 
     if (!(slave = ec_master_find_slave(
                     master, 0, data.slave_position))) {
@@ -953,7 +956,7 @@ static int ec_ioctl_slave_sii_write(
     up(&master->master_sem);
 
     // wait for processing through FSM
-    if (wait_event_interruptible(master->sii_queue,
+    if (wait_event_interruptible(master->request_queue,
                 request.state != EC_INT_REQUEST_QUEUED)) {
         // interrupted by signal
         down(&master->master_sem);
@@ -968,7 +971,7 @@ static int ec_ioctl_slave_sii_write(
     }
 
     // wait until master FSM has finished processing
-    wait_event(master->sii_queue, request.state != EC_INT_REQUEST_BUSY);
+    wait_event(master->request_queue, request.state != EC_INT_REQUEST_BUSY);
 
     kfree(words);
 
@@ -1025,7 +1028,7 @@ static int ec_ioctl_slave_reg_read(
     up(&master->master_sem);
 
     // wait for processing through FSM
-    if (wait_event_interruptible(slave->reg_queue,
+    if (wait_event_interruptible(master->request_queue,
                 request.state != EC_INT_REQUEST_QUEUED)) {
         // interrupted by signal
         down(&master->master_sem);
@@ -1040,7 +1043,7 @@ static int ec_ioctl_slave_reg_read(
     }
 
     // wait until master FSM has finished processing
-    wait_event(slave->reg_queue, request.state != EC_INT_REQUEST_BUSY);
+    wait_event(master->request_queue, request.state != EC_INT_REQUEST_BUSY);
 
     if (request.state == EC_INT_REQUEST_SUCCESS) {
         if (copy_to_user((void __user *) io.data, request.data, io.size)) {
@@ -1092,8 +1095,7 @@ static int ec_ioctl_slave_reg_write(
         return -EINTR;
     }
 
-    if (!(slave = ec_master_find_slave(
-                    master, 0, io.slave_position))) {
+    if (!(slave = ec_master_find_slave(master, 0, io.slave_position))) {
         up(&master->master_sem);
         ec_reg_request_clear(&request);
         EC_MASTER_ERR(master, "Slave %u does not exist!\n",
@@ -1107,7 +1109,7 @@ static int ec_ioctl_slave_reg_write(
     up(&master->master_sem);
 
     // wait for processing through FSM
-    if (wait_event_interruptible(slave->reg_queue,
+    if (wait_event_interruptible(master->request_queue,
                 request.state != EC_INT_REQUEST_QUEUED)) {
         // interrupted by signal
         down(&master->master_sem);
@@ -1122,7 +1124,7 @@ static int ec_ioctl_slave_reg_write(
     }
 
     // wait until master FSM has finished processing
-    wait_event(slave->reg_queue, request.state != EC_INT_REQUEST_BUSY);
+    wait_event(master->request_queue, request.state != EC_INT_REQUEST_BUSY);
 
     ec_reg_request_clear(&request);
 
@@ -3597,15 +3599,15 @@ static int ec_ioctl_slave_foe_read(
         return -EINVAL;
     }
 
+    EC_SLAVE_DBG(slave, 1, "Scheduling FoE read request.\n");
+
     // schedule request.
     list_add_tail(&request.list, &slave->foe_requests);
 
     up(&master->master_sem);
 
-    EC_SLAVE_DBG(slave, 1, "Scheduled FoE read request.\n");
-
     // wait for processing through FSM
-    if (wait_event_interruptible(slave->foe_queue,
+    if (wait_event_interruptible(master->request_queue,
                 request.state != EC_INT_REQUEST_QUEUED)) {
         // interrupted by signal
         down(&master->master_sem);
@@ -3619,16 +3621,11 @@ static int ec_ioctl_slave_foe_read(
         up(&master->master_sem);
     }
 
-    // FIXME slave may become invalid
-
     // wait until master FSM has finished processing
-    wait_event(slave->foe_queue, request.state != EC_INT_REQUEST_BUSY);
+    wait_event(master->request_queue, request.state != EC_INT_REQUEST_BUSY);
 
     io.result = request.result;
     io.error_code = request.error_code;
-
-    EC_SLAVE_DBG(slave, 1, "Read %zd bytes via FoE (result = 0x%x).\n",
-            request.data_size, request.result);
 
     if (request.state != EC_INT_REQUEST_SUCCESS) {
         io.data_size = 0;
@@ -3652,10 +3649,7 @@ static int ec_ioctl_slave_foe_read(
         ret = -EFAULT;
     }
 
-    EC_SLAVE_DBG(slave, 1, "Finished FoE read request.\n");
-
     ec_foe_request_clear(&request);
-
     return ret;
 }
 
@@ -3715,7 +3709,7 @@ static int ec_ioctl_slave_foe_write(
     up(&master->master_sem);
 
     // wait for processing through FSM
-    if (wait_event_interruptible(slave->foe_queue,
+    if (wait_event_interruptible(master->request_queue,
                 request.state != EC_INT_REQUEST_QUEUED)) {
         // interrupted by signal
         down(&master->master_sem);
@@ -3729,10 +3723,8 @@ static int ec_ioctl_slave_foe_write(
         up(&master->master_sem);
     }
 
-    // FIXME slave may become invalid
-
     // wait until master FSM has finished processing
-    wait_event(slave->foe_queue, request.state != EC_INT_REQUEST_BUSY);
+    wait_event(master->request_queue, request.state != EC_INT_REQUEST_BUSY);
 
     io.result = request.result;
     io.error_code = request.error_code;
@@ -3744,9 +3736,6 @@ static int ec_ioctl_slave_foe_write(
     }
 
     ec_foe_request_clear(&request);
-
-    EC_SLAVE_DBG(slave, 1, "Finished FoE write request.\n");
-
     return ret;
 }
 

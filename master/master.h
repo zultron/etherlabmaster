@@ -287,8 +287,9 @@ struct ec_master {
     void *app_cb_data; /**< Application callback data. */
 
     struct list_head sii_requests; /**< SII write requests. */
-    wait_queue_head_t sii_queue; /**< Wait queue for SII
-                                      write requests from user space. */
+
+    wait_queue_head_t request_queue; /**< Wait queue for external requests
+                                       from user space. */
 };
 
 /*****************************************************************************/

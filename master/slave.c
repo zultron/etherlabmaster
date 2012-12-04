@@ -153,16 +153,9 @@ void ec_slave_init(
     slave->jiffies_preop = 0;
 
     INIT_LIST_HEAD(&slave->sdo_requests);
-    init_waitqueue_head(&slave->sdo_queue);
-
     INIT_LIST_HEAD(&slave->reg_requests);
-    init_waitqueue_head(&slave->reg_queue);
-
     INIT_LIST_HEAD(&slave->foe_requests);
-    init_waitqueue_head(&slave->foe_queue);
-
     INIT_LIST_HEAD(&slave->soe_requests);
-    init_waitqueue_head(&slave->soe_queue);
 
     // init state machine datagram
     ec_datagram_init(&slave->fsm_datagram);
@@ -201,7 +194,7 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
         EC_SLAVE_WARN(slave, "Discarding SDO request,"
                 " slave about to be deleted.\n");
         request->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&slave->sdo_queue);
+        wake_up(&slave->master->request_queue);
     }
 
     while (!list_empty(&slave->reg_requests)) {
@@ -211,7 +204,7 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
         EC_SLAVE_WARN(slave, "Discarding register request,"
                 " slave about to be deleted.\n");
         reg->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&slave->reg_queue);
+        wake_up(&slave->master->request_queue);
     }
 
     while (!list_empty(&slave->foe_requests)) {
@@ -221,7 +214,7 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
         EC_SLAVE_WARN(slave, "Discarding FoE request,"
                 " slave about to be deleted.\n");
         request->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&slave->foe_queue);
+        wake_up(&slave->master->request_queue);
     }
 
     while (!list_empty(&slave->soe_requests)) {
@@ -231,7 +224,7 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
         EC_SLAVE_WARN(slave, "Discarding SoE request,"
                 " slave about to be deleted.\n");
         request->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&slave->soe_queue);
+        wake_up(&slave->master->request_queue);
     }
 
     if (slave->config) {

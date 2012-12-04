@@ -1136,7 +1136,7 @@ void ec_fsm_master_state_write_sii(
     if (!ec_fsm_sii_success(&fsm->fsm_sii)) {
         EC_SLAVE_ERR(slave, "Failed to write SII data.\n");
         request->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&master->sii_queue);
+        wake_up(&master->request_queue);
         ec_fsm_master_restart(fsm);
         return;
     }
@@ -1164,7 +1164,7 @@ void ec_fsm_master_state_write_sii(
     // TODO: Evaluate other SII contents!
 
     request->state = EC_INT_REQUEST_SUCCESS;
-    wake_up(&master->sii_queue);
+    wake_up(&master->request_queue);
 
     // check for another SII write request
     if (ec_fsm_master_action_process_sii(fsm))
@@ -1232,14 +1232,14 @@ void ec_fsm_master_state_sdo_request(
         EC_SLAVE_DBG(fsm->slave, 1,
                 "Failed to process internal SDO request.\n");
         request->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&fsm->slave->sdo_queue);
+        wake_up(&fsm->master->request_queue);
         ec_fsm_master_restart(fsm);
         return;
     }
 
     // SDO request finished
     request->state = EC_INT_REQUEST_SUCCESS;
-    wake_up(&fsm->slave->sdo_queue);
+    wake_up(&fsm->master->request_queue);
 
     EC_SLAVE_DBG(fsm->slave, 1, "Finished internal SDO request.\n");
 
