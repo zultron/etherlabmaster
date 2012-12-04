@@ -180,7 +180,7 @@ int ec_fsm_slave_action_process_sdo(
         )
 {
     ec_slave_t *slave = fsm->slave;
-    ec_master_sdo_request_t *request, *next;
+    ec_sdo_request_t *request, *next;
 
     // search the first external request to be processed
     list_for_each_entry_safe(request, next, &slave->sdo_requests, list) {
@@ -189,7 +189,7 @@ int ec_fsm_slave_action_process_sdo(
         if (slave->current_state & EC_SLAVE_STATE_ACK_ERR) {
             EC_SLAVE_WARN(slave, "Aborting SDO request,"
                     " slave has error flag set.\n");
-            request->req.state = EC_INT_REQUEST_FAILURE;
+            request->state = EC_INT_REQUEST_FAILURE;
             wake_up(&slave->sdo_queue);
             fsm->sdo_request = NULL;
             fsm->state = ec_fsm_slave_state_idle;
@@ -198,22 +198,22 @@ int ec_fsm_slave_action_process_sdo(
 
         if (slave->current_state == EC_SLAVE_STATE_INIT) {
             EC_SLAVE_WARN(slave, "Aborting SDO request, slave is in INIT.\n");
-            request->req.state = EC_INT_REQUEST_FAILURE;
+            request->state = EC_INT_REQUEST_FAILURE;
             wake_up(&slave->sdo_queue);
             fsm->sdo_request = NULL;
             fsm->state = ec_fsm_slave_state_idle;
             return 0;
         }
 
-        request->req.state = EC_INT_REQUEST_BUSY;
+        request->state = EC_INT_REQUEST_BUSY;
 
         // Found pending SDO request. Execute it!
         EC_SLAVE_DBG(slave, 1, "Processing SDO request...\n");
 
         // Start SDO transfer
-        fsm->sdo_request = &request->req;
+        fsm->sdo_request = request;
         fsm->state = ec_fsm_slave_state_sdo_request;
-        ec_fsm_coe_transfer(&fsm->fsm_coe, slave, &request->req);
+        ec_fsm_coe_transfer(&fsm->fsm_coe, slave, request);
         ec_fsm_coe_exec(&fsm->fsm_coe); // execute immediately
         ec_master_queue_external_datagram(fsm->slave->master, fsm->datagram);
         return 1;
