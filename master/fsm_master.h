@@ -61,16 +61,6 @@ typedef struct {
 
 /*****************************************************************************/
 
-/** Slave/SDO request record for master's SDO request list.
- */
-typedef struct {
-    struct list_head list; /**< List element. */
-    ec_slave_t *slave; /**< Slave. */
-    ec_sdo_request_t req; /**< SDO request. */
-} ec_master_sdo_request_t;
-
-/*****************************************************************************/
-
 /** FoE request.
  */
 typedef struct {
