@@ -435,8 +435,11 @@ int ec_fsm_master_action_process_sdo(
     for (slave = master->slaves;
             slave < master->slaves + master->slave_count;
             slave++) {
-        if (!slave->config)
+
+        if (!slave->config) {
             continue;
+        }
+
         list_for_each_entry(req, &slave->config->sdo_requests, list) {
             if (req->state == EC_INT_REQUEST_QUEUED) {
 
@@ -1215,7 +1218,15 @@ void ec_fsm_master_state_sdo_request(
 {
     ec_sdo_request_t *request = fsm->sdo_request;
 
-    if (ec_fsm_coe_exec(&fsm->fsm_coe)) return;
+    if (!request) {
+        // configuration was cleared in the meantime
+        ec_fsm_master_restart(fsm);
+        return;
+    }
+
+    if (ec_fsm_coe_exec(&fsm->fsm_coe)) {
+        return;
+    }
 
     if (!ec_fsm_coe_success(&fsm->fsm_coe)) {
         EC_SLAVE_DBG(fsm->slave, 1,
