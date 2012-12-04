@@ -61,16 +61,6 @@ typedef struct {
 
 /*****************************************************************************/
 
-/** FoE request.
- */
-typedef struct {
-    struct list_head list; /**< List head. */
-    ec_slave_t *slave; /**< EtherCAT slave. */
-    ec_foe_request_t req; /**< FoE request. */
-} ec_master_foe_request_t;
-
-/*****************************************************************************/
-
 /** SoE request.
  */
 typedef struct {

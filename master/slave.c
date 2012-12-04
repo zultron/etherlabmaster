@@ -215,13 +215,12 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
     }
 
     while (!list_empty(&slave->foe_requests)) {
-        ec_master_foe_request_t *request =
-            list_entry(slave->foe_requests.next,
-                ec_master_foe_request_t, list);
+        ec_foe_request_t *request =
+            list_entry(slave->foe_requests.next, ec_foe_request_t, list);
         list_del_init(&request->list); // dequeue
         EC_SLAVE_WARN(slave, "Discarding FoE request,"
                 " slave about to be deleted.\n");
-        request->req.state = EC_INT_REQUEST_FAILURE;
+        request->state = EC_INT_REQUEST_FAILURE;
         wake_up(&slave->foe_queue);
     }
 
