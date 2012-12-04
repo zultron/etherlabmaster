@@ -1621,21 +1621,6 @@ schedule:
 
 /*****************************************************************************/
 
-/** Detaches the slave configurations from the slaves.
- */
-void ec_master_detach_slave_configs(
-        ec_master_t *master /**< EtherCAT master. */
-        )
-{
-    ec_slave_config_t *sc;
-
-    list_for_each_entry(sc, &master->configs, list) {
-        ec_slave_config_detach(sc);
-    }
-}
-
-/*****************************************************************************/
-
 /** Attaches the slave configurations to the slaves.
  */
 void ec_master_attach_slave_configs(
