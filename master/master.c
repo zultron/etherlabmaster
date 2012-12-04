@@ -565,8 +565,9 @@ void ec_master_thread_stop(
     master->thread = NULL;
     EC_MASTER_INFO(master, "Master thread exited.\n");
 
-    if (master->fsm_datagram.state != EC_DATAGRAM_SENT)
+    if (master->fsm_datagram.state != EC_DATAGRAM_SENT) {
         return;
+    }
 
     // wait for FSM datagram
     sleep_jiffies = max(HZ / 100, 1); // 10 ms, at least 1 jiffy
@@ -1386,15 +1387,20 @@ static int ec_master_idle_thread(void *priv_data)
         up(&master->io_sem);
 
         fsm_exec = 0;
+
         // execute master & slave state machines
-        if (down_interruptible(&master->master_sem))
+        if (down_interruptible(&master->master_sem)) {
             break;
+        }
+
         fsm_exec = ec_fsm_master_exec(&master->fsm);
+
         for (slave = master->slaves;
                 slave < master->slaves + master->slave_count;
                 slave++) {
             ec_fsm_slave_exec(&slave->fsm);
         }
+
         up(&master->master_sem);
 
         // queue and send
@@ -1452,21 +1458,27 @@ static int ec_master_operation_thread(void *priv_data)
             ec_master_output_stats(master);
 
             fsm_exec = 0;
+
             // execute master & slave state machines
-            if (down_interruptible(&master->master_sem))
+            if (down_interruptible(&master->master_sem)) {
                 break;
+            }
+
             fsm_exec += ec_fsm_master_exec(&master->fsm);
+
             for (slave = master->slaves;
                     slave < master->slaves + master->slave_count;
                     slave++) {
                 ec_fsm_slave_exec(&slave->fsm);
             }
+
             up(&master->master_sem);
 
             // inject datagrams (let the rt thread queue them, see
             // ecrt_master_send)
-            if (fsm_exec)
+            if (fsm_exec) {
                 master->injection_seq_fsm++;
+            }
         }
 
 #ifdef EC_USE_HRTIMER
@@ -2261,8 +2273,9 @@ void ecrt_master_deactivate(ec_master_t *master)
     }
 #endif
     if (ec_master_thread_start(master, ec_master_idle_thread,
-                "EtherCAT-IDLE"))
+                "EtherCAT-IDLE")) {
         EC_MASTER_WARN(master, "Failed to restart master thread!\n");
+    }
 
     /* Disallow scanning to get into the same state like after a master
      * request (after ec_master_enter_operation_phase() is called). */
