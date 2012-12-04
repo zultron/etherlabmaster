@@ -336,6 +336,12 @@ void ec_fsm_slave_state_reg_request(
     ec_slave_t *slave = fsm->slave;
     ec_reg_request_t *reg = fsm->reg_request;
 
+    if (!reg) {
+        // configuration was cleared in the meantime
+        fsm->state = ec_fsm_slave_state_ready;
+        return;
+    }
+
     if (fsm->datagram->state != EC_DATAGRAM_RECEIVED) {
         EC_SLAVE_ERR(slave, "Failed to receive register"
                 " request datagram: ");

@@ -268,7 +268,18 @@ void ec_slave_config_detach(
         )
 {
     if (sc->slave) {
+        ec_reg_request_t *reg;
+
         sc->slave->config = NULL;
+
+        // invalidate processing register request
+        list_for_each_entry(reg, &sc->reg_requests, list) {
+            if (sc->slave->fsm.reg_request == reg) {
+                sc->slave->fsm.reg_request = NULL;
+                break;
+            }
+        }
+
         sc->slave = NULL;
     }
 }
