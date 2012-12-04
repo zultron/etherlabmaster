@@ -183,8 +183,7 @@ int ec_fsm_slave_action_process_sdo(
     ec_master_sdo_request_t *request, *next;
 
     // search the first external request to be processed
-    list_for_each_entry_safe(request, next,
-            &slave->slave_sdo_requests, list) {
+    list_for_each_entry_safe(request, next, &slave->sdo_requests, list) {
 
         list_del_init(&request->list); // dequeue
         if (slave->current_state & EC_SLAVE_STATE_ACK_ERR) {
