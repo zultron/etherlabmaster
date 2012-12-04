@@ -452,106 +452,101 @@ uint8_t *ecrt_domain_data(ec_domain_t *domain)
 void ecrt_domain_process(ec_domain_t *domain)
 {
     uint16_t wc_sum[EC_MAX_NUM_DEVICES] = {}, redundant_wc, wc_total;
-    ec_datagram_pair_t *pair;
-    ec_datagram_t *main_datagram;
-    uint32_t logical_datagram_address;
-    size_t datagram_size;
-    uint16_t datagram_pair_wc;
     unsigned int dev_idx, wc_change;
-#if EC_MAX_NUM_DEVICES > 1
-    ec_fmmu_config_t *fmmu =
-        list_first_entry(&domain->fmmu_configs, ec_fmmu_config_t, list);
-#endif
     unsigned int redundancy;
 
 #if DEBUG_REDUNDANCY
     EC_MASTER_DBG(domain->master, 1, "domain %u process\n", domain->index);
 #endif
 
-    list_for_each_entry(pair, &domain->datagram_pairs, list) {
-
-        main_datagram = &pair->datagrams[EC_DEVICE_MAIN];
-        logical_datagram_address = EC_READ_U32(main_datagram->address);
-        datagram_size = main_datagram->data_size;
-
-#if DEBUG_REDUNDANCY
-        EC_MASTER_DBG(domain->master, 1, "dgram %s log=%u\n",
-                main_datagram->name, logical_datagram_address);
-#endif
-
-        datagram_pair_wc = ec_datagram_pair_process(pair, wc_sum);
-
 #if EC_MAX_NUM_DEVICES > 1
-        if (ec_master_num_devices(domain->master) < 2) {
-            continue;
-        }
+    if (ec_master_num_devices(domain->master) > 1) {
+        ec_datagram_pair_t *pair;
+        ec_fmmu_config_t *fmmu =
+            list_first_entry(&domain->fmmu_configs, ec_fmmu_config_t, list);
 
-        /* Redundancy: Go through all FMMU configs to detect data changes. */
-        list_for_each_entry_from(fmmu, &domain->fmmu_configs, list) {
-            unsigned int datagram_offset;
-            ec_datagram_t *backup_datagram =
-                &pair->datagrams[EC_DEVICE_BACKUP];
-
-            if (fmmu->dir != EC_DIR_INPUT) {
-                continue;
-            }
-
-            if (fmmu->logical_start_address >=
-                    logical_datagram_address + datagram_size) {
-                // fmmu data contained in next datagram pair
-                break;
-            }
-
-            datagram_offset =
-                fmmu->logical_start_address - logical_datagram_address;
+        list_for_each_entry(pair, &domain->datagram_pairs, list) {
+            ec_datagram_t *main_datagram = &pair->datagrams[EC_DEVICE_MAIN];
+            uint32_t logical_datagram_address =
+                EC_READ_U32(main_datagram->address);
+            size_t datagram_size = main_datagram->data_size;
+            uint16_t datagram_pair_wc;
 
 #if DEBUG_REDUNDANCY
-            EC_MASTER_DBG(domain->master, 1,
-                    "input fmmu log=%u size=%u offset=%u\n",
-                    fmmu->logical_start_address, fmmu->data_size,
-                    datagram_offset);
-            if (domain->master->debug_level > 0) {
-                ec_print_data(pair->send_buffer + datagram_offset,
-                        fmmu->data_size);
-                ec_print_data(main_datagram->data + datagram_offset,
-                        fmmu->data_size);
-                ec_print_data(backup_datagram->data + datagram_offset,
-                        fmmu->data_size);
-            }
+            EC_MASTER_DBG(domain->master, 1, "dgram %s log=%u\n",
+                    main_datagram->name, logical_datagram_address);
 #endif
 
-            if (data_changed(pair->send_buffer, main_datagram,
-                        datagram_offset, fmmu->data_size)) {
-                /* data changed on main link: no copying necessary. */
-#if DEBUG_REDUNDANCY
-                EC_MASTER_DBG(domain->master, 1, "main changed\n");
-#endif
-            } else if (data_changed(pair->send_buffer, backup_datagram,
-                        datagram_offset, fmmu->data_size)) {
-                /* data changed on backup link: copy to main memory. */
-#if DEBUG_REDUNDANCY
-                EC_MASTER_DBG(domain->master, 1, "backup changed\n");
-#endif
-                memcpy(main_datagram->data + datagram_offset,
-                        backup_datagram->data + datagram_offset,
-                        fmmu->data_size);
-            } else if (datagram_pair_wc == pair->expected_working_counter) {
-                /* no change, but WC complete: use main data. */
-#if DEBUG_REDUNDANCY
-                EC_MASTER_DBG(domain->master, 1, "no change but complete\n");
-#endif
-            } else {
-                /* no change and WC incomplete: mark WC as zero to avoid
-                 * data.dependent WC flickering. */
-                datagram_pair_wc = 0;
+            /* Redundancy: Go through FMMU configs to detect data changes. */
+            list_for_each_entry_from(fmmu, &domain->fmmu_configs, list) {
+                unsigned int datagram_offset;
+                ec_datagram_t *backup_datagram =
+                    &pair->datagrams[EC_DEVICE_BACKUP];
+
+                if (fmmu->dir != EC_DIR_INPUT) {
+                    continue;
+                }
+
+                if (fmmu->logical_start_address >=
+                        logical_datagram_address + datagram_size) {
+                    // fmmu data contained in next datagram pair
+                    break;
+                }
+
+                datagram_offset =
+                    fmmu->logical_start_address - logical_datagram_address;
+
 #if DEBUG_REDUNDANCY
                 EC_MASTER_DBG(domain->master, 1,
-                        "no change and incomplete\n");
+                        "input fmmu log=%u size=%u offset=%u\n",
+                        fmmu->logical_start_address, fmmu->data_size,
+                        datagram_offset);
+                if (domain->master->debug_level > 0) {
+                    ec_print_data(pair->send_buffer + datagram_offset,
+                            fmmu->data_size);
+                    ec_print_data(main_datagram->data + datagram_offset,
+                            fmmu->data_size);
+                    ec_print_data(backup_datagram->data + datagram_offset,
+                            fmmu->data_size);
+                }
 #endif
+                datagram_pair_wc = ec_datagram_pair_process(pair, wc_sum);
+
+                if (data_changed(pair->send_buffer, main_datagram,
+                            datagram_offset, fmmu->data_size)) {
+                    /* data changed on main link: no copying necessary. */
+#if DEBUG_REDUNDANCY
+                    EC_MASTER_DBG(domain->master, 1, "main changed\n");
+#endif
+                } else if (data_changed(pair->send_buffer, backup_datagram,
+                            datagram_offset, fmmu->data_size)) {
+                    /* data changed on backup link: copy to main memory. */
+#if DEBUG_REDUNDANCY
+                    EC_MASTER_DBG(domain->master, 1, "backup changed\n");
+#endif
+                    memcpy(main_datagram->data + datagram_offset,
+                            backup_datagram->data + datagram_offset,
+                            fmmu->data_size);
+                } else if (datagram_pair_wc ==
+                        pair->expected_working_counter) {
+                    /* no change, but WC complete: use main data. */
+#if DEBUG_REDUNDANCY
+                    EC_MASTER_DBG(domain->master, 1,
+                            "no change but complete\n");
+#endif
+                } else {
+                    /* no change and WC incomplete: mark WC as zero to avoid
+                     * data.dependent WC flickering. */
+                    datagram_pair_wc = 0;
+#if DEBUG_REDUNDANCY
+                    EC_MASTER_DBG(domain->master, 1,
+                            "no change and incomplete\n");
+#endif
+                }
             }
         }
-#endif // EC_MAX_NUM_DEVICES > 1
     }
+#endif // EC_MAX_NUM_DEVICES > 1
 
     redundant_wc = 0;
     for (dev_idx = EC_DEVICE_BACKUP;
