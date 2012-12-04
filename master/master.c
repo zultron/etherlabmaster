@@ -220,7 +220,8 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     master->app_cb_data = NULL;
 
     INIT_LIST_HEAD(&master->sii_requests);
-    init_waitqueue_head(&master->sii_queue);
+
+    init_waitqueue_head(&master->request_queue);
 
     // init devices
     for (dev_idx = EC_DEVICE_MAIN; dev_idx < ec_master_num_devices(master);
@@ -434,8 +435,8 @@ void ec_master_clear_slaves(ec_master_t *master)
 
     master->dc_ref_clock = NULL;
 
-    // external requests are obsolete, so we wake pending waiters and remove
-    // them from the list
+    // External requests are obsolete, so we wake pending waiters and remove
+    // them from the list.
 
     while (!list_empty(&master->sii_requests)) {
         ec_sii_write_request_t *request =
@@ -445,7 +446,7 @@ void ec_master_clear_slaves(ec_master_t *master)
         EC_MASTER_WARN(master, "Discarding SII request, slave %u about"
                 " to be deleted.\n", request->slave->ring_position);
         request->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&master->sii_queue);
+        wake_up(&master->request_queue);
     }
 
     for (slave = master->slaves;
@@ -2667,6 +2668,7 @@ int ecrt_master_sdo_download(ec_master_t *master, uint16_t slave_position,
 {
     ec_sdo_request_t request;
     ec_slave_t *slave;
+    int ret;
 
     EC_MASTER_DBG(master, 1, "%s(master = 0x%p,"
             " slave_position = %u, index = 0x%04X, subindex = 0x%02X,"
@@ -2681,9 +2683,10 @@ int ecrt_master_sdo_download(ec_master_t *master, uint16_t slave_position,
 
     ec_sdo_request_init(&request);
     ecrt_sdo_request_index(&request, index, subindex);
-    if (ec_sdo_request_alloc(&request, data_size)) {
+    ret = ec_sdo_request_alloc(&request, data_size);
+    if (ret) {
         ec_sdo_request_clear(&request);
-        return -ENOMEM;
+        return ret;
     }
 
     memcpy(request.data, data, data_size);
@@ -2702,7 +2705,7 @@ int ecrt_master_sdo_download(ec_master_t *master, uint16_t slave_position,
         return -EINVAL;
     }
 
-    EC_SLAVE_DBG(slave, 1, "Schedule SDO download request.\n");
+    EC_SLAVE_DBG(slave, 1, "Scheduling SDO download request.\n");
 
     // schedule request.
     list_add_tail(&request.list, &slave->sdo_requests);
@@ -2710,7 +2713,7 @@ int ecrt_master_sdo_download(ec_master_t *master, uint16_t slave_position,
     up(&master->master_sem);
 
     // wait for processing through FSM
-    if (wait_event_interruptible(slave->sdo_queue,
+    if (wait_event_interruptible(master->request_queue,
                 request.state != EC_INT_REQUEST_QUEUED)) {
         // interrupted by signal
         down(&master->master_sem);
@@ -2724,22 +2727,21 @@ int ecrt_master_sdo_download(ec_master_t *master, uint16_t slave_position,
         up(&master->master_sem);
     }
 
-    // FIXME slave may become invalid!
-
     // wait until master FSM has finished processing
-    wait_event(slave->sdo_queue, request.state != EC_INT_REQUEST_BUSY);
-
-    EC_SLAVE_DBG(slave, 1, "Finished SDO download request.\n");
+    wait_event(master->request_queue, request.state != EC_INT_REQUEST_BUSY);
 
     *abort_code = request.abort_code;
 
     if (request.state == EC_INT_REQUEST_SUCCESS) {
-        return 0;
+        ret = 0;
     } else if (request.errno) {
-        return -request.errno;
+        ret = -request.errno;
     } else {
-        return -EIO;
+        ret = -EIO;
     }
+
+    ec_sdo_request_clear(&request);
+    return ret;
 }
 
 /*****************************************************************************/
@@ -2750,6 +2752,7 @@ int ecrt_master_sdo_download_complete(ec_master_t *master,
 {
     ec_sdo_request_t request;
     ec_slave_t *slave;
+    int ret;
 
     EC_MASTER_DBG(master, 1, "%s(master = 0x%p,"
             " slave_position = %u, index = 0x%04X,"
@@ -2764,9 +2767,10 @@ int ecrt_master_sdo_download_complete(ec_master_t *master,
 
     ec_sdo_request_init(&request);
     ecrt_sdo_request_index(&request, index, 0);
-    if (ec_sdo_request_alloc(&request, data_size)) {
+    ret = ec_sdo_request_alloc(&request, data_size);
+    if (ret) {
         ec_sdo_request_clear(&request);
-        return -ENOMEM;
+        return ret;
     }
 
     request.complete_access = 1;
@@ -2786,7 +2790,7 @@ int ecrt_master_sdo_download_complete(ec_master_t *master,
         return -EINVAL;
     }
 
-    EC_SLAVE_DBG(slave, 1, "Schedule SDO download request"
+    EC_SLAVE_DBG(slave, 1, "Scheduling SDO download request"
             " (complete access).\n");
 
     // schedule request.
@@ -2795,7 +2799,7 @@ int ecrt_master_sdo_download_complete(ec_master_t *master,
     up(&master->master_sem);
 
     // wait for processing through FSM
-    if (wait_event_interruptible(slave->sdo_queue,
+    if (wait_event_interruptible(master->request_queue,
                 request.state != EC_INT_REQUEST_QUEUED)) {
         // interrupted by signal
         down(&master->master_sem);
@@ -2809,23 +2813,21 @@ int ecrt_master_sdo_download_complete(ec_master_t *master,
         up(&master->master_sem);
     }
 
-    // FIXME slave may become invalid!
-
     // wait until master FSM has finished processing
-    wait_event(slave->sdo_queue, request.state != EC_INT_REQUEST_BUSY);
-
-    EC_SLAVE_DBG(slave, 1, "Finished SDO download request"
-            " (complete access).\n");
+    wait_event(master->request_queue, request.state != EC_INT_REQUEST_BUSY);
 
     *abort_code = request.abort_code;
 
     if (request.state == EC_INT_REQUEST_SUCCESS) {
-        return 0;
+        ret = 0;
     } else if (request.errno) {
-        return -request.errno;
+        ret = -request.errno;
     } else {
-        return -EIO;
+        ret = -EIO;
     }
+
+    ec_sdo_request_clear(&request);
+    return ret;
 }
 
 /*****************************************************************************/
@@ -2836,7 +2838,7 @@ int ecrt_master_sdo_upload(ec_master_t *master, uint16_t slave_position,
 {
     ec_sdo_request_t request;
     ec_slave_t *slave;
-    int retval = 0;
+    int ret = 0;
 
     EC_MASTER_DBG(master, 1, "%s(master = 0x%p,"
             " slave_position = %u, index = 0x%04X, subindex = 0x%02X,"
@@ -2861,7 +2863,7 @@ int ecrt_master_sdo_upload(ec_master_t *master, uint16_t slave_position,
         return -EINVAL;
     }
 
-    EC_SLAVE_DBG(slave, 1, "Schedule SDO upload request.\n");
+    EC_SLAVE_DBG(slave, 1, "Scheduling SDO upload request.\n");
 
     // schedule request.
     list_add_tail(&request.list, &slave->sdo_requests);
@@ -2869,7 +2871,7 @@ int ecrt_master_sdo_upload(ec_master_t *master, uint16_t slave_position,
     up(&master->master_sem);
 
     // wait for processing through FSM
-    if (wait_event_interruptible(slave->sdo_queue,
+    if (wait_event_interruptible(master->request_queue,
                 request.state != EC_INT_REQUEST_QUEUED)) {
         // interrupted by signal
         down(&master->master_sem);
@@ -2883,34 +2885,32 @@ int ecrt_master_sdo_upload(ec_master_t *master, uint16_t slave_position,
         up(&master->master_sem);
     }
 
-    // FIXME slave may become invalid!
-
     // wait until master FSM has finished processing
-    wait_event(slave->sdo_queue, request.state != EC_INT_REQUEST_BUSY);
-
-    EC_SLAVE_DBG(slave, 1, "Finished SDO upload request.\n");
+    wait_event(master->request_queue, request.state != EC_INT_REQUEST_BUSY);
 
     *abort_code = request.abort_code;
 
     if (request.state != EC_INT_REQUEST_SUCCESS) {
         *result_size = 0;
         if (request.errno) {
-            retval = -request.errno;
+            ret = -request.errno;
         } else {
-            retval = -EIO;
+            ret = -EIO;
         }
     } else {
         if (request.data_size > target_size) {
             EC_MASTER_ERR(master, "Buffer too small.\n");
-            ec_sdo_request_clear(&request);
-            return -EOVERFLOW;
+            ret = -EOVERFLOW;
         }
-        memcpy(target, request.data, request.data_size);
-        *result_size = request.data_size;
+        else {
+            memcpy(target, request.data, request.data_size);
+            *result_size = request.data_size;
+            ret = 0;
+        }
     }
 
     ec_sdo_request_clear(&request);
-    return retval;
+    return ret;
 }
 
 /*****************************************************************************/
@@ -2963,7 +2963,7 @@ int ecrt_master_write_idn(ec_master_t *master, uint16_t slave_position,
     up(&master->master_sem);
 
     // wait for processing through FSM
-    if (wait_event_interruptible(slave->soe_queue,
+    if (wait_event_interruptible(master->request_queue,
                 request.state != EC_INT_REQUEST_QUEUED)) {
         // interrupted by signal
         down(&master->master_sem);
@@ -2977,10 +2977,8 @@ int ecrt_master_write_idn(ec_master_t *master, uint16_t slave_position,
         up(&master->master_sem);
     }
 
-    // FIXME slave may become invalid
-
     // wait until master FSM has finished processing
-    wait_event(slave->soe_queue, request.state != EC_INT_REQUEST_BUSY);
+    wait_event(master->request_queue, request.state != EC_INT_REQUEST_BUSY);
 
     if (error_code) {
         *error_code = request.error_code;
@@ -3023,15 +3021,15 @@ int ecrt_master_read_idn(ec_master_t *master, uint16_t slave_position,
         return -EINVAL;
     }
 
+    EC_SLAVE_DBG(slave, 1, "Scheduling SoE read request.\n");
+
     // schedule request.
     list_add_tail(&request.list, &slave->soe_requests);
 
     up(&master->master_sem);
 
-    EC_SLAVE_DBG(slave, 1, "Scheduled SoE read request.\n");
-
     // wait for processing through FSM
-    if (wait_event_interruptible(slave->soe_queue,
+    if (wait_event_interruptible(master->request_queue,
                 request.state != EC_INT_REQUEST_QUEUED)) {
         // interrupted by signal
         down(&master->master_sem);
@@ -3045,16 +3043,12 @@ int ecrt_master_read_idn(ec_master_t *master, uint16_t slave_position,
         up(&master->master_sem);
     }
 
-    // FIXME slave may become invalid
-
     // wait until master FSM has finished processing
-    wait_event(slave->soe_queue, request.state != EC_INT_REQUEST_BUSY);
+    wait_event(master->request_queue, request.state != EC_INT_REQUEST_BUSY);
 
     if (error_code) {
         *error_code = request.error_code;
     }
-
-    EC_SLAVE_DBG(slave, 1, "Read %zd bytes via SoE.\n", request.data_size);
 
     if (request.state != EC_INT_REQUEST_SUCCESS) {
         if (result_size) {
