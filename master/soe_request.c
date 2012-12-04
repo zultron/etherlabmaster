@@ -57,6 +57,7 @@ void ec_soe_request_init(
         ec_soe_request_t *req /**< SoE request. */
         )
 {
+    INIT_LIST_HEAD(&req->list);
     req->drive_no = 0x00;
     req->idn = 0x0000;
     req->al_state = EC_AL_STATE_INIT;
