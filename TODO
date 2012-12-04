@@ -16,6 +16,10 @@ Version 1.5.2:
 • Set the "Cyclic Generation Start Time" based on the slave's
   "System Time" register instead of using the application time.
 • Add ecrt_slave_config_reg_pdo_entry_by_pos().
+• Move SII request to slave FSM.
+• Move SDO request to slave FSM.
+• Simplify slave FSM by introducing a common request state to handle external
+  requests.
 
 Future issues:
 
@@ -62,8 +66,6 @@ Future issues:
     - Implement 0xXXXX:YY format for specifying SDOs.
     - Implement reading from stream for soe_write.
     - Output error after usage.
-* Simplify master fsm by introducing a common request state to handle external
-  requests (replace write_sii, sdo_request, etc).
 * Fix bus scan hang when calling ecrt_master_deactivate().
 
 Smaller issues:
