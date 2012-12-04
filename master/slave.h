@@ -224,7 +224,7 @@ struct ec_slave
     uint8_t sdo_dictionary_fetched; /**< Dictionary has been fetched. */
     unsigned long jiffies_preop; /**< Time, the slave went to PREOP. */
 
-    struct list_head slave_sdo_requests; /**< SDO access requests. */
+    struct list_head sdo_requests; /**< SDO access requests. */
     wait_queue_head_t sdo_queue; /**< Wait queue for SDO access requests
                                    from user space. */
     struct list_head reg_requests; /**< Register access requests. */

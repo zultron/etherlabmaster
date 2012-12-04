@@ -152,7 +152,7 @@ void ec_slave_init(
     slave->sdo_dictionary_fetched = 0;
     slave->jiffies_preop = 0;
 
-    INIT_LIST_HEAD(&slave->slave_sdo_requests);
+    INIT_LIST_HEAD(&slave->sdo_requests);
     init_waitqueue_head(&slave->sdo_queue);
 
     INIT_LIST_HEAD(&slave->reg_requests);
@@ -194,9 +194,9 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
 
     // abort all pending requests
 
-    while (!list_empty(&slave->slave_sdo_requests)) {
+    while (!list_empty(&slave->sdo_requests)) {
         ec_master_sdo_request_t *request =
-            list_entry(slave->slave_sdo_requests.next,
+            list_entry(slave->sdo_requests.next,
                 ec_master_sdo_request_t, list);
         list_del_init(&request->list); // dequeue
         EC_SLAVE_WARN(slave, "Discarding SDO request,"

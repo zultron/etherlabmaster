@@ -2702,7 +2702,7 @@ int ecrt_master_sdo_download(ec_master_t *master, uint16_t slave_position,
     EC_SLAVE_DBG(request.slave, 1, "Schedule SDO download request.\n");
 
     // schedule request.
-    list_add_tail(&request.list, &request.slave->slave_sdo_requests);
+    list_add_tail(&request.list, &request.slave->sdo_requests);
 
     up(&master->master_sem);
 
@@ -2783,7 +2783,7 @@ int ecrt_master_sdo_download_complete(ec_master_t *master,
             " (complete access).\n");
 
     // schedule request.
-    list_add_tail(&request.list, &request.slave->slave_sdo_requests);
+    list_add_tail(&request.list, &request.slave->sdo_requests);
 
     up(&master->master_sem);
 
@@ -2854,7 +2854,7 @@ int ecrt_master_sdo_upload(ec_master_t *master, uint16_t slave_position,
     EC_SLAVE_DBG(request.slave, 1, "Schedule SDO upload request.\n");
 
     // schedule request.
-    list_add_tail(&request.list, &request.slave->slave_sdo_requests);
+    list_add_tail(&request.list, &request.slave->sdo_requests);
 
     up(&master->master_sem);
 
