@@ -61,16 +61,6 @@ typedef struct {
 
 /*****************************************************************************/
 
-/** SoE request.
- */
-typedef struct {
-    struct list_head list; /**< List head. */
-    ec_slave_t *slave; /**< EtherCAT slave. */
-    ec_soe_request_t req; /**< SoE request. */
-} ec_master_soe_request_t;
-
-/*****************************************************************************/
-
 typedef struct ec_fsm_master ec_fsm_master_t; /**< \see ec_fsm_master */
 
 /** Finite state machine of an EtherCAT master.
