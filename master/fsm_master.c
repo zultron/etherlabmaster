@@ -917,8 +917,6 @@ void ec_fsm_master_enter_write_system_times(
 {
     ec_master_t *master = fsm->master;
 
-    EC_MASTER_DBG(master, 1, "Writing system time offsets...\n");
-
     if (master->has_app_time) {
 
         while (fsm->slave < master->slaves + master->slave_count) {
@@ -927,6 +925,8 @@ void ec_fsm_master_enter_write_system_times(
                 fsm->slave++;
                 continue;
             }
+
+            EC_SLAVE_DBG(fsm->slave, 1, "Checking system time offset.\n");
 
             // read DC system time (0x0910, 64 bit)
             //                         gap (64 bit)
@@ -976,7 +976,7 @@ u64 ec_fsm_master_dc_offset32(
     system_time32 += correction;
     time_diff = (u32) slave->master->app_time - system_time32;
 
-    EC_SLAVE_DBG(slave, 1, "DC system time offset calculation:"
+    EC_SLAVE_DBG(slave, 1, "DC 32 bit system time offset calculation:"
             " system_time=%u (corrected with %u),"
             " app_time=%llu, diff=%i\n",
             system_time32, correction,
@@ -1013,7 +1013,7 @@ u64 ec_fsm_master_dc_offset64(
     system_time += correction;
     time_diff = fsm->slave->master->app_time - system_time;
 
-    EC_SLAVE_DBG(slave, 1, "DC system time offset calculation:"
+    EC_SLAVE_DBG(slave, 1, "DC 64 bit system time offset calculation:"
             " system_time=%llu (corrected with %llu),"
             " app_time=%llu, diff=%lli\n",
             system_time, correction,
