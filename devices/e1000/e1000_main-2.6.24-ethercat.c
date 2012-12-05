@@ -1479,7 +1479,9 @@ e1000_open(struct net_device *netdev)
 	clear_bit(__E1000_DOWN, &adapter->flags);
 
 #ifdef CONFIG_E1000_NAPI
-	napi_enable(&adapter->napi);
+	if (!adapter->ecdev) {
+		napi_enable(&adapter->napi);
+	}
 #endif
 
 	e1000_irq_enable(adapter);

@@ -1356,7 +1356,9 @@ static int e1000_open(struct net_device *netdev)
 	if (test_bit(__E1000_TESTING, &adapter->flags))
 		return -EBUSY;
 
-	netif_carrier_off(netdev);
+	if (!adapter->ecdev) {
+		netif_carrier_off(netdev);
+	}
 
 	/* allocate transmit descriptors */
 	err = e1000_setup_all_tx_resources(adapter);
@@ -1389,11 +1391,13 @@ static int e1000_open(struct net_device *netdev)
 	/* From here on the code is the same as e1000_up() */
 	clear_bit(__E1000_DOWN, &adapter->flags);
 
-	napi_enable(&adapter->napi);
+	if (!adapter->ecdev) {
+		napi_enable(&adapter->napi);
 
-	e1000_irq_enable(adapter);
+		e1000_irq_enable(adapter);
 
-	netif_start_queue(netdev);
+		netif_start_queue(netdev);
+	}
 
 	/* fire a link status change interrupt to start the watchdog */
 	ew32(ICS, E1000_ICS_LSC);
