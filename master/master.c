@@ -2072,8 +2072,7 @@ void ec_master_request_op(
 
     // always set DC reference clock to OP
     if (master->dc_ref_clock) {
-        ec_slave_request_state(master->dc_ref_clock,
-                EC_SLAVE_STATE_OP);
+        ec_slave_request_state(master->dc_ref_clock, EC_SLAVE_STATE_OP);
     }
 }
 
@@ -2629,16 +2628,20 @@ int ecrt_master_reference_clock_time(ec_master_t *master, uint32_t *time)
 
 void ecrt_master_sync_reference_clock(ec_master_t *master)
 {
-    EC_WRITE_U32(master->ref_sync_datagram.data, master->app_time);
-    ec_master_queue_datagram(master, &master->ref_sync_datagram);
+    if (master->dc_ref_clock) {
+        EC_WRITE_U32(master->ref_sync_datagram.data, master->app_time);
+        ec_master_queue_datagram(master, &master->ref_sync_datagram);
+    }
 }
 
 /*****************************************************************************/
 
 void ecrt_master_sync_slave_clocks(ec_master_t *master)
 {
-    ec_datagram_zero(&master->sync_datagram);
-    ec_master_queue_datagram(master, &master->sync_datagram);
+    if (master->dc_ref_clock) {
+        ec_datagram_zero(&master->sync_datagram);
+        ec_master_queue_datagram(master, &master->sync_datagram);
+    }
 }
 
 /*****************************************************************************/
