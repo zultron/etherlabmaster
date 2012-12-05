@@ -24,6 +24,8 @@
   e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 
+  vim: noexpandtab
+
 *******************************************************************************/
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
@@ -984,7 +986,7 @@ static bool e1000_clean_rx_irq(struct e1000_adapter *adapter,
 		} else {
 		    e1000_receive_skb(adapter, netdev, skb, staterr,
 				      rx_desc->wb.upper.vlan);
-        }
+		}
 
 next_desc:
 		rx_desc->wb.upper.status_error &= cpu_to_le32(~0xFF);
@@ -1065,7 +1067,9 @@ static void e1000_print_hw_hang(struct work_struct *work)
 	}
 	/* Real hang detected */
 	adapter->tx_hang_recheck = false;
-	netif_stop_queue(netdev);
+	if (!adapter->ecdev) {
+		netif_stop_queue(netdev);
+	}
 
 	e1e_rphy(hw, PHY_STATUS, &phy_status);
 	e1e_rphy(hw, PHY_1000T_STATUS, &phy_1000t_status);
@@ -1664,10 +1668,10 @@ static irqreturn_t e1000_intr_msi(int irq, void *data)
 	struct e1000_hw *hw = &adapter->hw;
 	u32 icr = er32(ICR);
 
- 	if (adapter->ecdev) {
- 		int ec_work_done = 0;
- 		adapter->clean_rx(adapter, &ec_work_done, 100);
- 		e1000_clean_tx_irq(adapter);
+	if (adapter->ecdev) {
+		int ec_work_done = 0;
+		adapter->clean_rx(adapter, &ec_work_done, 100);
+		e1000_clean_tx_irq(adapter);
 		return IRQ_HANDLED;
 	}
 	/*
@@ -1768,10 +1772,10 @@ static irqreturn_t e1000_intr(int irq, void *data)
 			mod_timer(&adapter->watchdog_timer, jiffies + 1);
 	}
 
- 	if (adapter->ecdev) {
- 		int ec_work_done = 0;
- 		adapter->clean_rx(adapter, &ec_work_done, 100);
- 		e1000_clean_tx_irq(adapter);
+	if (adapter->ecdev) {
+		int ec_work_done = 0;
+		adapter->clean_rx(adapter, &ec_work_done, 100);
+		e1000_clean_tx_irq(adapter);
 		return IRQ_HANDLED;
 	}
 
@@ -1851,9 +1855,9 @@ static irqreturn_t e1000_intr_msix_rx(int irq, void *data)
 		adapter->rx_ring->set_itr = 0;
 	}
 
- 	if (adapter->ecdev) {
- 		int ec_work_done = 0;
- 		adapter->clean_rx(adapter, &ec_work_done, 100);
+	if (adapter->ecdev) {
+		int ec_work_done = 0;
+		adapter->clean_rx(adapter, &ec_work_done, 100);
 	} else {
 		if (napi_schedule_prep(&adapter->napi)) {
 			adapter->total_rx_bytes = 0;
@@ -3871,19 +3875,22 @@ static int e1000_open(struct net_device *netdev)
 		napi_enable(&adapter->napi);
 
 		e1000_irq_enable(adapter);
+	}
 
 	adapter->tx_hang_recheck = false;
+
+	if (!adapter->ecdev) {
 		netif_start_queue(netdev);
-
-		adapter->idle_check = true;
-		pm_runtime_put(&pdev->dev);
-
-		/* fire a link status change interrupt to start the watchdog */
-		if (adapter->msix_entries)
-			ew32(ICS, E1000_ICS_LSC | E1000_ICR_OTHER);
-		else
-			ew32(ICS, E1000_ICS_LSC);
 	}
+
+	adapter->idle_check = true;
+	pm_runtime_put(&pdev->dev);
+
+	/* fire a link status change interrupt to start the watchdog */
+	if (adapter->msix_entries)
+		ew32(ICS, E1000_ICS_LSC | E1000_ICR_OTHER);
+	else
+		ew32(ICS, E1000_ICS_LSC);
 
 	return 0;
 
