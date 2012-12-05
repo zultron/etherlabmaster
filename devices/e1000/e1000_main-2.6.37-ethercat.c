@@ -3075,6 +3075,10 @@ static int __e1000_maybe_stop_tx(struct net_device *netdev, int size)
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 	struct e1000_tx_ring *tx_ring = adapter->tx_ring;
 
+	if (adapter->ecdev) {
+		return -EBUSY;
+	}
+
 	netif_stop_queue(netdev);
 	/* Herbert's original patch had:
 	 *  smp_mb__after_netif_stop_queue();
