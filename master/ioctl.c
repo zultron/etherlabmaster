@@ -797,7 +797,7 @@ static int ec_ioctl_slave_sdo_upload(
         return -EFAULT;
     }
 
-    return 0;
+    return ret;
 }
 
 /*****************************************************************************/
@@ -2017,9 +2017,9 @@ static int ec_ioctl_sc_sync(
 
     for (i = 0; i < EC_MAX_SYNC_MANAGERS; i++) {
         if (data.syncs[i].config_this) {
-            if (ecrt_slave_config_sync_manager(sc, i, data.syncs[i].dir,
-                        data.syncs[i].watchdog_mode)) {
-                ret = -EINVAL;
+            ret = ecrt_slave_config_sync_manager(sc, i, data.syncs[i].dir,
+                        data.syncs[i].watchdog_mode);
+            if (ret) {
                 goto out_up;
             }
         }
