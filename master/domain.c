@@ -658,8 +658,8 @@ void ecrt_domain_state(const ec_domain_t *domain, ec_domain_state_t *state)
 
     state->working_counter = wc;
 
-    if (state->working_counter) {
-        if (state->working_counter == domain->expected_working_counter) {
+    if (wc) {
+        if (wc == domain->expected_working_counter) {
             state->wc_state = EC_WC_COMPLETE;
         } else {
             state->wc_state = EC_WC_INCOMPLETE;
