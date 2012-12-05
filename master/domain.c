@@ -451,26 +451,34 @@ uint8_t *ecrt_domain_data(ec_domain_t *domain)
 
 void ecrt_domain_process(ec_domain_t *domain)
 {
-    uint16_t wc_sum[EC_MAX_NUM_DEVICES] = {}, redundant_wc, wc_total;
-    unsigned int dev_idx, wc_change;
+    uint16_t wc_sum[EC_MAX_NUM_DEVICES] = {}, wc_total;
+    ec_datagram_pair_t *pair;
+#if EC_MAX_NUM_DEVICES > 1
+    uint16_t datagram_pair_wc, redundant_wc;
+    unsigned int datagram_offset;
+    ec_fmmu_config_t *fmmu = list_first_entry(&domain->fmmu_configs,
+            ec_fmmu_config_t, list);
     unsigned int redundancy;
+#endif
+    unsigned int dev_idx, wc_change;
 
 #if DEBUG_REDUNDANCY
     EC_MASTER_DBG(domain->master, 1, "domain %u process\n", domain->index);
 #endif
 
+    list_for_each_entry(pair, &domain->datagram_pairs, list) {
 #if EC_MAX_NUM_DEVICES > 1
-    if (ec_master_num_devices(domain->master) > 1) {
-        ec_datagram_pair_t *pair;
-        ec_fmmu_config_t *fmmu =
-            list_first_entry(&domain->fmmu_configs, ec_fmmu_config_t, list);
+        datagram_pair_wc = ec_datagram_pair_process(pair, wc_sum);
+#else
+        ec_datagram_pair_process(pair, wc_sum);
+#endif
 
-        list_for_each_entry(pair, &domain->datagram_pairs, list) {
+#if EC_MAX_NUM_DEVICES > 1
+        if (ec_master_num_devices(domain->master) > 1) {
             ec_datagram_t *main_datagram = &pair->datagrams[EC_DEVICE_MAIN];
             uint32_t logical_datagram_address =
                 EC_READ_U32(main_datagram->address);
             size_t datagram_size = main_datagram->data_size;
-            uint16_t datagram_pair_wc;
 
 #if DEBUG_REDUNDANCY
             EC_MASTER_DBG(domain->master, 1, "dgram %s log=%u\n",
@@ -479,7 +487,6 @@ void ecrt_domain_process(ec_domain_t *domain)
 
             /* Redundancy: Go through FMMU configs to detect data changes. */
             list_for_each_entry_from(fmmu, &domain->fmmu_configs, list) {
-                unsigned int datagram_offset;
                 ec_datagram_t *backup_datagram =
                     &pair->datagrams[EC_DEVICE_BACKUP];
 
@@ -510,7 +517,6 @@ void ecrt_domain_process(ec_domain_t *domain)
                             fmmu->data_size);
                 }
 #endif
-                datagram_pair_wc = ec_datagram_pair_process(pair, wc_sum);
 
                 if (data_changed(pair->send_buffer, main_datagram,
                             datagram_offset, fmmu->data_size)) {
@@ -545,9 +551,10 @@ void ecrt_domain_process(ec_domain_t *domain)
                 }
             }
         }
-    }
 #endif // EC_MAX_NUM_DEVICES > 1
+    }
 
+#if EC_MAX_NUM_DEVICES > 1
     redundant_wc = 0;
     for (dev_idx = EC_DEVICE_BACKUP;
             dev_idx < ec_master_num_devices(domain->master); dev_idx++) {
@@ -567,6 +574,9 @@ void ecrt_domain_process(ec_domain_t *domain)
         }
         domain->redundancy_active = redundancy;
     }
+#else
+    domain->redundancy_active = 0;
+#endif
 
     wc_change = 0;
     wc_total = 0;
@@ -596,6 +606,7 @@ void ecrt_domain_process(ec_domain_t *domain)
                     domain->working_counter_changes,
                     wc_total, domain->expected_working_counter);
         }
+#if EC_MAX_NUM_DEVICES > 1
         if (ec_master_num_devices(domain->master) > 1) {
             printk(" (");
             for (dev_idx = EC_DEVICE_MAIN;
@@ -608,6 +619,7 @@ void ecrt_domain_process(ec_domain_t *domain)
             }
             printk(")");
         }
+#endif
         printk(".\n");
 
         domain->working_counter_changes = 0;
