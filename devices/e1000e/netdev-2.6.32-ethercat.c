@@ -1190,10 +1190,10 @@ static irqreturn_t e1000_intr_msi(int irq, void *data)
 	struct e1000_hw *hw = &adapter->hw;
 	u32 icr = er32(ICR);
 
- 	if (adapter->ecdev) {
- 		int ec_work_done = 0;
- 		adapter->clean_rx(adapter, &ec_work_done, 100);
- 		e1000_clean_tx_irq(adapter);
+	if (adapter->ecdev) {
+		int ec_work_done = 0;
+		adapter->clean_rx(adapter, &ec_work_done, 100);
+		e1000_clean_tx_irq(adapter);
 		return IRQ_HANDLED;
 	}
 	/*
@@ -1294,10 +1294,10 @@ static irqreturn_t e1000_intr(int irq, void *data)
 			mod_timer(&adapter->watchdog_timer, jiffies + 1);
 	}
 
- 	if (adapter->ecdev) {
- 		int ec_work_done = 0;
- 		adapter->clean_rx(adapter, &ec_work_done, 100);
- 		e1000_clean_tx_irq(adapter);
+	if (adapter->ecdev) {
+		int ec_work_done = 0;
+		adapter->clean_rx(adapter, &ec_work_done, 100);
+		e1000_clean_tx_irq(adapter);
 		return IRQ_HANDLED;
 	}
 
@@ -1377,9 +1377,9 @@ static irqreturn_t e1000_intr_msix_rx(int irq, void *data)
 		adapter->rx_ring->set_itr = 0;
 	}
 
- 	if (adapter->ecdev) {
- 		int ec_work_done = 0;
- 		adapter->clean_rx(adapter, &ec_work_done, 100);
+	if (adapter->ecdev) {
+		int ec_work_done = 0;
+		adapter->clean_rx(adapter, &ec_work_done, 100);
 	} else {
 		if (napi_schedule_prep(&adapter->napi)) {
 			adapter->total_rx_bytes = 0;
@@ -3249,11 +3249,13 @@ static int e1000_open(struct net_device *netdev)
 	/* From here on the code is the same as e1000e_up() */
 	clear_bit(__E1000_DOWN, &adapter->state);
 
-	napi_enable(&adapter->napi);
+	if (!adapter->ecdev) {
+		napi_enable(&adapter->napi);
 
-	e1000_irq_enable(adapter);
+		e1000_irq_enable(adapter);
 
-	netif_start_queue(netdev);
+		netif_start_queue(netdev);
+	}
 
 	/* fire a link status change interrupt to start the watchdog */
 	ew32(ICS, E1000_ICS_LSC);
