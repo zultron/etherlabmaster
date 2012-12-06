@@ -35,6 +35,7 @@
 /*****************************************************************************/
 
 #include <linux/module.h>
+#include <linux/vmalloc.h>
 
 #include "master.h"
 #include "slave_config.h"
