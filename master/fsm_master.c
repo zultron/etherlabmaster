@@ -86,10 +86,11 @@ void ec_fsm_master_init(
 
     // init sub-state-machines
     ec_fsm_coe_init(&fsm->fsm_coe, fsm->datagram);
+    ec_fsm_soe_init(&fsm->fsm_soe, fsm->datagram);
     ec_fsm_pdo_init(&fsm->fsm_pdo, &fsm->fsm_coe);
     ec_fsm_change_init(&fsm->fsm_change, fsm->datagram);
     ec_fsm_slave_config_init(&fsm->fsm_slave_config, fsm->datagram,
-            &fsm->fsm_change, &fsm->fsm_coe, &fsm->fsm_pdo);
+            &fsm->fsm_change, &fsm->fsm_coe, &fsm->fsm_soe, &fsm->fsm_pdo);
     ec_fsm_slave_scan_init(&fsm->fsm_slave_scan, fsm->datagram,
             &fsm->fsm_slave_config, &fsm->fsm_pdo);
     ec_fsm_sii_init(&fsm->fsm_sii, fsm->datagram);
@@ -105,6 +106,7 @@ void ec_fsm_master_clear(
 {
     // clear sub-state machines
     ec_fsm_coe_clear(&fsm->fsm_coe);
+    ec_fsm_soe_clear(&fsm->fsm_soe);
     ec_fsm_pdo_clear(&fsm->fsm_pdo);
     ec_fsm_change_clear(&fsm->fsm_change);
     ec_fsm_slave_config_clear(&fsm->fsm_slave_config);
@@ -611,7 +613,7 @@ void ec_fsm_master_action_configure(
         return;
     }
 
-    // slave has error flag set; process next one
+    // process next slave
     ec_fsm_master_action_next_slave_state(fsm);
 }
 

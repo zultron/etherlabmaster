@@ -114,6 +114,7 @@ void ec_fsm_slave_config_init(
         ec_datagram_t *datagram, /**< datagram structure to use */
         ec_fsm_change_t *fsm_change, /**< State change state machine to use. */
         ec_fsm_coe_t *fsm_coe, /**< CoE state machine to use. */
+        ec_fsm_soe_t *fsm_soe, /**< SoE state machine to use. */
         ec_fsm_pdo_t *fsm_pdo /**< PDO configuration state machine to use. */
         )
 {
@@ -123,6 +124,7 @@ void ec_fsm_slave_config_init(
     fsm->datagram = datagram;
     fsm->fsm_change = fsm_change;
     fsm->fsm_coe = fsm_coe;
+    fsm->fsm_soe = fsm_soe;
     fsm->fsm_pdo = fsm_pdo;
 }
 
@@ -688,7 +690,9 @@ void ec_fsm_slave_config_state_sdo_conf(
         ec_fsm_slave_config_t *fsm /**< slave state machine */
         )
 {
-    if (ec_fsm_coe_exec(fsm->fsm_coe)) return;
+    if (ec_fsm_coe_exec(fsm->fsm_coe)) {
+        return;
+    }
 
     if (!ec_fsm_coe_success(fsm->fsm_coe)) {
         EC_SLAVE_ERR(fsm->slave, "SDO configuration failed.\n");
@@ -726,7 +730,6 @@ void ec_fsm_slave_config_enter_soe_conf_preop(
         )
 {
     ec_slave_t *slave = fsm->slave;
-    ec_fsm_soe_t *fsm_soe = &slave->fsm.fsm_soe;
     ec_soe_request_t *req;
 
     if (!slave->config) {
@@ -741,10 +744,9 @@ void ec_fsm_slave_config_enter_soe_conf_preop(
             fsm->soe_request = req;
             ec_soe_request_copy(&fsm->soe_request_copy, fsm->soe_request);
             ec_soe_request_write(&fsm->soe_request_copy);
-            ec_fsm_soe_transfer(fsm_soe, fsm->slave, &fsm->soe_request_copy);
-            ec_fsm_soe_exec(fsm_soe); // execute immediately
-            ec_master_queue_external_datagram(slave->master,
-                    fsm_soe->datagram);
+            ec_fsm_soe_transfer(fsm->fsm_soe, fsm->slave,
+                    &fsm->soe_request_copy);
+            ec_fsm_soe_exec(fsm->fsm_soe); // execute immediately
             return;
         }
     }
@@ -762,14 +764,12 @@ void ec_fsm_slave_config_state_soe_conf_preop(
         )
 {
     ec_slave_t *slave = fsm->slave;
-    ec_fsm_soe_t *fsm_soe = &slave->fsm.fsm_soe;
 
-    if (ec_fsm_soe_exec(fsm_soe)) {
-        ec_master_queue_external_datagram(slave->master, fsm_soe->datagram);
+    if (ec_fsm_soe_exec(fsm->fsm_soe)) {
         return;
     }
 
-    if (!ec_fsm_soe_success(fsm_soe)) {
+    if (!ec_fsm_soe_success(fsm->fsm_soe)) {
         EC_SLAVE_ERR(slave, "SoE configuration failed.\n");
         fsm->slave->error_flag = 1;
         fsm->state = ec_fsm_slave_config_state_error;
@@ -788,10 +788,9 @@ void ec_fsm_slave_config_state_soe_conf_preop(
         if (fsm->soe_request->al_state == EC_AL_STATE_PREOP) {
             ec_soe_request_copy(&fsm->soe_request_copy, fsm->soe_request);
             ec_soe_request_write(&fsm->soe_request_copy);
-            ec_fsm_soe_transfer(fsm_soe, fsm->slave, &fsm->soe_request_copy);
-            ec_fsm_soe_exec(fsm_soe); // execute immediately
-            ec_master_queue_external_datagram(slave->master,
-                    fsm_soe->datagram);
+            ec_fsm_soe_transfer(fsm->fsm_soe, fsm->slave,
+                    &fsm->soe_request_copy);
+            ec_fsm_soe_exec(fsm->fsm_soe); // execute immediately
             return;
         }
     }
@@ -1455,7 +1454,6 @@ void ec_fsm_slave_config_enter_soe_conf_safeop(
         )
 {
     ec_slave_t *slave = fsm->slave;
-    ec_fsm_soe_t *fsm_soe = &slave->fsm.fsm_soe;
     ec_soe_request_t *req;
 
     if (!slave->config) {
@@ -1470,10 +1468,9 @@ void ec_fsm_slave_config_enter_soe_conf_safeop(
             fsm->soe_request = req;
             ec_soe_request_copy(&fsm->soe_request_copy, fsm->soe_request);
             ec_soe_request_write(&fsm->soe_request_copy);
-            ec_fsm_soe_transfer(fsm_soe, fsm->slave, &fsm->soe_request_copy);
-            ec_fsm_soe_exec(fsm_soe); // execute immediately
-            ec_master_queue_external_datagram(slave->master,
-                    fsm_soe->datagram);
+            ec_fsm_soe_transfer(fsm->fsm_soe, fsm->slave,
+                    &fsm->soe_request_copy);
+            ec_fsm_soe_exec(fsm->fsm_soe); // execute immediately
             return;
         }
     }
@@ -1491,14 +1488,12 @@ void ec_fsm_slave_config_state_soe_conf_safeop(
         )
 {
     ec_slave_t *slave = fsm->slave;
-    ec_fsm_soe_t *fsm_soe = &slave->fsm.fsm_soe;
 
-    if (ec_fsm_soe_exec(fsm_soe)) {
-        ec_master_queue_external_datagram(slave->master, fsm_soe->datagram);
+    if (ec_fsm_soe_exec(fsm->fsm_soe)) {
         return;
     }
 
-    if (!ec_fsm_soe_success(fsm_soe)) {
+    if (!ec_fsm_soe_success(fsm->fsm_soe)) {
         EC_SLAVE_ERR(slave, "SoE configuration failed.\n");
         fsm->slave->error_flag = 1;
         fsm->state = ec_fsm_slave_config_state_error;
@@ -1517,10 +1512,9 @@ void ec_fsm_slave_config_state_soe_conf_safeop(
         if (fsm->soe_request->al_state == EC_AL_STATE_SAFEOP) {
             ec_soe_request_copy(&fsm->soe_request_copy, fsm->soe_request);
             ec_soe_request_write(&fsm->soe_request_copy);
-            ec_fsm_soe_transfer(fsm_soe, fsm->slave, &fsm->soe_request_copy);
-            ec_fsm_soe_exec(fsm_soe); // execute immediately
-            ec_master_queue_external_datagram(slave->master,
-                    fsm_soe->datagram);
+            ec_fsm_soe_transfer(fsm->fsm_soe, fsm->slave,
+                    &fsm->soe_request_copy);
+            ec_fsm_soe_exec(fsm->fsm_soe); // execute immediately
             return;
         }
     }
