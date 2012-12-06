@@ -1955,9 +1955,7 @@ static ATTRIBUTES int ec_ioctl_sync_mon_process(
     if (unlikely(!ctx->requested))
         return -EPERM;
 
-    down(&master->io_sem);
     time_diff = ecrt_master_sync_monitor_process(master);
-    up(&master->io_sem);
 
     if (copy_to_user((void __user *) arg, &time_diff, sizeof(time_diff)))
         return -EFAULT;
@@ -2397,25 +2395,22 @@ static ATTRIBUTES int ec_ioctl_sc_emerg_pop(
     u8 msg[EC_COE_EMERGENCY_MSG_SIZE];
     int ret;
 
-    if (unlikely(!ctx->requested))
+    if (unlikely(!ctx->requested)) {
         return -EPERM;
-
-    if (copy_from_user(&io, (void __user *) arg, sizeof(io)))
-        return -EFAULT;
-
-    if (down_interruptible(&master->master_sem)) {
-        return -EINTR;
     }
 
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io))) {
+        return -EFAULT;
+    }
+
+    /* no locking of master_sem needed, because configuration will not be
+     * deleted in the meantime. */
+
     if (!(sc = ec_master_get_config(master, io.config_index))) {
-        up(&master->master_sem);
         return -ENOENT;
     }
 
     ret = ecrt_slave_config_emerg_pop(sc, msg);
-
-    up(&master->master_sem);
-
     if (ret < 0) {
         return ret;
     }
@@ -2441,26 +2436,22 @@ static ATTRIBUTES int ec_ioctl_sc_emerg_clear(
     ec_slave_config_t *sc;
     int ret;
 
-    if (unlikely(!ctx->requested))
+    if (unlikely(!ctx->requested)) {
         return -EPERM;
-
-    if (copy_from_user(&io, (void __user *) arg, sizeof(io)))
-        return -EFAULT;
-
-    if (down_interruptible(&master->master_sem)) {
-        return -EINTR;
     }
 
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io))) {
+        return -EFAULT;
+    }
+
+    /* no locking of master_sem needed, because configuration will not be
+     * deleted in the meantime. */
+
     if (!(sc = ec_master_get_config(master, io.config_index))) {
-        up(&master->master_sem);
         return -ENOENT;
     }
 
-    ret = ecrt_slave_config_emerg_clear(sc);
-
-    up(&master->master_sem);
-
-    return ret;
+    return ecrt_slave_config_emerg_clear(sc);
 }
 
 /*****************************************************************************/
@@ -2477,25 +2468,22 @@ static ATTRIBUTES int ec_ioctl_sc_emerg_overruns(
     ec_slave_config_t *sc;
     int ret;
 
-    if (unlikely(!ctx->requested))
+    if (unlikely(!ctx->requested)) {
         return -EPERM;
-
-    if (copy_from_user(&io, (void __user *) arg, sizeof(io)))
-        return -EFAULT;
-
-    if (down_interruptible(&master->master_sem)) {
-        return -EINTR;
     }
 
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io))) {
+        return -EFAULT;
+    }
+
+    /* no locking of master_sem needed, because configuration will not be
+     * deleted in the meantime. */
+
     if (!(sc = ec_master_get_config(master, io.config_index))) {
-        up(&master->master_sem);
         return -ENOENT;
     }
 
     ret = ecrt_slave_config_emerg_overruns(sc);
-
-    up(&master->master_sem);
-
     if (ret < 0) {
         return ret;
     }
