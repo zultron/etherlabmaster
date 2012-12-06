@@ -847,6 +847,7 @@ void ec_master_queue_external_datagram(
     list_for_each_entry(queued_datagram, &master->external_datagram_queue,
             queue) {
         if (queued_datagram == datagram) {
+            up(&master->io_sem);
             datagram->state = EC_DATAGRAM_QUEUED;
             return;
         }
@@ -864,8 +865,9 @@ void ec_master_queue_external_datagram(
 #endif
     datagram->jiffies_sent = jiffies;
 
-    master->fsm.idle = 0;
     up(&master->io_sem);
+
+    master->fsm.idle = 0;
 }
 
 /*****************************************************************************/
@@ -1478,8 +1480,8 @@ static int ec_master_operation_thread(void *priv_data)
 
             up(&master->master_sem);
 
-            // inject datagrams (let the rt thread queue them, see
-            // ecrt_master_send)
+            // Inject datagrams (let the RT thread queue them, see
+            // ecrt_master_send())
             if (fsm_exec) {
                 master->injection_seq_fsm++;
             }
@@ -2280,7 +2282,7 @@ void ecrt_master_send(ec_master_t *master)
     ec_device_index_t dev_idx;
 
     if (master->injection_seq_rt != master->injection_seq_fsm) {
-        // inject datagrams produced by master and slave FSMs
+        // inject datagrams produced by master FSM
         ec_master_queue_datagram(master, &master->fsm_datagram);
         master->injection_seq_rt = master->injection_seq_fsm;
     }
