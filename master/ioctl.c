@@ -1718,6 +1718,10 @@ static int ec_ioctl_set_send_interval(
 {
     size_t send_interval;
 
+    if (unlikely(!ctx->requested)) {
+        return -EPERM;
+    }
+
     if (copy_from_user(&send_interval, (void __user *) arg,
                 sizeof(send_interval))) {
         return -EFAULT;
@@ -1782,9 +1786,6 @@ static int ec_ioctl_master_state(
 {
     ec_master_state_t data;
 
-    if (unlikely(!ctx->requested))
-        return -EPERM;
-
     ecrt_master_state(master, &data);
 
     if (copy_to_user((void __user *) arg, &data, sizeof(data)))
@@ -1806,10 +1807,6 @@ static int ec_ioctl_master_link_state(
     ec_ioctl_link_state_t ioctl;
     ec_master_link_state_t state;
     int ret;
-
-    if (unlikely(!ctx->requested)) {
-        return -EPERM;
-    }
 
     if (copy_from_user(&ioctl, (void __user *) arg, sizeof(ioctl))) {
         return -EFAULT;
@@ -1971,9 +1968,6 @@ static int ec_ioctl_reset(
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
         )
 {
-    if (unlikely(!ctx->requested))
-        return -EPERM;
-
     down(&master->master_sem);
     ecrt_master_reset(master);
     up(&master->master_sem);
@@ -4170,10 +4164,6 @@ long EC_IOCTL(ec_master_t *master, ec_ioctl_context_t *ctx,
             ret = ec_ioctl_sc_emerg_clear(master, arg, ctx);
             break;
         case EC_IOCTL_SC_EMERG_OVERRUNS:
-            if (!ctx->writable) {
-                ret = -EPERM;
-                break;
-            }
             ret = ec_ioctl_sc_emerg_overruns(master, arg, ctx);
             break;
         case EC_IOCTL_SC_SDO_REQUEST:
