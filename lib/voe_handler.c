@@ -178,8 +178,8 @@ ec_request_state_t ecrt_voe_handler_execute(ec_voe_handler_t *voe)
 
     if (data.size) { // new data waiting to be copied
         if (voe->mem_size < data.size) {
-            fprintf(stderr, "Received %u bytes do not fit info VoE data"
-                    " memory (%u bytes)!\n", data.size, voe->mem_size);
+            fprintf(stderr, "Received %zu bytes do not fit info VoE data"
+                    " memory (%zu bytes)!\n", data.size, voe->mem_size);
             return EC_REQUEST_ERROR;
         }
 
