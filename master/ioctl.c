@@ -48,6 +48,12 @@
  */
 #define DEBUG_LATENCY 0
 
+#if 0
+#define ATTRIBUTES __attribute__ ((__noinline__))
+#else
+#define ATTRIBUTES
+#endif
+
 /*****************************************************************************/
 
 /** Copies a string to an ioctl structure.
@@ -69,7 +75,7 @@ static void ec_ioctl_strcpy(
 
 /** Get module information.
  */
-static int ec_ioctl_module(
+static ATTRIBUTES int ec_ioctl_module(
         void *arg /**< Userspace address to store the results. */
         )
 {
@@ -88,7 +94,7 @@ static int ec_ioctl_module(
 
 /** Get master information.
  */
-static int ec_ioctl_master(
+static ATTRIBUTES int ec_ioctl_master(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< Userspace address to store the results. */
         )
@@ -181,7 +187,7 @@ static int ec_ioctl_master(
 
 /** Get slave information.
  */
-static int ec_ioctl_slave(
+static ATTRIBUTES int ec_ioctl_slave(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< Userspace address to store the results. */
         )
@@ -266,7 +272,7 @@ static int ec_ioctl_slave(
 
 /** Get slave sync manager information.
  */
-static int ec_ioctl_slave_sync(
+static ATTRIBUTES int ec_ioctl_slave_sync(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< Userspace address to store the results. */
         )
@@ -317,7 +323,7 @@ static int ec_ioctl_slave_sync(
 
 /** Get slave sync manager PDO information.
  */
-static int ec_ioctl_slave_sync_pdo(
+static ATTRIBUTES int ec_ioctl_slave_sync_pdo(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< Userspace address to store the results. */
         )
@@ -374,7 +380,7 @@ static int ec_ioctl_slave_sync_pdo(
 
 /** Get slave sync manager PDO entry information.
  */
-static int ec_ioctl_slave_sync_pdo_entry(
+static ATTRIBUTES int ec_ioctl_slave_sync_pdo_entry(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< Userspace address to store the results. */
         )
@@ -441,7 +447,7 @@ static int ec_ioctl_slave_sync_pdo_entry(
 
 /** Get domain information.
  */
-static int ec_ioctl_domain(
+static ATTRIBUTES int ec_ioctl_domain(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< Userspace address to store the results. */
         )
@@ -484,7 +490,7 @@ static int ec_ioctl_domain(
 
 /** Get domain FMMU information.
  */
-static int ec_ioctl_domain_fmmu(
+static ATTRIBUTES int ec_ioctl_domain_fmmu(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< Userspace address to store the results. */
         )
@@ -534,7 +540,7 @@ static int ec_ioctl_domain_fmmu(
 
 /** Get domain data.
  */
-static int ec_ioctl_domain_data(
+static ATTRIBUTES int ec_ioctl_domain_data(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< Userspace address to store the results. */
         )
@@ -577,7 +583,7 @@ static int ec_ioctl_domain_data(
 
 /** Set master debug level.
  */
-static int ec_ioctl_master_debug(
+static ATTRIBUTES int ec_ioctl_master_debug(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -589,7 +595,7 @@ static int ec_ioctl_master_debug(
 
 /** Issue a bus scan.
  */
-static int ec_ioctl_master_rescan(
+static ATTRIBUTES int ec_ioctl_master_rescan(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -602,7 +608,7 @@ static int ec_ioctl_master_rescan(
 
 /** Set slave state.
  */
-static int ec_ioctl_slave_state(
+static ATTRIBUTES int ec_ioctl_slave_state(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -635,7 +641,7 @@ static int ec_ioctl_slave_state(
 
 /** Get slave SDO information.
  */
-static int ec_ioctl_slave_sdo(
+static ATTRIBUTES int ec_ioctl_slave_sdo(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -682,7 +688,7 @@ static int ec_ioctl_slave_sdo(
 
 /** Get slave SDO entry information.
  */
-static int ec_ioctl_slave_sdo_entry(
+static ATTRIBUTES int ec_ioctl_slave_sdo_entry(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -760,7 +766,7 @@ static int ec_ioctl_slave_sdo_entry(
 
 /** Upload SDO.
  */
-static int ec_ioctl_slave_sdo_upload(
+static ATTRIBUTES int ec_ioctl_slave_sdo_upload(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -804,7 +810,7 @@ static int ec_ioctl_slave_sdo_upload(
 
 /** Download SDO.
  */
-static int ec_ioctl_slave_sdo_download(
+static ATTRIBUTES int ec_ioctl_slave_sdo_download(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -850,7 +856,7 @@ static int ec_ioctl_slave_sdo_download(
 
 /** Read a slave's SII.
  */
-static int ec_ioctl_slave_sii_read(
+static ATTRIBUTES int ec_ioctl_slave_sii_read(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -896,7 +902,7 @@ static int ec_ioctl_slave_sii_read(
 
 /** Write a slave's SII.
  */
-static int ec_ioctl_slave_sii_write(
+static ATTRIBUTES int ec_ioctl_slave_sii_write(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -982,7 +988,7 @@ static int ec_ioctl_slave_sii_write(
 
 /** Read a slave's registers.
  */
-static int ec_ioctl_slave_reg_read(
+static ATTRIBUTES int ec_ioctl_slave_reg_read(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -1059,7 +1065,7 @@ static int ec_ioctl_slave_reg_read(
 
 /** Write a slave's registers.
  */
-static int ec_ioctl_slave_reg_write(
+static ATTRIBUTES int ec_ioctl_slave_reg_write(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -1135,7 +1141,7 @@ static int ec_ioctl_slave_reg_write(
 
 /** Get slave configuration information.
  */
-static int ec_ioctl_config(
+static ATTRIBUTES int ec_ioctl_config(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -1191,7 +1197,7 @@ static int ec_ioctl_config(
 
 /** Get slave configuration PDO information.
  */
-static int ec_ioctl_config_pdo(
+static ATTRIBUTES int ec_ioctl_config_pdo(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -1245,7 +1251,7 @@ static int ec_ioctl_config_pdo(
 
 /** Get slave configuration PDO entry information.
  */
-static int ec_ioctl_config_pdo_entry(
+static ATTRIBUTES int ec_ioctl_config_pdo_entry(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -1308,7 +1314,7 @@ static int ec_ioctl_config_pdo_entry(
 
 /** Get slave configuration SDO information.
  */
-static int ec_ioctl_config_sdo(
+static ATTRIBUTES int ec_ioctl_config_sdo(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -1370,7 +1376,7 @@ static int ec_ioctl_config_sdo(
 
 /** Get slave configuration IDN information.
  */
-static int ec_ioctl_config_idn(
+static ATTRIBUTES int ec_ioctl_config_idn(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -1434,7 +1440,7 @@ static int ec_ioctl_config_idn(
 
 /** Get EoE handler information.
  */
-static int ec_ioctl_eoe_handler(
+static ATTRIBUTES int ec_ioctl_eoe_handler(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -1484,7 +1490,7 @@ static int ec_ioctl_eoe_handler(
 
 /** Request the master from userspace.
  */
-static int ec_ioctl_request(
+static ATTRIBUTES int ec_ioctl_request(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1507,7 +1513,7 @@ static int ec_ioctl_request(
 
 /** Create a domain.
  */
-static int ec_ioctl_create_domain(
+static ATTRIBUTES int ec_ioctl_create_domain(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1529,7 +1535,7 @@ static int ec_ioctl_create_domain(
 
 /** Create a slave configuration.
  */
-static int ec_ioctl_create_slave_config(
+static ATTRIBUTES int ec_ioctl_create_slave_config(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1573,7 +1579,7 @@ static int ec_ioctl_create_slave_config(
 
 /** Select the DC reference clock.
  */
-static int ec_ioctl_select_ref_clock(
+static ATTRIBUTES int ec_ioctl_select_ref_clock(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1612,7 +1618,7 @@ out_return:
 
 /** Activates the master.
  */
-static int ec_ioctl_activate(
+static ATTRIBUTES int ec_ioctl_activate(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1693,7 +1699,7 @@ static int ec_ioctl_activate(
 
 /** Deactivates the master.
  */
-static int ec_ioctl_deactivate(
+static ATTRIBUTES int ec_ioctl_deactivate(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1710,7 +1716,7 @@ static int ec_ioctl_deactivate(
 
 /** Set max. number of databytes in a cycle
  */
-static int ec_ioctl_set_send_interval(
+static ATTRIBUTES int ec_ioctl_set_send_interval(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1740,7 +1746,7 @@ static int ec_ioctl_set_send_interval(
 
 /** Send frames.
  */
-static int ec_ioctl_send(
+static ATTRIBUTES int ec_ioctl_send(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1759,7 +1765,7 @@ static int ec_ioctl_send(
 
 /** Receive frames.
  */
-static int ec_ioctl_receive(
+static ATTRIBUTES int ec_ioctl_receive(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1778,7 +1784,7 @@ static int ec_ioctl_receive(
 
 /** Get the master state.
  */
-static int ec_ioctl_master_state(
+static ATTRIBUTES int ec_ioctl_master_state(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1798,7 +1804,7 @@ static int ec_ioctl_master_state(
 
 /** Get the master state.
  */
-static int ec_ioctl_master_link_state(
+static ATTRIBUTES int ec_ioctl_master_link_state(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1828,7 +1834,7 @@ static int ec_ioctl_master_link_state(
 
 /** Set the master dc app time.
  */
-static int ec_ioctl_app_time(
+static ATTRIBUTES int ec_ioctl_app_time(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1851,7 +1857,7 @@ static int ec_ioctl_app_time(
 
 /** Sync the reference clock.
  */
-static int ec_ioctl_sync_ref(
+static ATTRIBUTES int ec_ioctl_sync_ref(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1870,7 +1876,7 @@ static int ec_ioctl_sync_ref(
 
 /** Sync the slave clocks.
  */
-static int ec_ioctl_sync_slaves(
+static ATTRIBUTES int ec_ioctl_sync_slaves(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1889,7 +1895,7 @@ static int ec_ioctl_sync_slaves(
 
 /** Get the system time of the reference clock.
  */
-static int ec_ioctl_ref_clock_time(
+static ATTRIBUTES int ec_ioctl_ref_clock_time(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1918,7 +1924,7 @@ static int ec_ioctl_ref_clock_time(
 
 /** Queue the sync monitoring datagram.
  */
-static int ec_ioctl_sync_mon_queue(
+static ATTRIBUTES int ec_ioctl_sync_mon_queue(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1937,7 +1943,7 @@ static int ec_ioctl_sync_mon_queue(
 
 /** Processes the sync monitoring datagram.
  */
-static int ec_ioctl_sync_mon_process(
+static ATTRIBUTES int ec_ioctl_sync_mon_process(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1962,7 +1968,7 @@ static int ec_ioctl_sync_mon_process(
 
 /** Reset configuration.
  */
-static int ec_ioctl_reset(
+static ATTRIBUTES int ec_ioctl_reset(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -1978,7 +1984,7 @@ static int ec_ioctl_reset(
 
 /** Configure a sync manager.
  */
-static int ec_ioctl_sc_sync(
+static ATTRIBUTES int ec_ioctl_sc_sync(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2029,7 +2035,7 @@ out_return:
 
 /** Configure a slave's watchdogs.
  */
-static int ec_ioctl_sc_watchdog(
+static ATTRIBUTES int ec_ioctl_sc_watchdog(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2072,7 +2078,7 @@ out_return:
 
 /** Add a PDO to the assignment.
  */
-static int ec_ioctl_sc_add_pdo(
+static ATTRIBUTES int ec_ioctl_sc_add_pdo(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2104,7 +2110,7 @@ static int ec_ioctl_sc_add_pdo(
 
 /** Clears the PDO assignment.
  */
-static int ec_ioctl_sc_clear_pdos(
+static ATTRIBUTES int ec_ioctl_sc_clear_pdos(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2137,7 +2143,7 @@ static int ec_ioctl_sc_clear_pdos(
 
 /** Add an entry to a PDO's mapping.
  */
-static int ec_ioctl_sc_add_entry(
+static ATTRIBUTES int ec_ioctl_sc_add_entry(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2170,7 +2176,7 @@ static int ec_ioctl_sc_add_entry(
 
 /** Clears the mapping of a PDO.
  */
-static int ec_ioctl_sc_clear_entries(
+static ATTRIBUTES int ec_ioctl_sc_clear_entries(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2203,7 +2209,7 @@ static int ec_ioctl_sc_clear_entries(
 
 /** Registers a PDO entry.
  */
-static int ec_ioctl_sc_reg_pdo_entry(
+static ATTRIBUTES int ec_ioctl_sc_reg_pdo_entry(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2248,7 +2254,7 @@ static int ec_ioctl_sc_reg_pdo_entry(
 
 /** Sets the DC AssignActivate word and the sync signal times.
  */
-static int ec_ioctl_sc_dc(
+static ATTRIBUTES int ec_ioctl_sc_dc(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2286,7 +2292,7 @@ static int ec_ioctl_sc_dc(
 
 /** Configures an SDO.
  */
-static int ec_ioctl_sc_sdo(
+static ATTRIBUTES int ec_ioctl_sc_sdo(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2343,7 +2349,7 @@ static int ec_ioctl_sc_sdo(
 
 /** Set the emergency ring buffer size.
  */
-static int ec_ioctl_sc_emerg_size(
+static ATTRIBUTES int ec_ioctl_sc_emerg_size(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2379,7 +2385,7 @@ static int ec_ioctl_sc_emerg_size(
 
 /** Get an emergency message from the ring.
  */
-static int ec_ioctl_sc_emerg_pop(
+static ATTRIBUTES int ec_ioctl_sc_emerg_pop(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2424,7 +2430,7 @@ static int ec_ioctl_sc_emerg_pop(
 
 /** Clear the emergency ring.
  */
-static int ec_ioctl_sc_emerg_clear(
+static ATTRIBUTES int ec_ioctl_sc_emerg_clear(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2460,7 +2466,7 @@ static int ec_ioctl_sc_emerg_clear(
 
 /** Get the number of emergency overruns.
  */
-static int ec_ioctl_sc_emerg_overruns(
+static ATTRIBUTES int ec_ioctl_sc_emerg_overruns(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2506,7 +2512,7 @@ static int ec_ioctl_sc_emerg_overruns(
 
 /** Create an SDO request.
  */
-static int ec_ioctl_sc_create_sdo_request(
+static ATTRIBUTES int ec_ioctl_sc_create_sdo_request(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2555,7 +2561,7 @@ static int ec_ioctl_sc_create_sdo_request(
 
 /** Create a register request.
  */
-static int ec_ioctl_sc_create_reg_request(
+static ATTRIBUTES int ec_ioctl_sc_create_reg_request(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2607,7 +2613,7 @@ static int ec_ioctl_sc_create_reg_request(
 
 /** Create a VoE handler.
  */
-static int ec_ioctl_sc_create_voe_handler(
+static ATTRIBUTES int ec_ioctl_sc_create_voe_handler(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2655,7 +2661,7 @@ static int ec_ioctl_sc_create_voe_handler(
 
 /** Get the slave configuration's state.
  */
-static int ec_ioctl_sc_state(
+static ATTRIBUTES int ec_ioctl_sc_state(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2691,7 +2697,7 @@ static int ec_ioctl_sc_state(
 
 /** Configures an IDN.
  */
-static int ec_ioctl_sc_idn(
+static ATTRIBUTES int ec_ioctl_sc_idn(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2743,7 +2749,7 @@ static int ec_ioctl_sc_idn(
 
 /** Gets the domain's offset in the total process data.
  */
-static int ec_ioctl_domain_offset(
+static ATTRIBUTES int ec_ioctl_domain_offset(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2775,7 +2781,7 @@ static int ec_ioctl_domain_offset(
 
 /** Process the domain.
  */
-static int ec_ioctl_domain_process(
+static ATTRIBUTES int ec_ioctl_domain_process(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2801,7 +2807,7 @@ static int ec_ioctl_domain_process(
 
 /** Queue the domain.
  */
-static int ec_ioctl_domain_queue(
+static ATTRIBUTES int ec_ioctl_domain_queue(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2827,7 +2833,7 @@ static int ec_ioctl_domain_queue(
 
 /** Get the domain state.
  */
-static int ec_ioctl_domain_state(
+static ATTRIBUTES int ec_ioctl_domain_state(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2863,7 +2869,7 @@ static int ec_ioctl_domain_state(
 
 /** Sets an SDO request's SDO index and subindex.
  */
-static int ec_ioctl_sdo_request_index(
+static ATTRIBUTES int ec_ioctl_sdo_request_index(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2898,7 +2904,7 @@ static int ec_ioctl_sdo_request_index(
 
 /** Sets an SDO request's timeout.
  */
-static int ec_ioctl_sdo_request_timeout(
+static ATTRIBUTES int ec_ioctl_sdo_request_timeout(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2933,7 +2939,7 @@ static int ec_ioctl_sdo_request_timeout(
 
 /** Gets an SDO request's state.
  */
-static int ec_ioctl_sdo_request_state(
+static ATTRIBUTES int ec_ioctl_sdo_request_state(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -2976,7 +2982,7 @@ static int ec_ioctl_sdo_request_state(
 
 /** Starts an SDO read operation.
  */
-static int ec_ioctl_sdo_request_read(
+static ATTRIBUTES int ec_ioctl_sdo_request_read(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -3011,7 +3017,7 @@ static int ec_ioctl_sdo_request_read(
 
 /** Starts an SDO write operation.
  */
-static int ec_ioctl_sdo_request_write(
+static ATTRIBUTES int ec_ioctl_sdo_request_write(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -3060,7 +3066,7 @@ static int ec_ioctl_sdo_request_write(
 
 /** Read SDO data.
  */
-static int ec_ioctl_sdo_request_data(
+static ATTRIBUTES int ec_ioctl_sdo_request_data(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -3098,7 +3104,7 @@ static int ec_ioctl_sdo_request_data(
 
 /** Read register data.
  */
-static int ec_ioctl_reg_request_data(
+static ATTRIBUTES int ec_ioctl_reg_request_data(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -3143,7 +3149,7 @@ static int ec_ioctl_reg_request_data(
 
 /** Gets an register request's state.
  */
-static int ec_ioctl_reg_request_state(
+static ATTRIBUTES int ec_ioctl_reg_request_state(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -3186,7 +3192,7 @@ static int ec_ioctl_reg_request_state(
 
 /** Starts an register write operation.
  */
-static int ec_ioctl_reg_request_write(
+static ATTRIBUTES int ec_ioctl_reg_request_write(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -3232,7 +3238,7 @@ static int ec_ioctl_reg_request_write(
 
 /** Starts an register read operation.
  */
-static int ec_ioctl_reg_request_read(
+static ATTRIBUTES int ec_ioctl_reg_request_read(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -3273,7 +3279,7 @@ static int ec_ioctl_reg_request_read(
 
 /** Sets the VoE send header.
  */
-static int ec_ioctl_voe_send_header(
+static ATTRIBUTES int ec_ioctl_voe_send_header(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -3316,7 +3322,7 @@ static int ec_ioctl_voe_send_header(
 
 /** Gets the received VoE header.
  */
-static int ec_ioctl_voe_rec_header(
+static ATTRIBUTES int ec_ioctl_voe_rec_header(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -3362,7 +3368,7 @@ static int ec_ioctl_voe_rec_header(
 
 /** Starts a VoE read operation.
  */
-static int ec_ioctl_voe_read(
+static ATTRIBUTES int ec_ioctl_voe_read(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -3397,7 +3403,7 @@ static int ec_ioctl_voe_read(
 
 /** Starts a VoE read operation without sending a sync message first.
  */
-static int ec_ioctl_voe_read_nosync(
+static ATTRIBUTES int ec_ioctl_voe_read_nosync(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -3432,7 +3438,7 @@ static int ec_ioctl_voe_read_nosync(
 
 /** Starts a VoE write operation.
  */
-static int ec_ioctl_voe_write(
+static ATTRIBUTES int ec_ioctl_voe_write(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -3476,7 +3482,7 @@ static int ec_ioctl_voe_write(
 
 /** Executes the VoE state machine.
  */
-static int ec_ioctl_voe_exec(
+static ATTRIBUTES int ec_ioctl_voe_exec(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -3519,7 +3525,7 @@ static int ec_ioctl_voe_exec(
 
 /** Reads the received VoE data.
  */
-static int ec_ioctl_voe_data(
+static ATTRIBUTES int ec_ioctl_voe_data(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg, /**< ioctl() argument. */
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
@@ -3557,7 +3563,7 @@ static int ec_ioctl_voe_data(
 
 /** Read a file from a slave via FoE.
  */
-static int ec_ioctl_slave_foe_read(
+static ATTRIBUTES int ec_ioctl_slave_foe_read(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -3651,7 +3657,7 @@ static int ec_ioctl_slave_foe_read(
 
 /** Write a file to a slave via FoE
  */
-static int ec_ioctl_slave_foe_write(
+static ATTRIBUTES int ec_ioctl_slave_foe_write(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -3737,7 +3743,7 @@ static int ec_ioctl_slave_foe_write(
 
 /** Read an SoE IDN.
  */
-static int ec_ioctl_slave_soe_read(
+static ATTRIBUTES int ec_ioctl_slave_soe_read(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
@@ -3784,7 +3790,7 @@ static int ec_ioctl_slave_soe_read(
 
 /** Write an IDN to a slave via SoE.
  */
-static int ec_ioctl_slave_soe_write(
+static ATTRIBUTES int ec_ioctl_slave_soe_write(
         ec_master_t *master, /**< EtherCAT master. */
         void *arg /**< ioctl() argument. */
         )
