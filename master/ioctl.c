@@ -2434,7 +2434,6 @@ static ATTRIBUTES int ec_ioctl_sc_emerg_clear(
 {
     ec_ioctl_sc_emerg_t io;
     ec_slave_config_t *sc;
-    int ret;
 
     if (unlikely(!ctx->requested)) {
         return -EPERM;
