@@ -124,8 +124,8 @@ ec_request_state_t ecrt_sdo_request_state(ec_sdo_request_t *req)
 
     if (data.size) { // new data waiting to be copied
         if (req->mem_size < data.size) {
-            fprintf(stderr, "Received %u bytes do not fit info SDO data"
-                    " memory (%u bytes)!\n", data.size, req->mem_size);
+            fprintf(stderr, "Received %zu bytes do not fit info SDO data"
+                    " memory (%zu bytes)!\n", data.size, req->mem_size);
             return EC_REQUEST_ERROR;
         }
 
