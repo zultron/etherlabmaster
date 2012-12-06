@@ -589,7 +589,7 @@ static ATTRIBUTES int ec_ioctl_master_debug(
         void *arg /**< ioctl() argument. */
         )
 {
-    return ec_master_debug_level(master, (unsigned int) arg);
+    return ec_master_debug_level(master, (unsigned long) arg);
 }
 
 /*****************************************************************************/
@@ -781,7 +781,7 @@ static ATTRIBUTES int ec_ioctl_slave_sdo_upload(
     }
 
     if (!(target = kmalloc(data.target_size, GFP_KERNEL))) {
-        EC_MASTER_ERR(master, "Failed to allocate %u bytes"
+        EC_MASTER_ERR(master, "Failed to allocate %zu bytes"
                 " for SDO upload.\n", data.target_size);
         return -ENOMEM;
     }
@@ -825,7 +825,7 @@ static ATTRIBUTES int ec_ioctl_slave_sdo_download(
     }
 
     if (!(sdo_data = kmalloc(data.data_size, GFP_KERNEL))) {
-        EC_MASTER_ERR(master, "Failed to allocate %u bytes"
+        EC_MASTER_ERR(master, "Failed to allocate %zu bytes"
                 " for SDO download.\n", data.data_size);
         return -ENOMEM;
     }
@@ -1586,7 +1586,7 @@ static ATTRIBUTES int ec_ioctl_select_ref_clock(
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
         )
 {
-    uint32_t config_index = (uint32_t) arg;
+    unsigned long config_index = (unsigned long) arg;
     ec_slave_config_t *sc = NULL;
     int ret = 0;
 
@@ -2754,7 +2754,7 @@ static ATTRIBUTES int ec_ioctl_domain_offset(
     }
 
     list_for_each_entry(domain, &master->domains, list) {
-        if (domain->index == (unsigned int) arg) {
+        if (domain->index == (unsigned long) arg) {
             up(&master->master_sem);
             return offset;
         }
@@ -2783,7 +2783,7 @@ static ATTRIBUTES int ec_ioctl_domain_process(
     /* no locking of master_sem needed, because domain will not be deleted in
      * the meantime. */
 
-    if (!(domain = ec_master_find_domain(master, (unsigned int) arg))) {
+    if (!(domain = ec_master_find_domain(master, (unsigned long) arg))) {
         return -ENOENT;
     }
 
@@ -2809,7 +2809,7 @@ static ATTRIBUTES int ec_ioctl_domain_queue(
     /* no locking of master_sem needed, because domain will not be deleted in
      * the meantime. */
 
-    if (!(domain = ec_master_find_domain(master, (unsigned int) arg))) {
+    if (!(domain = ec_master_find_domain(master, (unsigned long) arg))) {
         return -ENOENT;
     }
 
@@ -3746,7 +3746,7 @@ static ATTRIBUTES int ec_ioctl_slave_soe_read(
 
     data = kmalloc(ioctl.mem_size, GFP_KERNEL);
     if (!data) {
-        EC_MASTER_ERR(master, "Failed to allocate %u bytes of IDN data.\n",
+        EC_MASTER_ERR(master, "Failed to allocate %zu bytes of IDN data.\n",
                 ioctl.mem_size);
         return -ENOMEM;
     }
