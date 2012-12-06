@@ -56,7 +56,7 @@
  *
  * Increment this when changing the ioctl interface!
  */
-#define EC_IOCTL_VERSION_MAGIC 24
+#define EC_IOCTL_VERSION_MAGIC 25
 
 // Command-line tool
 #define EC_IOCTL_MODULE                EC_IOR(0x00, ec_ioctl_module_t)
@@ -379,11 +379,11 @@ typedef struct {
     uint16_t slave_position;
     uint16_t sdo_index;
     uint8_t sdo_entry_subindex;
-    uint32_t target_size;
+    size_t target_size;
     uint8_t *target;
 
     // outputs
-    uint32_t data_size;
+    size_t data_size;
     uint32_t abort_code;
 } ec_ioctl_slave_sdo_upload_t;
 
@@ -395,7 +395,7 @@ typedef struct {
     uint16_t sdo_index;
     uint8_t sdo_entry_subindex;
     uint8_t complete_access;
-    uint32_t data_size;
+    size_t data_size;
     uint8_t *data;
 
     // outputs
@@ -428,11 +428,11 @@ typedef struct {
     // inputs
     uint16_t slave_position;
     uint16_t offset;
-    uint32_t buffer_size;
+    size_t buffer_size;
     uint8_t *buffer;
 
     // outputs
-    uint32_t data_size;
+    size_t data_size;
     uint32_t result;
     uint32_t error_code;
     char file_name[32];
@@ -445,7 +445,7 @@ typedef struct {
     uint16_t slave_position;
     uint8_t drive_no;
     uint16_t idn;
-    uint32_t mem_size;
+    size_t mem_size;
     uint8_t *data;
 
     // outputs
@@ -538,7 +538,7 @@ typedef struct {
     // outputs
     uint16_t index;
     uint8_t subindex;
-    uint32_t size;
+    size_t size;
     uint8_t data[EC_MAX_SDO_DATA_SIZE];
     uint8_t complete_access;
 } ec_ioctl_config_sdo_t;
