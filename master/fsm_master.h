@@ -90,6 +90,7 @@ struct ec_fsm_master {
     ec_sdo_request_t *sdo_request; /**< SDO request to process. */
 
     ec_fsm_coe_t fsm_coe; /**< CoE state machine */
+    ec_fsm_soe_t fsm_soe; /**< SoE state machine */
     ec_fsm_pdo_t fsm_pdo; /**< PDO configuration state machine. */
     ec_fsm_change_t fsm_change; /**< State change state machine */
     ec_fsm_slave_config_t fsm_slave_config; /**< slave state machine */
