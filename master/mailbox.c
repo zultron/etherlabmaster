@@ -163,7 +163,7 @@ const ec_code_msg_t mbox_error_messages[] = {
  * \return Pointer to the received data, or ERR_PTR() code.
  */
 uint8_t *ec_slave_mbox_fetch(const ec_slave_t *slave, /**< slave */
-                             ec_datagram_t *datagram, /**< datagram */
+                             const ec_datagram_t *datagram, /**< datagram */
                              uint8_t *type, /**< expected mailbox protocol */
                              size_t *size /**< size of the received data */
                              )
