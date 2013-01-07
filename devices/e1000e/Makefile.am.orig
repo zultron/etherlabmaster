@@ -28,8 +28,6 @@
 #------------------------------------------------------------------------------
 
 EXTRA_DIST = \
-	80003es2lan-3.4-ethercat.c \
-	80003es2lan-3.4-orig.c \
 	82571-2.6.32-ethercat.c \
 	82571-2.6.32-orig.c \
 	82571-2.6.33-ethercat.c \
@@ -85,6 +83,8 @@ EXTRA_DIST = \
 	es2lan-2.6.37-orig.c \
 	es2lan-3.2-ethercat.c \
 	es2lan-3.2-orig.c \
+	es2lan-3.4-ethercat.c \
+	es2lan-3.4-orig.c \
 	ethtool-2.6.32-ethercat.c \
 	ethtool-2.6.32-orig.c \
 	ethtool-2.6.33-ethercat.c \
@@ -139,10 +139,8 @@ EXTRA_DIST = \
 	lib-2.6.37-orig.c \
 	lib-3.2-ethercat.c \
 	lib-3.2-orig.c \
-	mac-3.4-ethercat.c \
-	mac-3.4-orig.c \
-	manage-3.4-ethercat.c \
-	manage-3.4-orig.c \
+	lib-3.4-ethercat.c \
+	lib-3.4-orig.c \
 	netdev-2.6.32-ethercat.c \
 	netdev-2.6.32-orig.c \
 	netdev-2.6.33-ethercat.c \
@@ -157,8 +155,6 @@ EXTRA_DIST = \
 	netdev-3.2-orig.c \
 	netdev-3.4-ethercat.c \
 	netdev-3.4-orig.c \
-	nvm-3.4-ethercat.c \
-	nvm-3.4-orig.c \
 	param-2.6.32-ethercat.c \
 	param-2.6.32-orig.c \
 	param-2.6.33-ethercat.c \
