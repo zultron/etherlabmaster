@@ -1170,7 +1170,9 @@ static bool e1000_clean_tx_irq(struct e1000_ring *tx_ring)
 
 	tx_ring->next_to_clean = i;
 
-	netdev_completed_queue(netdev, pkts_compl, bytes_compl);
+	if (!adapter->ecdev) {
+		netdev_completed_queue(netdev, pkts_compl, bytes_compl);
+	}
 
 #define TX_WAKE_THRESHOLD 32
 	if (!adapter->ecdev && count && netif_carrier_ok(netdev) &&
@@ -1702,7 +1704,7 @@ static irqreturn_t e1000_intr_msi(int irq, void *data)
 	 * read ICR disables interrupts using IAM
 	 */
 
-	if (!adapter->ecdev && icr & E1000_ICR_LSC) {
+	if (icr & E1000_ICR_LSC) {
 		hw->mac.get_link_status = true;
 		/*
 		 * ICH8 workaround-- Call gig speed drop workaround on cable
@@ -1752,6 +1754,13 @@ static irqreturn_t e1000_intr(int irq, void *data)
 	struct e1000_hw *hw = &adapter->hw;
 	u32 rctl, icr = er32(ICR);
 
+	if (adapter->ecdev) {
+		int ec_work_done = 0;
+		adapter->clean_rx(adapter->rx_ring, &ec_work_done, 100);
+		e1000_clean_tx_irq(adapter->tx_ring);
+		return IRQ_HANDLED;
+	}
+
 	if (!icr || test_bit(__E1000_DOWN, &adapter->state))
 		return IRQ_NONE;  /* Not our interrupt */
 
@@ -1759,7 +1768,7 @@ static irqreturn_t e1000_intr(int irq, void *data)
 	 * IMS will not auto-mask if INT_ASSERTED is not set, and if it is
 	 * not set, then the adapter didn't send an interrupt
 	 */
-	if (!adapter->ecdev && !(icr & E1000_ICR_INT_ASSERTED))
+	if (!(icr & E1000_ICR_INT_ASSERTED))
 		return IRQ_NONE;
 
 	/*
@@ -1794,13 +1803,6 @@ static irqreturn_t e1000_intr(int irq, void *data)
 		/* guard against interrupt when we're going down */
 		if (!test_bit(__E1000_DOWN, &adapter->state))
 			mod_timer(&adapter->watchdog_timer, jiffies + 1);
-	}
-
-	if (adapter->ecdev) {
-		int ec_work_done = 0;
-		adapter->clean_rx(adapter->rx_ring, &ec_work_done, 100);
-		e1000_clean_tx_irq(adapter->tx_ring);
-		return IRQ_HANDLED;
 	}
 
 	if (napi_schedule_prep(&adapter->napi)) {
@@ -2126,8 +2128,9 @@ static void e1000_free_irq(struct e1000_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 
-	if (adapter->ecdev)
+	if (adapter->ecdev) {
 		return;
+	}
 
 	if (adapter->msix_entries) {
 		int vector = 0;
@@ -4061,7 +4064,9 @@ static int e1000_close(struct net_device *netdev)
 
 	pm_runtime_get_sync(&pdev->dev);
 
-	napi_disable(&adapter->napi);
+	if (!adapter->ecdev) {
+		napi_disable(&adapter->napi);
+	}
 
 	if (!test_bit(__E1000_DOWN, &adapter->state)) {
 		e1000e_down(adapter);
@@ -6201,9 +6206,9 @@ void ec_poll(struct net_device *netdev)
 	}
 
 #ifdef CONFIG_PCI_MSI
-	e1000_intr_msi(0,netdev);
+	e1000_intr_msi(0, netdev);
 #else
-	e1000_intr(0,netdev);
+	e1000_intr(0, netdev);
 #endif
 }
 
@@ -6571,6 +6576,11 @@ static void __devexit e1000_remove(struct pci_dev *pdev)
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 	bool down = test_bit(__E1000_DOWN, &adapter->state);
 
+	if (adapter->ecdev) {
+		ecdev_close(adapter->ecdev);
+		ecdev_withdraw(adapter->ecdev);
+	}
+
 	/*
 	 * The timers may be rescheduled, so explicitly disable them
 	 * from being rescheduled.
@@ -6593,10 +6603,7 @@ static void __devexit e1000_remove(struct pci_dev *pdev)
 	if (!down)
 		clear_bit(__E1000_DOWN, &adapter->state);
 
-	if (adapter->ecdev) {
-		ecdev_close(adapter->ecdev);
-		ecdev_withdraw(adapter->ecdev);
-	} else {
+	if (!adapter->ecdev) {
 		unregister_netdev(netdev);
 	}
 
