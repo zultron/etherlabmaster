@@ -3527,12 +3527,14 @@ int e1000e_up(struct e1000_adapter *adapter)
 	if (!adapter->ecdev) {
 		napi_enable(&adapter->napi);
 	}
+
 	if (adapter->msix_entries)
 		e1000_configure_msix(adapter);
+
 	if (!adapter->ecdev) {
 		e1000_irq_enable(adapter);
 
-	netif_start_queue(adapter->netdev);
+		netif_start_queue(adapter->netdev);
 
 		/* fire a link change interrupt to start the watchdog */
 		if (adapter->msix_entries)
