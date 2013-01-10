@@ -2156,13 +2156,14 @@ static void e1000_irq_disable(struct e1000_adapter *adapter)
 {
 	struct e1000_hw *hw = &adapter->hw;
 
-	if (adapter->ecdev)
-		return;
-
 	ew32(IMC, ~0);
 	if (adapter->msix_entries)
 		ew32(EIAC_82574, 0);
 	e1e_flush();
+
+	if (adapter->ecdev) {
+		return;
+	}
 
 	if (adapter->msix_entries) {
 		int i;
@@ -3645,10 +3646,10 @@ int e1000e_up(struct e1000_adapter *adapter)
 
 	clear_bit(__E1000_DOWN, &adapter->state);
 
-	if (adapter->msix_entries)
-		e1000_configure_msix(adapter);
-
 	if (!adapter->ecdev) {
+		if (adapter->msix_entries)
+			e1000_configure_msix(adapter);
+
 		e1000_irq_enable(adapter);
 
 		netif_start_queue(adapter->netdev);
@@ -3993,7 +3994,7 @@ static int e1000_open(struct net_device *netdev)
 	 * ignore e1000e MSI messages, which means we need to test our MSI
 	 * interrupt now
 	 */
-	if (adapter->int_mode != E1000E_INT_MODE_LEGACY) {
+	if (!adapter->ecdev && adapter->int_mode != E1000E_INT_MODE_LEGACY) {
 		err = e1000_test_msi(adapter);
 		if (err) {
 			e_err("Interrupt allocation failed\n");
@@ -4645,19 +4646,21 @@ static void e1000_watchdog_task(struct work_struct *work)
 			/* Link status message must follow this format */
 			printk(KERN_INFO "e1000e: %s NIC Link is Down\n",
 			       adapter->netdev->name);
-			if (adapter->ecdev)
+			if (adapter->ecdev) {
 				ecdev_set_link(adapter->ecdev, 0);
-			else
+			}
+			else {
 				netif_carrier_off(netdev);
-			if (!adapter->ecdev && !test_bit(__E1000_DOWN, &adapter->state))
-				mod_timer(&adapter->phy_info_timer,
-					  round_jiffies(jiffies + 2 * HZ));
+				if (!test_bit(__E1000_DOWN, &adapter->state))
+					mod_timer(&adapter->phy_info_timer,
+							round_jiffies(jiffies + 2 * HZ));
+			}
 
 			if (adapter->flags & FLAG_RX_NEEDS_RESTART)
 				schedule_work(&adapter->reset_task);
 			else
 				pm_schedule_suspend(netdev->dev.parent,
-							LINK_TIMEOUT);
+						LINK_TIMEOUT);
 		}
 	}
 
@@ -6201,7 +6204,9 @@ void ec_poll(struct net_device *netdev)
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 
 	if (jiffies - adapter->ec_watchdog_jiffies >= 2 * HZ) {
-		e1000_watchdog((unsigned long) adapter);
+		struct e1000_hw *hw = &adapter->hw;
+		hw->mac.get_link_status = true;
+		e1000_watchdog_task(&adapter->watchdog_task);
 		adapter->ec_watchdog_jiffies = jiffies;
 	}
 
@@ -6514,6 +6519,7 @@ static int __devinit e1000_probe(struct pci_dev *pdev,
 
 	adapter->ecdev = ecdev_offer(netdev, ec_poll, THIS_MODULE);
 	if (adapter->ecdev) {
+		adapter->ec_watchdog_jiffies = jiffies;
 		if (ecdev_open(adapter->ecdev)) {
 			ecdev_withdraw(adapter->ecdev);
 			goto err_register;
