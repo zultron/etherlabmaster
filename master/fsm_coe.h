@@ -51,10 +51,10 @@ typedef struct ec_fsm_coe ec_fsm_coe_t; /**< \see ec_fsm_coe */
  */
 struct ec_fsm_coe {
     ec_slave_t *slave; /**< slave the FSM runs on */
-    ec_datagram_t *datagram; /**< datagram used in the state machine */
     unsigned int retries; /**< retries upon datagram timeout */
 
-    void (*state)(ec_fsm_coe_t *); /**< CoE state function */
+    void (*state)(ec_fsm_coe_t *, ec_datagram_t *); /**< CoE state function */
+    ec_datagram_t *datagram; /**< Datagram used in last step. */
     unsigned long jiffies_start; /**< CoE timestamp. */
     ec_sdo_t *sdo; /**< current SDO */
     uint8_t subindex; /**< current subindex */
@@ -63,18 +63,19 @@ struct ec_fsm_coe {
     uint8_t toggle; /**< toggle bit for segment commands */
     uint32_t offset; /**< Data offset during segmented download. */
     uint32_t remaining; /**< Remaining bytes during segmented download. */
+    size_t segment_size; /**< Current segment size. */
 };
 
 /*****************************************************************************/
 
-void ec_fsm_coe_init(ec_fsm_coe_t *, ec_datagram_t *);
+void ec_fsm_coe_init(ec_fsm_coe_t *);
 void ec_fsm_coe_clear(ec_fsm_coe_t *);
 
 void ec_fsm_coe_dictionary(ec_fsm_coe_t *, ec_slave_t *);
 void ec_fsm_coe_transfer(ec_fsm_coe_t *, ec_slave_t *, ec_sdo_request_t *);
 
-int ec_fsm_coe_exec(ec_fsm_coe_t *);
-int ec_fsm_coe_success(ec_fsm_coe_t *);
+int ec_fsm_coe_exec(ec_fsm_coe_t *, ec_datagram_t *);
+int ec_fsm_coe_success(const ec_fsm_coe_t *);
 
 /*****************************************************************************/
 

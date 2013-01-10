@@ -17,6 +17,7 @@ Changes in 1.5.1:
 * Added fix for ESC port order (DC delay calculation).
 * Added e1000 driver for kernels 2.6.35, 3.0, 3.4.
 * Added 8139too driver for kernel 3.4.
+* Avoided slave FSM datagram queue; implemented datagram ring instead.
 
 Changes in 1.5.0:
 

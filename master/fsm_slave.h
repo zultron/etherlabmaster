@@ -53,27 +53,29 @@ typedef struct ec_fsm_slave ec_fsm_slave_t; /**< \see ec_fsm_slave */
  */
 struct ec_fsm_slave {
     ec_slave_t *slave; /**< slave the FSM runs on */
-    ec_datagram_t *datagram; /**< datagram used in the state machine */
+    struct list_head list; /**< Used for execution list. */
 
-    void (*state)(ec_fsm_slave_t *); /**< master state function */
+    void (*state)(ec_fsm_slave_t *, ec_datagram_t *); /**< State function. */
+    ec_datagram_t *datagram; /**< Previous state datagram. */
     ec_sdo_request_t *sdo_request; /**< SDO request to process. */
     ec_reg_request_t *reg_request; /**< Register request to process. */
     ec_foe_request_t *foe_request; /**< FoE request to process. */
-    off_t foe_index; /**< index to FoE write request data */
+    off_t foe_index; /**< Index to FoE write request data. */
     ec_soe_request_t *soe_request; /**< SoE request to process. */
 
-    ec_fsm_coe_t fsm_coe; /**< CoE state machine */
-    ec_fsm_foe_t fsm_foe; /**< FoE state machine */
-    ec_fsm_soe_t fsm_soe; /**< SoE state machine */
+    ec_fsm_coe_t fsm_coe; /**< CoE state machine. */
+    ec_fsm_foe_t fsm_foe; /**< FoE state machine. */
+    ec_fsm_soe_t fsm_soe; /**< SoE state machine. */
 };
 
 /*****************************************************************************/
 
-void ec_fsm_slave_init(ec_fsm_slave_t *, ec_slave_t *, ec_datagram_t *);
+void ec_fsm_slave_init(ec_fsm_slave_t *, ec_slave_t *);
 void ec_fsm_slave_clear(ec_fsm_slave_t *);
 
-void ec_fsm_slave_exec(ec_fsm_slave_t *);
-void ec_fsm_slave_ready(ec_fsm_slave_t *);
+int ec_fsm_slave_exec(ec_fsm_slave_t *, ec_datagram_t *);
+void ec_fsm_slave_set_ready(ec_fsm_slave_t *);
+int ec_fsm_slave_is_ready(const ec_fsm_slave_t *);
 
 /*****************************************************************************/
 

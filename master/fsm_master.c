@@ -85,8 +85,8 @@ void ec_fsm_master_init(
     ec_fsm_master_reset(fsm);
 
     // init sub-state-machines
-    ec_fsm_coe_init(&fsm->fsm_coe, fsm->datagram);
-    ec_fsm_soe_init(&fsm->fsm_soe, fsm->datagram);
+    ec_fsm_coe_init(&fsm->fsm_coe);
+    ec_fsm_soe_init(&fsm->fsm_soe);
     ec_fsm_pdo_init(&fsm->fsm_pdo, &fsm->fsm_coe);
     ec_fsm_change_init(&fsm->fsm_change, fsm->datagram);
     ec_fsm_slave_config_init(&fsm->fsm_slave_config, fsm->datagram,
@@ -342,6 +342,7 @@ void ec_fsm_master_state_broadcast(
                 }
             }
             master->slave_count = count;
+            master->fsm_slave = master->slaves;
 
             /* start with first device with slaves responding; at least one
              * has responding slaves, otherwise count would be zero. */
@@ -465,7 +466,7 @@ int ec_fsm_master_action_process_sdo(
                 fsm->slave = slave;
                 fsm->state = ec_fsm_master_state_sdo_request;
                 ec_fsm_coe_transfer(&fsm->fsm_coe, slave, req);
-                ec_fsm_coe_exec(&fsm->fsm_coe); // execute immediately
+                ec_fsm_coe_exec(&fsm->fsm_coe, fsm->datagram);
                 return 1;
             }
         }
@@ -495,7 +496,7 @@ void ec_fsm_master_action_idle(
     for (slave = master->slaves;
             slave < master->slaves + master->slave_count;
             slave++) {
-        ec_fsm_slave_ready(&slave->fsm);
+        ec_fsm_slave_set_ready(&slave->fsm);
     }
 
     // check, if slaves have an SDO dictionary to read out.
@@ -520,7 +521,7 @@ void ec_fsm_master_action_idle(
         fsm->slave = slave;
         fsm->state = ec_fsm_master_state_sdo_dictionary;
         ec_fsm_coe_dictionary(&fsm->fsm_coe, slave);
-        ec_fsm_coe_exec(&fsm->fsm_coe); // execute immediately
+        ec_fsm_coe_exec(&fsm->fsm_coe, fsm->datagram); // execute immediately
         fsm->datagram->device_index = fsm->slave->device_index;
         return;
     }
@@ -1138,7 +1139,7 @@ void ec_fsm_master_state_write_sii(
     if (!ec_fsm_sii_success(&fsm->fsm_sii)) {
         EC_SLAVE_ERR(slave, "Failed to write SII data.\n");
         request->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&master->request_queue);
+        wake_up_all(&master->request_queue);
         ec_fsm_master_restart(fsm);
         return;
     }
@@ -1166,7 +1167,7 @@ void ec_fsm_master_state_write_sii(
     // TODO: Evaluate other SII contents!
 
     request->state = EC_INT_REQUEST_SUCCESS;
-    wake_up(&master->request_queue);
+    wake_up_all(&master->request_queue);
 
     // check for another SII write request
     if (ec_fsm_master_action_process_sii(fsm))
@@ -1186,7 +1187,7 @@ void ec_fsm_master_state_sdo_dictionary(
     ec_slave_t *slave = fsm->slave;
     ec_master_t *master = fsm->master;
 
-    if (ec_fsm_coe_exec(&fsm->fsm_coe)) {
+    if (ec_fsm_coe_exec(&fsm->fsm_coe, fsm->datagram)) {
         return;
     }
 
@@ -1226,7 +1227,7 @@ void ec_fsm_master_state_sdo_request(
         return;
     }
 
-    if (ec_fsm_coe_exec(&fsm->fsm_coe)) {
+    if (ec_fsm_coe_exec(&fsm->fsm_coe, fsm->datagram)) {
         return;
     }
 
@@ -1234,14 +1235,14 @@ void ec_fsm_master_state_sdo_request(
         EC_SLAVE_DBG(fsm->slave, 1,
                 "Failed to process internal SDO request.\n");
         request->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&fsm->master->request_queue);
+        wake_up_all(&fsm->master->request_queue);
         ec_fsm_master_restart(fsm);
         return;
     }
 
     // SDO request finished
     request->state = EC_INT_REQUEST_SUCCESS;
-    wake_up(&fsm->master->request_queue);
+    wake_up_all(&fsm->master->request_queue);
 
     EC_SLAVE_DBG(fsm->slave, 1, "Finished internal SDO request.\n");
 

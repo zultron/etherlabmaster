@@ -894,7 +894,7 @@ void ec_fsm_slave_scan_enter_pdos(
     EC_SLAVE_DBG(slave, 1, "Scanning PDO assignment and mapping.\n");
     fsm->state = ec_fsm_slave_scan_state_pdos;
     ec_fsm_pdo_start_reading(fsm->fsm_pdo, slave);
-    ec_fsm_pdo_exec(fsm->fsm_pdo); // execute immediately
+    ec_fsm_pdo_exec(fsm->fsm_pdo, fsm->datagram); // execute immediately
 }
 
 /*****************************************************************************/
@@ -905,8 +905,9 @@ void ec_fsm_slave_scan_state_pdos(
         ec_fsm_slave_scan_t *fsm /**< slave state machine */
         )
 {
-    if (ec_fsm_pdo_exec(fsm->fsm_pdo))
+    if (ec_fsm_pdo_exec(fsm->fsm_pdo, fsm->datagram)) {
         return;
+    }
 
     if (!ec_fsm_pdo_success(fsm->fsm_pdo)) {
         fsm->state = ec_fsm_slave_scan_state_error;

@@ -679,7 +679,7 @@ void ec_fsm_slave_config_enter_sdo_conf(
     ec_sdo_request_copy(&fsm->request_copy, fsm->request);
     ecrt_sdo_request_write(&fsm->request_copy);
     ec_fsm_coe_transfer(fsm->fsm_coe, fsm->slave, &fsm->request_copy);
-    ec_fsm_coe_exec(fsm->fsm_coe); // execute immediately
+    ec_fsm_coe_exec(fsm->fsm_coe, fsm->datagram); // execute immediately
 }
 
 /*****************************************************************************/
@@ -690,7 +690,7 @@ void ec_fsm_slave_config_state_sdo_conf(
         ec_fsm_slave_config_t *fsm /**< slave state machine */
         )
 {
-    if (ec_fsm_coe_exec(fsm->fsm_coe)) {
+    if (ec_fsm_coe_exec(fsm->fsm_coe, fsm->datagram)) {
         return;
     }
 
@@ -713,7 +713,7 @@ void ec_fsm_slave_config_state_sdo_conf(
         ec_sdo_request_copy(&fsm->request_copy, fsm->request);
         ecrt_sdo_request_write(&fsm->request_copy);
         ec_fsm_coe_transfer(fsm->fsm_coe, fsm->slave, &fsm->request_copy);
-        ec_fsm_coe_exec(fsm->fsm_coe); // execute immediately
+        ec_fsm_coe_exec(fsm->fsm_coe, fsm->datagram); // execute immediately
         return;
     }
 
@@ -746,7 +746,7 @@ void ec_fsm_slave_config_enter_soe_conf_preop(
             ec_soe_request_write(&fsm->soe_request_copy);
             ec_fsm_soe_transfer(fsm->fsm_soe, fsm->slave,
                     &fsm->soe_request_copy);
-            ec_fsm_soe_exec(fsm->fsm_soe); // execute immediately
+            ec_fsm_soe_exec(fsm->fsm_soe, fsm->datagram);
             return;
         }
     }
@@ -765,7 +765,7 @@ void ec_fsm_slave_config_state_soe_conf_preop(
 {
     ec_slave_t *slave = fsm->slave;
 
-    if (ec_fsm_soe_exec(fsm->fsm_soe)) {
+    if (ec_fsm_soe_exec(fsm->fsm_soe, fsm->datagram)) {
         return;
     }
 
@@ -790,7 +790,7 @@ void ec_fsm_slave_config_state_soe_conf_preop(
             ec_soe_request_write(&fsm->soe_request_copy);
             ec_fsm_soe_transfer(fsm->fsm_soe, fsm->slave,
                     &fsm->soe_request_copy);
-            ec_fsm_soe_exec(fsm->fsm_soe); // execute immediately
+            ec_fsm_soe_exec(fsm->fsm_soe, fsm->datagram);
             return;
         }
     }
@@ -823,8 +823,9 @@ void ec_fsm_slave_config_state_pdo_conf(
 {
     // TODO check for config here
 
-    if (ec_fsm_pdo_exec(fsm->fsm_pdo))
+    if (ec_fsm_pdo_exec(fsm->fsm_pdo, fsm->datagram)) {
         return;
+    }
 
     if (!fsm->slave->config) { // config removed in the meantime
         ec_fsm_slave_config_reconfigure(fsm);
@@ -1470,7 +1471,7 @@ void ec_fsm_slave_config_enter_soe_conf_safeop(
             ec_soe_request_write(&fsm->soe_request_copy);
             ec_fsm_soe_transfer(fsm->fsm_soe, fsm->slave,
                     &fsm->soe_request_copy);
-            ec_fsm_soe_exec(fsm->fsm_soe); // execute immediately
+            ec_fsm_soe_exec(fsm->fsm_soe, fsm->datagram);
             return;
         }
     }
@@ -1489,7 +1490,7 @@ void ec_fsm_slave_config_state_soe_conf_safeop(
 {
     ec_slave_t *slave = fsm->slave;
 
-    if (ec_fsm_soe_exec(fsm->fsm_soe)) {
+    if (ec_fsm_soe_exec(fsm->fsm_soe, fsm->datagram)) {
         return;
     }
 
@@ -1514,7 +1515,7 @@ void ec_fsm_slave_config_state_soe_conf_safeop(
             ec_soe_request_write(&fsm->soe_request_copy);
             ec_fsm_soe_transfer(fsm->fsm_soe, fsm->slave,
                     &fsm->soe_request_copy);
-            ec_fsm_soe_exec(fsm->fsm_soe); // execute immediately
+            ec_fsm_soe_exec(fsm->fsm_soe, fsm->datagram);
             return;
         }
     }

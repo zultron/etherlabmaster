@@ -230,7 +230,6 @@ struct ec_slave
     struct list_head soe_requests; /**< SoE write requests. */
 
     ec_fsm_slave_t fsm; /**< Slave state machine. */
-    ec_datagram_t fsm_datagram; /**< Datagram used for state machines. */
 };
 
 /*****************************************************************************/
