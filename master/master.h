@@ -114,6 +114,13 @@
         } \
     } while (0)
 
+
+/** Size of the external datagram ring.
+ *
+ * The external datagram ring is used for slave FSMs.
+ */
+#define EC_EXT_RING_SIZE 32
+
 /*****************************************************************************/
 
 /** EtherCAT master phase.
@@ -260,10 +267,19 @@ struct ec_master {
     struct semaphore ext_queue_sem; /**< Semaphore protecting the \a
                                       ext_datagram_queue. */
 
-    struct list_head external_datagram_queue; /**< External Datagram queue. */
+    ec_datagram_t ext_datagram_ring[EC_EXT_RING_SIZE]; /**< External datagram
+                                                         ring. */
+    unsigned int ext_ring_idx_rt; /**< Index in external datagram ring for RT
+                                    side. */
+    unsigned int ext_ring_idx_fsm; /**< Index in external datagram ring for
+                                     FSM side. */
     unsigned int send_interval; /**< Interval between two calls to
                                   ecrt_master_send(). */
     size_t max_queue_size; /**< Maximum size of datagram queue */
+
+    ec_slave_t *fsm_slave; /**< Slave that is queried next for FSM exec. */
+    struct list_head fsm_exec_list; /**< Slave FSM execution list. */
+    unsigned int fsm_exec_count; /**< Number of entries in execution list. */
 
     unsigned int debug_level; /**< Master debug level. */
     ec_stats_t stats; /**< Cyclic statistics. */
@@ -324,8 +340,6 @@ void ec_master_eoe_stop(ec_master_t *);
 void ec_master_receive_datagrams(ec_master_t *, const uint8_t *, size_t);
 void ec_master_queue_datagram(ec_master_t *, ec_datagram_t *);
 void ec_master_queue_datagram_ext(ec_master_t *, ec_datagram_t *);
-void ec_master_queue_external_datagram(ec_master_t *, ec_datagram_t *);
-void ec_master_inject_external_datagrams(ec_master_t *);
 
 // misc.
 void ec_master_set_send_interval(ec_master_t *, unsigned int);

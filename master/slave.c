@@ -68,7 +68,6 @@ void ec_slave_init(
         )
 {
     unsigned int i;
-    int ret;
 
     slave->master = master;
     slave->device_index = dev_idx;
@@ -157,19 +156,8 @@ void ec_slave_init(
     INIT_LIST_HEAD(&slave->foe_requests);
     INIT_LIST_HEAD(&slave->soe_requests);
 
-    // init state machine datagram
-    ec_datagram_init(&slave->fsm_datagram);
-    snprintf(slave->fsm_datagram.name, EC_DATAGRAM_NAME_SIZE,
-            "slave%u-fsm", slave->ring_position);
-    ret = ec_datagram_prealloc(&slave->fsm_datagram, EC_MAX_DATA_SIZE);
-    if (ret < 0) {
-        ec_datagram_clear(&slave->fsm_datagram);
-        EC_SLAVE_ERR(slave, "Failed to allocate FSM datagram.\n");
-        return;
-    }
-
     // create state machine object
-    ec_fsm_slave_init(&slave->fsm, slave, &slave->fsm_datagram);
+    ec_fsm_slave_init(&slave->fsm, slave);
 }
 
 /*****************************************************************************/
@@ -194,7 +182,6 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
         EC_SLAVE_WARN(slave, "Discarding SDO request,"
                 " slave about to be deleted.\n");
         request->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&slave->master->request_queue);
     }
 
     while (!list_empty(&slave->reg_requests)) {
@@ -204,7 +191,6 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
         EC_SLAVE_WARN(slave, "Discarding register request,"
                 " slave about to be deleted.\n");
         reg->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&slave->master->request_queue);
     }
 
     while (!list_empty(&slave->foe_requests)) {
@@ -214,7 +200,6 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
         EC_SLAVE_WARN(slave, "Discarding FoE request,"
                 " slave about to be deleted.\n");
         request->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&slave->master->request_queue);
     }
 
     while (!list_empty(&slave->soe_requests)) {
@@ -224,8 +209,9 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
         EC_SLAVE_WARN(slave, "Discarding SoE request,"
                 " slave about to be deleted.\n");
         request->state = EC_INT_REQUEST_FAILURE;
-        wake_up(&slave->master->request_queue);
     }
+
+    wake_up_all(&slave->master->request_queue);
 
     if (slave->config) {
         ec_slave_config_detach(slave->config);
@@ -260,7 +246,6 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
     }
 
     ec_fsm_slave_clear(&slave->fsm);
-    ec_datagram_clear(&slave->fsm_datagram);
 }
 
 /*****************************************************************************/

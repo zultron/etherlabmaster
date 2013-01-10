@@ -1753,12 +1753,11 @@ static ATTRIBUTES int ec_ioctl_send(
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
         )
 {
-    if (unlikely(!ctx->requested))
+    if (unlikely(!ctx->requested)) {
         return -EPERM;
+    }
 
-    down(&master->io_sem);
     ecrt_master_send(master);
-    up(&master->io_sem);
     return 0;
 }
 
@@ -1772,12 +1771,11 @@ static ATTRIBUTES int ec_ioctl_receive(
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
         )
 {
-    if (unlikely(!ctx->requested))
+    if (unlikely(!ctx->requested)) {
         return -EPERM;
+    }
 
-    down(&master->io_sem);
     ecrt_master_receive(master);
-    up(&master->io_sem);
     return 0;
 }
 
@@ -1864,12 +1862,11 @@ static ATTRIBUTES int ec_ioctl_sync_ref(
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
         )
 {
-    if (unlikely(!ctx->requested))
+    if (unlikely(!ctx->requested)) {
         return -EPERM;
+    }
 
-    down(&master->io_sem);
     ecrt_master_sync_reference_clock(master);
-    up(&master->io_sem);
     return 0;
 }
 
@@ -1883,12 +1880,11 @@ static ATTRIBUTES int ec_ioctl_sync_slaves(
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
         )
 {
-    if (unlikely(!ctx->requested))
+    if (unlikely(!ctx->requested)) {
         return -EPERM;
+    }
 
-    down(&master->io_sem);
     ecrt_master_sync_slave_clocks(master);
-    up(&master->io_sem);
     return 0;
 }
 
@@ -1931,12 +1927,11 @@ static ATTRIBUTES int ec_ioctl_sync_mon_queue(
         ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
         )
 {
-    if (unlikely(!ctx->requested))
+    if (unlikely(!ctx->requested)) {
         return -EPERM;
+    }
 
-    down(&master->io_sem);
     ecrt_master_sync_monitor_queue(master);
-    up(&master->io_sem);
     return 0;
 }
 
