@@ -5768,14 +5768,16 @@ void ec_poll(struct net_device *netdev)
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 
 	if (jiffies - adapter->ec_watchdog_jiffies >= 2 * HZ) {
-		e1000_watchdog((unsigned long) adapter);
+		struct e1000_hw *hw = &adapter->hw;
+		hw->mac.get_link_status = true;
+		e1000_watchdog_task(&adapter->watchdog_task);
 		adapter->ec_watchdog_jiffies = jiffies;
 	}
 
 #ifdef CONFIG_PCI_MSI
-	e1000_intr_msi(0,netdev);
+	e1000_intr_msi(0, netdev);
 #else
-	e1000_intr(0,netdev);
+	e1000_intr(0, netdev);
 #endif
 }
 
@@ -6068,6 +6070,7 @@ static int __devinit e1000_probe(struct pci_dev *pdev,
 
 	adapter->ecdev = ecdev_offer(netdev, ec_poll, THIS_MODULE);
 	if (adapter->ecdev) {
+		adapter->ec_watchdog_jiffies = jiffies;
 		if (ecdev_open(adapter->ecdev)) {
 			ecdev_withdraw(adapter->ecdev);
 			goto err_register;
