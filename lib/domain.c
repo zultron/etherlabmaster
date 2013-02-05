@@ -76,6 +76,21 @@ int ecrt_domain_reg_pdo_entry_list(ec_domain_t *domain,
 
 /*****************************************************************************/
 
+size_t ecrt_domain_size(const ec_domain_t *domain)
+{
+    int ret;
+
+    ret = ioctl(domain->master->fd, EC_IOCTL_DOMAIN_SIZE, domain->index);
+    if (EC_IOCTL_IS_ERROR(ret)) {
+        fprintf(stderr, "Failed to get domain size: %s\n",
+                strerror(EC_IOCTL_ERRNO(ret)));
+    }
+
+    return ret;
+}
+
+/*****************************************************************************/
+
 uint8_t *ecrt_domain_data(ec_domain_t *domain)
 {
     if (!domain->process_data) {
