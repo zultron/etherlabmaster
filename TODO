@@ -10,19 +10,16 @@ vim700: spelllang=en spell
 
 Version 1.5.2:
 
-• Try redundancy with more then 2 devices.
 • Document --with-devices.
 • Document RTDM interface.
-• Set the "Cyclic Generation Start Time" based on the slave's
-  "System Time" register instead of using the application time.
 • Add ecrt_slave_config_reg_pdo_entry_by_pos().
 • Move SII request to slave FSM.
 • Move SDO request to slave FSM.
-• Simplify slave FSM by introducing a common request state to handle external
-  requests.
 
 Future issues:
 
+• Simplify slave FSM by introducing a common request state to handle external
+  requests.
 * Fix link detection in generic driver.
 * Remove allow_scanning flag.
 * Check for Enable SDO Complete Access flag.
