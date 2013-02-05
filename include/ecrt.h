@@ -66,6 +66,9 @@
  *   clock to the reference clock.
  * - Changed the datatypes of the shift times in ecrt_slave_config_dc() to
  *   int32_t to correctly display negative shift times.
+ * - Added ecrt_slave_config_reg_pdo_entry_pos() and the feature flag
+ *   EC_HAVE_REG_BY_POS for registering PDO entries with non-unique indices
+ *   via their positions in the mapping.
  *
  * Changes in version 1.5:
  *
@@ -179,6 +182,10 @@
 /* Defined if the method ecrt_master_reference_clock_time() is available.
  */
 #define EC_HAVE_REF_CLOCK_TIME
+
+/* Defined if the method ecrt_slave_config_reg_pdo_entry_pos() is available.
+ */
+#define EC_HAVE_REG_BY_POS
 
 /*****************************************************************************/
 
@@ -1255,6 +1262,26 @@ int ecrt_slave_config_reg_pdo_entry(
         ec_slave_config_t *sc, /**< Slave configuration. */
         uint16_t entry_index, /**< Index of the PDO entry to register. */
         uint8_t entry_subindex, /**< Subindex of the PDO entry to register. */
+        ec_domain_t *domain, /**< Domain. */
+        unsigned int *bit_position /**< Optional address if bit addressing
+                                 is desired */
+        );
+
+/** Registers a PDO entry using its position.
+ *
+ * Similar to ecrt_slave_config_reg_pdo_entry(), but not using PDO indices but
+ * offsets in the PDO mapping, because PDO entry indices may not be unique
+ * inside a slave's PDO mapping. An error is raised, if
+ * one of the given positions is out of range.
+ *
+ * \retval >=0 Success: Offset of the PDO entry's process data.
+ * \retval  <0 Error code.
+ */
+int ecrt_slave_config_reg_pdo_entry_pos(
+        ec_slave_config_t *sc, /**< Slave configuration. */
+        uint8_t sync_index, /**< Sync manager index. */
+        unsigned int pdo_pos, /**< Position of the PDO inside the SM. */
+        unsigned int entry_pos, /**< Position of the entry inside the PDO. */
         ec_domain_t *domain, /**< Domain. */
         unsigned int *bit_position /**< Optional address if bit addressing
                                  is desired */

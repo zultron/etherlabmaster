@@ -781,6 +781,71 @@ int ecrt_slave_config_reg_pdo_entry(
 
 /*****************************************************************************/
 
+int ecrt_slave_config_reg_pdo_entry_pos(
+        ec_slave_config_t *sc,
+        uint8_t sync_index,
+        unsigned int pdo_pos,
+        unsigned int entry_pos,
+        ec_domain_t *domain,
+        unsigned int *bit_position
+        )
+{
+    const ec_sync_config_t *sync_config;
+    unsigned int bit_offset, pp, ep;
+    ec_pdo_t *pdo;
+    ec_pdo_entry_t *entry;
+
+    EC_CONFIG_DBG(sc, 1, "%s(sc = 0x%p, sync_index = %u, pdo_pos = %u,"
+            " entry_pos = %u, domain = 0x%p, bit_position = 0x%p)\n",
+            __func__, sc, sync_index, pdo_pos, entry_pos,
+            domain, bit_position);
+
+    if (sync_index >= EC_MAX_SYNC_MANAGERS) {
+        EC_CONFIG_ERR(sc, "Invalid syncmanager position %u.\n", sync_index);
+        return -EINVAL;
+    }
+
+    sync_config = &sc->sync_configs[sync_index];
+    bit_offset = 0;
+    pp = 0;
+
+    list_for_each_entry(pdo, &sync_config->pdos.list, list) {
+        ep = 0;
+        list_for_each_entry(entry, &pdo->entries, list) {
+            if (pp != pdo_pos || ep != entry_pos) {
+                bit_offset += entry->bit_length;
+            } else {
+                unsigned int bit_pos = bit_offset % 8;
+                int sync_offset;
+
+                if (bit_position) {
+                    *bit_position = bit_pos;
+                } else if (bit_pos) {
+                    EC_CONFIG_ERR(sc, "PDO entry 0x%04X:%02X does"
+                            " not byte-align.\n",
+                            pdo->index, entry->subindex);
+                    return -EFAULT;
+                }
+
+                sync_offset = ec_slave_config_prepare_fmmu(
+                        sc, domain, sync_index, sync_config->dir);
+                if (sync_offset < 0)
+                    return sync_offset;
+
+                return sync_offset + bit_offset / 8;
+            }
+            ep++;
+        }
+        pp++;
+    }
+
+    EC_CONFIG_ERR(sc, "PDO entry specification %u/%u/%u out of range.\n",
+           sync_index, pdo_pos, entry_pos);
+    return -ENOENT;
+}
+
+/*****************************************************************************/
+
 void ecrt_slave_config_dc(ec_slave_config_t *sc, uint16_t assign_activate,
         uint32_t sync0_cycle_time, int32_t sync0_shift_time,
         uint32_t sync1_cycle_time, int32_t sync1_shift_time)
