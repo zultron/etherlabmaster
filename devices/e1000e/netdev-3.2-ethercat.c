@@ -4546,9 +4546,8 @@ link_up:
 
 	e1000e_update_adaptive(&adapter->hw);
 
-	if ((adapter->ecdev && !ecdev_get_link(adapter->ecdev))
-			|| (!adapter->ecdev && (!netif_carrier_ok(netdev) &&
-	    	(e1000_desc_unused(tx_ring) + 1 < tx_ring->count)))) {
+	if (!adapter->ecdev && !netif_carrier_ok(netdev) &&
+		(e1000_desc_unused(tx_ring) + 1 < tx_ring->count)) {
 		/*
 		 * We've lost link, so the controller stops DMA,
 		 * but we've got queued Tx work that's never going

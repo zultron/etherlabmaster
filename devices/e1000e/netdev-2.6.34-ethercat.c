@@ -3775,8 +3775,7 @@ link_up:
 
 	e1000e_update_adaptive(&adapter->hw);
 
-	if ((adapter->ecdev && !ecdev_get_link(adapter->ecdev))
-			|| (!adapter->ecdev && !netif_carrier_ok(netdev))) {
+	if (!adapter->ecdev && !netif_carrier_ok(netdev)) {
 		tx_pending = (e1000_desc_unused(tx_ring) + 1 <
 			       tx_ring->count);
 		if (tx_pending) {
