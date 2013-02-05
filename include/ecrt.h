@@ -1519,15 +1519,15 @@ int ecrt_domain_reg_pdo_entry_list(
                                                    registrations. */
         );
 
-#ifdef __KERNEL__
-
 /** Returns the current size of the domain's process data.
  *
- * \return Size of the process data image.
+ * \return Size of the process data image, or a negative error code.
  */
 size_t ecrt_domain_size(
         const ec_domain_t *domain /**< Domain. */
         );
+
+#ifdef __KERNEL__
 
 /** Provide external memory to store the domain's process data.
  *

@@ -2730,6 +2730,38 @@ static ATTRIBUTES int ec_ioctl_sc_idn(
 
 /*****************************************************************************/
 
+/** Gets the domain's data size.
+ */
+static ATTRIBUTES int ec_ioctl_domain_size(
+        ec_master_t *master, /**< EtherCAT master. */
+        void *arg, /**< ioctl() argument. */
+        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
+        )
+{
+    const ec_domain_t *domain;
+
+    if (unlikely(!ctx->requested)) {
+        return -EPERM;
+    }
+
+    if (down_interruptible(&master->master_sem)) {
+        return -EINTR;
+    }
+
+    list_for_each_entry(domain, &master->domains, list) {
+        if (domain->index == (unsigned long) arg) {
+            size_t size = ecrt_domain_size(domain);
+            up(&master->master_sem);
+            return size;
+        }
+    }
+
+    up(&master->master_sem);
+    return -ENOENT;
+}
+
+/*****************************************************************************/
+
 /** Gets the domain's offset in the total process data.
  */
 static ATTRIBUTES int ec_ioctl_domain_offset(
@@ -4185,6 +4217,9 @@ long EC_IOCTL(ec_master_t *master, ec_ioctl_context_t *ctx,
                 break;
             }
             ret = ec_ioctl_sc_idn(master, arg, ctx);
+            break;
+        case EC_IOCTL_DOMAIN_SIZE:
+            ret = ec_ioctl_domain_size(master, arg, ctx);
             break;
         case EC_IOCTL_DOMAIN_OFFSET:
             ret = ec_ioctl_domain_offset(master, arg, ctx);
