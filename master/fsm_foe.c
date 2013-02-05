@@ -418,7 +418,7 @@ void ec_fsm_foe_state_ack_read(
         return;
     }
 
-    data = ec_slave_mbox_fetch(fsm->slave, datagram, &mbox_prot, &rec_size);
+    data = ec_slave_mbox_fetch(slave, fsm->datagram, &mbox_prot, &rec_size);
     if (IS_ERR(data)) {
         ec_foe_set_tx_error(fsm, FOE_PROT_ERROR);
         return;
@@ -498,7 +498,7 @@ void ec_fsm_foe_state_wrq_sent(
 
     fsm->jiffies_start = fsm->datagram->jiffies_sent;
 
-    ec_slave_mbox_prepare_check(fsm->slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
 
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_foe_state_ack_check;
@@ -536,7 +536,7 @@ void ec_fsm_foe_state_data_sent(
         return;
     }
 
-    ec_slave_mbox_prepare_check(fsm->slave, datagram);
+    ec_slave_mbox_prepare_check(slave, datagram);
     fsm->jiffies_start = jiffies;
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_foe_state_ack_check;
@@ -632,7 +632,7 @@ void ec_fsm_foe_state_rrq_sent(
 
     fsm->jiffies_start = fsm->datagram->jiffies_sent;
 
-    ec_slave_mbox_prepare_check(fsm->slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
 
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_foe_state_data_check;
@@ -755,7 +755,7 @@ void ec_fsm_foe_state_data_read(
         return;
     }
 
-    data = ec_slave_mbox_fetch(slave, datagram, &mbox_prot, &rec_size);
+    data = ec_slave_mbox_fetch(slave, fsm->datagram, &mbox_prot, &rec_size);
     if (IS_ERR(data)) {
         ec_foe_set_rx_error(fsm, FOE_MBOX_FETCH_ERROR);
         return;
@@ -815,7 +815,7 @@ void ec_fsm_foe_state_data_read(
 
     fsm->rx_last_packet =
         (rec_size + EC_MBOX_HEADER_SIZE + EC_FOE_HEADER_SIZE
-         != fsm->slave->configured_rx_mailbox_size);
+         != slave->configured_rx_mailbox_size);
 
     if (fsm->rx_last_packet ||
             (slave->configured_rx_mailbox_size - EC_MBOX_HEADER_SIZE
@@ -879,7 +879,7 @@ void ec_fsm_foe_state_sent_ack(
 
     fsm->jiffies_start = fsm->datagram->jiffies_sent;
 
-    ec_slave_mbox_prepare_check(fsm->slave, datagram); // can not fail.
+    ec_slave_mbox_prepare_check(slave, datagram); // can not fail.
 
     if (fsm->rx_last_packet) {
         fsm->rx_expected_packet_no = 0;
