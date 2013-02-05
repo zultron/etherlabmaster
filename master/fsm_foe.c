@@ -257,7 +257,7 @@ int ec_foe_prepare_data_send(
         return -1;
     }
 
-    EC_WRITE_U8 (data, EC_FOE_OPCODE_DATA);    // OpCode = DataBlock req.
+    EC_WRITE_U16(data, EC_FOE_OPCODE_DATA);    // OpCode = DataBlock req.
     EC_WRITE_U32(data + 2, fsm->tx_packet_no); // PacketNo, Password
 
     memcpy(data + EC_FOE_HEADER_SIZE,
