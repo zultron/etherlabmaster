@@ -305,6 +305,47 @@ int ecrt_slave_config_reg_pdo_entry(
 
 /*****************************************************************************/
 
+int ecrt_slave_config_reg_pdo_entry_pos(
+        ec_slave_config_t *sc,
+        uint8_t sync_index,
+        unsigned int pdo_pos,
+        unsigned int entry_pos,
+        ec_domain_t *domain,
+        unsigned int *bit_position
+        )
+{
+    ec_ioctl_reg_pdo_pos_t io;
+    int ret;
+
+    io.config_index = sc->index;
+    io.sync_index = sync_index;
+    io.pdo_pos = pdo_pos;
+    io.entry_pos = entry_pos;
+    io.domain_index = domain->index;
+
+    ret = ioctl(sc->master->fd, EC_IOCTL_SC_REG_PDO_POS, &io);
+    if (EC_IOCTL_IS_ERROR(ret)) {
+        fprintf(stderr, "Failed to register PDO entry: %s\n",
+                strerror(EC_IOCTL_ERRNO(ret)));
+        return -EC_IOCTL_ERRNO(ret);
+    }
+
+    if (bit_position) {
+        *bit_position = io.bit_position;
+    } else {
+        if (io.bit_position) {
+            fprintf(stderr, "PDO entry %u/%u/%u does not byte-align "
+                    "in config %u:%u.\n", sync_index, pdo_pos, entry_pos,
+                    sc->alias, sc->position);
+            return -EFAULT;
+        }
+    }
+
+    return ret;
+}
+
+/*****************************************************************************/
+
 void ecrt_slave_config_dc(ec_slave_config_t *sc, uint16_t assign_activate,
         uint32_t sync0_cycle_time, int32_t sync0_shift_time,
         uint32_t sync1_cycle_time, int32_t sync1_shift_time)

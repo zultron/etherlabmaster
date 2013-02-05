@@ -2246,6 +2246,54 @@ static ATTRIBUTES int ec_ioctl_sc_reg_pdo_entry(
 
 /*****************************************************************************/
 
+/** Registers a PDO entry by its position.
+ */
+static ATTRIBUTES int ec_ioctl_sc_reg_pdo_pos(
+        ec_master_t *master, /**< EtherCAT master. */
+        void *arg, /**< ioctl() argument. */
+        ec_ioctl_context_t *ctx /**< Private data structure of file handle. */
+        )
+{
+    ec_ioctl_reg_pdo_pos_t io;
+    ec_slave_config_t *sc;
+    ec_domain_t *domain;
+    int ret;
+
+    if (unlikely(!ctx->requested)) {
+        return -EPERM;
+    }
+
+    if (copy_from_user(&io, (void __user *) arg, sizeof(io))) {
+        return -EFAULT;
+    }
+
+    if (down_interruptible(&master->master_sem)) {
+        return -EINTR;
+    }
+
+    if (!(sc = ec_master_get_config(master, io.config_index))) {
+        up(&master->master_sem);
+        return -ENOENT;
+    }
+
+    if (!(domain = ec_master_find_domain(master, io.domain_index))) {
+        up(&master->master_sem);
+        return -ENOENT;
+    }
+
+    up(&master->master_sem); /** \fixme sc or domain could be invalidated */
+
+    ret = ecrt_slave_config_reg_pdo_entry_pos(sc, io.sync_index,
+            io.pdo_pos, io.entry_pos, domain, &io.bit_position);
+
+    if (copy_to_user((void __user *) arg, &io, sizeof(io)))
+        return -EFAULT;
+
+    return ret;
+}
+
+/*****************************************************************************/
+
 /** Sets the DC AssignActivate word and the sync signal times.
  */
 static ATTRIBUTES int ec_ioctl_sc_dc(
@@ -4148,6 +4196,13 @@ long EC_IOCTL(ec_master_t *master, ec_ioctl_context_t *ctx,
                 break;
             }
             ret = ec_ioctl_sc_reg_pdo_entry(master, arg, ctx);
+            break;
+        case EC_IOCTL_SC_REG_PDO_POS:
+            if (!ctx->writable) {
+                ret = -EPERM;
+                break;
+            }
+            ret = ec_ioctl_sc_reg_pdo_pos(master, arg, ctx);
             break;
         case EC_IOCTL_SC_DC:
             if (!ctx->writable) {
