@@ -12,12 +12,12 @@ Version 1.5.2:
 
 • Document --with-devices.
 • Document RTDM interface.
-• Add ecrt_slave_config_reg_pdo_entry_by_pos().
-• Move SII request to slave FSM.
-• Move SDO request to slave FSM.
+• Allow PDI access to EEPROM during INIT->PREOP transition.
 
 Future issues:
 
+• Move SII request to slave FSM.
+• Move SDO request to slave FSM.
 • Simplify slave FSM by introducing a common request state to handle external
   requests.
 * Fix link detection in generic driver.
