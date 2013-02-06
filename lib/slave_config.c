@@ -482,8 +482,10 @@ int ecrt_slave_config_emerg_pop(ec_slave_config_t *sc, uint8_t *target)
 
     ret = ioctl(sc->master->fd, EC_IOCTL_SC_EMERG_POP, &io);
     if (EC_IOCTL_IS_ERROR(ret)) {
-        fprintf(stderr, "Failed to get emergency message: %s\n",
-                strerror(EC_IOCTL_ERRNO(ret)));
+        if (EC_IOCTL_ERRNO(ret) != ENOENT) {
+            fprintf(stderr, "Failed to get emergency message: %s\n",
+                    strerror(EC_IOCTL_ERRNO(ret)));
+        }
         return -EC_IOCTL_ERRNO(ret);
     }
 
