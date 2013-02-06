@@ -470,6 +470,8 @@ void ec_fsm_slave_scan_enter_assign_sii(
     ec_datagram_t *datagram = fsm->datagram;
     ec_slave_t *slave = fsm->slave;
 
+    EC_SLAVE_DBG(slave, 1, "Assigning SII access to EtherCAT.\n");
+
     // assign SII to ECAT
     ec_datagram_fpwr(datagram, slave->station_address, 0x0500, 1);
     EC_WRITE_U8(datagram->data, 0x00); // EtherCAT
