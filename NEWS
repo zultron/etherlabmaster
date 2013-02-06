@@ -6,6 +6,11 @@ vim: spelllang=en spell
 
 -------------------------------------------------------------------------------
 
+Changes since 1.5.1:
+
+* Introduced --enable-sii-assign to switch on assigning the SII to PDI and
+  back to EtherCAT during configuration.
+
 Changes in 1.5.1:
 
 * Fixed reset of allow_scanning flag if ecrt_master_activate() was not called.
