@@ -12,7 +12,6 @@ Version 1.5.2:
 
 • Document --with-devices.
 • Document RTDM interface.
-• Allow PDI access to EEPROM during INIT->PREOP transition.
 
 Future issues:
 

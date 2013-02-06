@@ -67,7 +67,13 @@ void ec_fsm_slave_config_state_clear_fmmus(ec_fsm_slave_config_t *);
 void ec_fsm_slave_config_state_clear_sync(ec_fsm_slave_config_t *);
 void ec_fsm_slave_config_state_dc_clear_assign(ec_fsm_slave_config_t *);
 void ec_fsm_slave_config_state_mbox_sync(ec_fsm_slave_config_t *);
+#ifdef EC_SII_ASSIGN
+void ec_fsm_slave_config_state_assign_pdi(ec_fsm_slave_config_t *);
+#endif
 void ec_fsm_slave_config_state_boot_preop(ec_fsm_slave_config_t *);
+#ifdef EC_SII_ASSIGN
+void ec_fsm_slave_config_state_assign_ethercat(ec_fsm_slave_config_t *);
+#endif
 void ec_fsm_slave_config_state_sdo_conf(ec_fsm_slave_config_t *);
 void ec_fsm_slave_config_state_soe_conf_preop(ec_fsm_slave_config_t *);
 void ec_fsm_slave_config_state_watchdog_divider(ec_fsm_slave_config_t *);
@@ -87,6 +93,9 @@ void ec_fsm_slave_config_enter_init(ec_fsm_slave_config_t *);
 void ec_fsm_slave_config_enter_clear_sync(ec_fsm_slave_config_t *);
 void ec_fsm_slave_config_enter_dc_clear_assign(ec_fsm_slave_config_t *);
 void ec_fsm_slave_config_enter_mbox_sync(ec_fsm_slave_config_t *);
+#ifdef EC_SII_ASSIGN
+void ec_fsm_slave_config_enter_assign_pdi(ec_fsm_slave_config_t *);
+#endif
 void ec_fsm_slave_config_enter_boot_preop(ec_fsm_slave_config_t *);
 void ec_fsm_slave_config_enter_sdo_conf(ec_fsm_slave_config_t *);
 void ec_fsm_slave_config_enter_soe_conf_preop(ec_fsm_slave_config_t *);
@@ -432,7 +441,11 @@ void ec_fsm_slave_config_enter_mbox_sync(
         // no mailbox protocols supported
         EC_SLAVE_DBG(slave, 1, "Slave does not support"
                 " mailbox communication.\n");
+#ifdef EC_SII_ASSIGN
+        ec_fsm_slave_config_enter_assign_pdi(fsm);
+#else
         ec_fsm_slave_config_enter_boot_preop(fsm);
+#endif
         return;
     }
 
@@ -595,8 +608,70 @@ void ec_fsm_slave_config_state_mbox_sync(
         return;
     }
 
+#ifdef EC_SII_ASSIGN
+    ec_fsm_slave_config_enter_assign_pdi(fsm);
+#else
+    ec_fsm_slave_config_enter_boot_preop(fsm);
+#endif
+}
+
+/*****************************************************************************/
+
+#ifdef EC_SII_ASSIGN
+
+/** Assign SII to PDI.
+ */
+void ec_fsm_slave_config_enter_assign_pdi(
+        ec_fsm_slave_config_t *fsm /**< slave state machine */
+        )
+{
+    ec_datagram_t *datagram = fsm->datagram;
+    ec_slave_t *slave = fsm->slave;
+
+    if (fsm->slave->requested_state != EC_SLAVE_STATE_BOOT) {
+        EC_SLAVE_DBG(slave, 1, "Assigning SII access to PDI.\n");
+
+        ec_datagram_fpwr(datagram, slave->station_address, 0x0500, 0x01);
+        EC_WRITE_U8(datagram->data, 0x01); // PDI
+        fsm->retries = EC_FSM_RETRIES;
+        fsm->state = ec_fsm_slave_config_state_assign_pdi;
+    }
+    else {
+        ec_fsm_slave_config_enter_boot_preop(fsm);
+    }
+}
+
+/*****************************************************************************/
+
+/** Slave configuration state: ASSIGN_PDI.
+ */
+void ec_fsm_slave_config_state_assign_pdi(
+        ec_fsm_slave_config_t *fsm /**< slave state machine */
+        )
+{
+    ec_datagram_t *datagram = fsm->datagram;
+    ec_slave_t *slave = fsm->slave;
+
+    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--) {
+        return;
+    }
+
+    if (datagram->state != EC_DATAGRAM_RECEIVED) {
+        EC_SLAVE_WARN(slave, "Failed receive SII assignment datagram: ");
+        ec_datagram_print_state(datagram);
+        goto cont_preop;
+    }
+
+    if (datagram->working_counter != 1) {
+        EC_SLAVE_WARN(slave, "Failed to assign SII to PDI: ");
+        ec_datagram_print_wc_error(datagram);
+    }
+
+cont_preop:
     ec_fsm_slave_config_enter_boot_preop(fsm);
 }
+
+#endif
 
 /*****************************************************************************/
 
@@ -609,9 +684,11 @@ void ec_fsm_slave_config_enter_boot_preop(
     fsm->state = ec_fsm_slave_config_state_boot_preop;
 
     if (fsm->slave->requested_state != EC_SLAVE_STATE_BOOT) {
-        ec_fsm_change_start(fsm->fsm_change, fsm->slave, EC_SLAVE_STATE_PREOP);
+        ec_fsm_change_start(fsm->fsm_change,
+                fsm->slave, EC_SLAVE_STATE_PREOP);
     } else { // BOOT
-        ec_fsm_change_start(fsm->fsm_change, fsm->slave, EC_SLAVE_STATE_BOOT);
+        ec_fsm_change_start(fsm->fsm_change,
+                fsm->slave, EC_SLAVE_STATE_BOOT);
     }
 
     ec_fsm_change_exec(fsm->fsm_change); // execute immediately
@@ -627,7 +704,9 @@ void ec_fsm_slave_config_state_boot_preop(
 {
     ec_slave_t *slave = fsm->slave;
 
-    if (ec_fsm_change_exec(fsm->fsm_change)) return;
+    if (ec_fsm_change_exec(fsm->fsm_change)) {
+        return;
+    }
 
     if (!ec_fsm_change_success(fsm->fsm_change)) {
         if (!fsm->fsm_change->spontaneous_change)
@@ -642,6 +721,53 @@ void ec_fsm_slave_config_state_boot_preop(
     EC_SLAVE_DBG(slave, 1, "Now in %s.\n",
             slave->requested_state != EC_SLAVE_STATE_BOOT ? "PREOP" : "BOOT");
 
+#ifdef EC_SII_ASSIGN
+    EC_SLAVE_DBG(slave, 1, "Assigning SII access back to EtherCAT.\n");
+
+    ec_datagram_fpwr(fsm->datagram, slave->station_address, 0x0500, 0x01);
+    EC_WRITE_U8(fsm->datagram->data, 0x00); // EtherCAT
+    fsm->retries = EC_FSM_RETRIES;
+    fsm->state = ec_fsm_slave_config_state_assign_ethercat;
+#else
+    if (slave->current_state == slave->requested_state) {
+        fsm->state = ec_fsm_slave_config_state_end; // successful
+        EC_SLAVE_DBG(slave, 1, "Finished configuration.\n");
+        return;
+    }
+
+    ec_fsm_slave_config_enter_sdo_conf(fsm);
+#endif
+}
+
+/*****************************************************************************/
+
+#ifdef EC_SII_ASSIGN
+
+/** Slave configuration state: ASSIGN_ETHERCAT.
+ */
+void ec_fsm_slave_config_state_assign_ethercat(
+        ec_fsm_slave_config_t *fsm /**< slave state machine */
+        )
+{
+    ec_datagram_t *datagram = fsm->datagram;
+    ec_slave_t *slave = fsm->slave;
+
+    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--) {
+        return;
+    }
+
+    if (datagram->state != EC_DATAGRAM_RECEIVED) {
+        EC_SLAVE_WARN(slave, "Failed receive SII assignment datagram: ");
+        ec_datagram_print_state(datagram);
+        goto cont_sdo_conf;
+    }
+
+    if (datagram->working_counter != 1) {
+        EC_SLAVE_WARN(slave, "Failed to assign SII back to EtherCAT: ");
+        ec_datagram_print_wc_error(datagram);
+    }
+
+cont_sdo_conf:
     if (slave->current_state == slave->requested_state) {
         fsm->state = ec_fsm_slave_config_state_end; // successful
         EC_SLAVE_DBG(slave, 1, "Finished configuration.\n");
@@ -650,6 +776,8 @@ void ec_fsm_slave_config_state_boot_preop(
 
     ec_fsm_slave_config_enter_sdo_conf(fsm);
 }
+
+#endif
 
 /*****************************************************************************/
 

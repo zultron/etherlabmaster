@@ -831,6 +831,30 @@ AC_DEFINE_UNQUOTED([EC_MAX_NUM_DEVICES], $devices,
     [Max. number of Ethernet devices per master])
 
 #------------------------------------------------------------------------------
+# SII assignment
+#------------------------------------------------------------------------------
+
+AC_ARG_ENABLE([sii-assign],
+    AS_HELP_STRING([--enable-sii-assign],
+                   [Enable SII assignment to PDI (default: no)]),
+    [
+        case "${enableval}" in
+            yes) siiassign=1
+                ;;
+            no) siiassign=0
+                ;;
+            *) AC_MSG_ERROR([Invalid value for --enable-sii-assign])
+                ;;
+        esac
+    ],
+    [siiassign=0]
+)
+
+if test "x${siiassign}" = "x1"; then
+    AC_DEFINE([EC_SII_ASSIGN], [1], [Assign SII to PDI])
+fi
+
+#------------------------------------------------------------------------------
 
 AC_CONFIG_FILES([
         Doxyfile
