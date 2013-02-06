@@ -562,6 +562,8 @@ AC_SUBST(ENABLE_RTDM,[$rtdm])
 # Debug interface
 #------------------------------------------------------------------------------
 
+AC_MSG_CHECKING([whether to build the debug interface])
+
 AC_ARG_ENABLE([debug-if],
     AS_HELP_STRING([--enable-debug-if],
                    [Create a debug interface for each master @<:@NO@:>@]),
@@ -580,13 +582,19 @@ AC_ARG_ENABLE([debug-if],
 
 if test "x${dbg}" = "x1"; then
     AC_DEFINE([EC_DEBUG_IF], [1], [Debug interfaces enabled])
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
 fi
+
 AM_CONDITIONAL(ENABLE_DEBUG_IF, test "x$dbg" = "x1")
 AC_SUBST(ENABLE_DEBUG_IF,[$dbg])
 
 #------------------------------------------------------------------------------
 # Debug ring
 #------------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to build the debug ring])
 
 AC_ARG_ENABLE([debug-ring],
     AS_HELP_STRING([--enable-debug-ring],
@@ -606,11 +614,16 @@ AC_ARG_ENABLE([debug-ring],
 
 if test "x${debugring}" = "x1"; then
     AC_DEFINE([EC_DEBUG_RING], [1], [Debug ring enabled])
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
 fi
 
 #------------------------------------------------------------------------------
 # Ethernet over EtherCAT support
 #------------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to build with EoE support])
 
 AC_ARG_ENABLE([eoe],
     AS_HELP_STRING([--enable-eoe],
@@ -630,13 +643,19 @@ AC_ARG_ENABLE([eoe],
 
 if test "x${eoe}" = "x1"; then
     AC_DEFINE([EC_EOE], [1], [EoE support enabled])
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
 fi
+
 AM_CONDITIONAL(ENABLE_EOE, test "x$eoe" = "x1")
 AC_SUBST(ENABLE_EOE,[$eoe])
 
 #------------------------------------------------------------------------------
 # CPU timestamp counter support
 #------------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to use the CPU timestamp counter])
 
 AC_ARG_ENABLE([cycles],
     AS_HELP_STRING([--enable-cycles],
@@ -656,11 +675,16 @@ AC_ARG_ENABLE([cycles],
 
 if test "x${cycles}" = "x1"; then
     AC_DEFINE([EC_HAVE_CYCLES], [1], [Use CPU timestamp counter])
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
 fi
 
 #------------------------------------------------------------------------------
 # High-resolution timer support
 #------------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to use high-resolution timers for scheduling])
 
 AC_ARG_ENABLE([hrtimer],
     AS_HELP_STRING([--enable-hrtimer],
@@ -680,11 +704,16 @@ AC_ARG_ENABLE([hrtimer],
 
 if test "x${hrtimer}" = "x1"; then
     AC_DEFINE([EC_USE_HRTIMER], [1], [Use hrtimer for scheduling])
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
 fi
 
 #------------------------------------------------------------------------------
 # Read alias address from register
 #------------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to read alias addresses from registers])
 
 AC_ARG_ENABLE([regalias],
     AS_HELP_STRING([--enable-regalias],
@@ -704,11 +733,16 @@ AC_ARG_ENABLE([regalias],
 
 if test "x${regalias}" = "x1"; then
     AC_DEFINE([EC_REGALIAS], [1], [Read alias adresses from register])
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
 fi
 
 #------------------------------------------------------------------------------
 # Command-line tool
 #-----------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to build the command-line tool])
 
 AC_ARG_ENABLE([tool],
     AS_HELP_STRING([--enable-tool],
@@ -726,11 +760,19 @@ AC_ARG_ENABLE([tool],
     [tool=1]
 )
 
+if test "x${tool}" = "x1"; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
+
 AM_CONDITIONAL(BUILD_TOOL, test "x$tool" = "x1")
 
 #------------------------------------------------------------------------------
 # Userspace library generation
 #------------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to build the userspace library])
 
 AC_ARG_ENABLE([userlib],
     AS_HELP_STRING([--enable-userlib],
@@ -748,11 +790,19 @@ AC_ARG_ENABLE([userlib],
     [userlib=1]
 )
 
+if test "x${userlib}" = "x1"; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
+
 AM_CONDITIONAL(ENABLE_USERLIB, test "x$userlib" = "x1")
 
 #------------------------------------------------------------------------------
 # TTY driver
 #------------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to build the tty driver])
 
 AC_ARG_ENABLE([tty],
     AS_HELP_STRING([--enable-tty],
@@ -770,12 +820,20 @@ AC_ARG_ENABLE([tty],
     [tty=0]
 )
 
+if test "x${tty}" = "x1"; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
+
 AM_CONDITIONAL(ENABLE_TTY, test "x$tty" = "x1")
 AC_SUBST(ENABLE_TTY,[$tty])
 
 #------------------------------------------------------------------------------
 # Slave identification wildcards
 #------------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to allow identification wildcards])
 
 AC_ARG_ENABLE([wildcards],
     AS_HELP_STRING([--enable-wildcards],
@@ -796,6 +854,9 @@ AC_ARG_ENABLE([wildcards],
 if test "x${wildcards}" = "x1"; then
     AC_DEFINE([EC_IDENT_WILDCARDS], [1],
         [Use vendor id / product code wildcards])
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
 fi
 
 #------------------------------------------------------------------------------
@@ -834,6 +895,8 @@ AC_DEFINE_UNQUOTED([EC_MAX_NUM_DEVICES], $devices,
 # SII assignment
 #------------------------------------------------------------------------------
 
+AC_MSG_CHECKING([whether to assign the SII to PDI])
+
 AC_ARG_ENABLE([sii-assign],
     AS_HELP_STRING([--enable-sii-assign],
                    [Enable SII assignment to PDI (default: no)]),
@@ -852,6 +915,9 @@ AC_ARG_ENABLE([sii-assign],
 
 if test "x${siiassign}" = "x1"; then
     AC_DEFINE([EC_SII_ASSIGN], [1], [Assign SII to PDI])
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
 fi
 
 #------------------------------------------------------------------------------
