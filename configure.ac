@@ -28,6 +28,15 @@
 #------------------------------------------------------------------------------
 
 AC_PREREQ(2.59)
+
+#
+# Release procedure
+# - Update version number below
+# - Write NEWS entry with changes since last release
+# - Check for complete Doxygen comments
+# - Update version number in documentation
+# - Update the ChangeLog
+#
 AC_INIT([ethercat],[1.5.1],[fp@igh-essen.com])
 AC_CONFIG_AUX_DIR([autoconf])
 AM_INIT_AUTOMAKE([-Wall -Werror dist-bzip2])
