@@ -212,6 +212,12 @@ long eccdev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 /*****************************************************************************/
 
+#ifndef VM_DONTDUMP
+/** VM_RESERVED disappeared in 3.7.
+ */
+#define VM_DONTDUMP VM_RESERVED
+#endif
+
 /** Memory-map callback for the EtherCAT character device.
  *
  * The actual mapping will be done in the eccdev_vma_nopage() callback of the
@@ -227,7 +233,7 @@ int eccdev_mmap(
     EC_MASTER_DBG(priv->cdev->master, 1, "mmap()\n");
 
     vma->vm_ops = &eccdev_vm_ops;
-    vma->vm_flags |= VM_RESERVED; /* Pages will not be swapped out */
+    vma->vm_flags |= VM_DONTDUMP; /* Pages will not be swapped out */
     vma->vm_private_data = priv;
 
     return 0;
