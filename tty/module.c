@@ -523,15 +523,26 @@ static void ec_tty_flush_buffer(struct tty_struct *tty)
 
 /*****************************************************************************/
 
-static int ec_tty_ioctl(struct tty_struct *tty, struct file *file,
+static int ec_tty_ioctl(struct tty_struct *tty,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39)
+        struct file *file,
+#endif
         unsigned int cmd, unsigned long arg)
 {
     ec_tty_t *t = (ec_tty_t *) tty->driver_data;
     int ret = -ENOTTY;
 
 #if EC_TTY_DEBUG >= 2
-    printk(KERN_INFO PFX "%s(tty=%p, file=%p, cmd=%08x, arg=%08lx).\n",
-            __func__, tty, file, cmd, arg);
+    printk(KERN_INFO PFX "%s(tty=%p, "
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39)
+            "file=%p, "
+#endif
+            "cmd=%08x, arg=%08lx).\n",
+            __func__, tty,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 39)
+            file,
+#endif
+            cmd, arg);
     printk(KERN_INFO PFX "decoded: type=%02x nr=%u\n",
             _IOC_TYPE(cmd), _IOC_NR(cmd));
 #endif
