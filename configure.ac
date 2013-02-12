@@ -31,13 +31,15 @@ AC_PREREQ(2.59)
 
 #
 # Release procedure
-# - Update version number below
+# - Update Ethernet drivers up to release kernel version
 # - Write NEWS entry with changes since last release
 # - Check for complete Doxygen comments
 # - Update version number in documentation
-# - Update the ChangeLog
+# - Update the ChangeLog -> hg log -bstable-1.5 --style=changelog > ChangeLog
+# - Update version number below
+# - make dist-bzip2
 #
-AC_INIT([ethercat],[1.5.1],[fp@igh-essen.com])
+AC_INIT([ethercat],[1.5.2],[fp@igh-essen.com])
 AC_CONFIG_AUX_DIR([autoconf])
 AM_INIT_AUTOMAKE([-Wall -Werror dist-bzip2])
 AC_PREFIX_DEFAULT([/opt/etherlab])
