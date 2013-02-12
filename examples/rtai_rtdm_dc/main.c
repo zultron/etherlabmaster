@@ -503,6 +503,11 @@ int main(int argc, char *argv[])
      */
     dc_start_time_ns = system_time_ns();
     dc_time_ns = dc_start_time_ns;
+
+    /* Attention: The initial application time is also used for phase
+     * calculation for the SYNC0/1 interrupts. Please be sure to call it at
+     * the correct phase to the realtime cycle.
+     */
     ecrt_master_application_time(master, dc_start_time_ns);
 
     ret = ecrt_master_select_reference_clock(master, sc_ek1100);
