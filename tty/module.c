@@ -192,6 +192,7 @@ int ec_tty_init(ec_tty_t *t, int minor,
     int ret;
     tcflag_t cflag;
     struct tty_struct *tty;
+    struct ktermios *termios;
 
     t->minor = minor;
     t->tx_read_idx = 0;
@@ -215,8 +216,16 @@ int ec_tty_init(ec_tty_t *t, int minor,
     // Tell the device-specific implementation about the initial cflags
     tty = tty_driver->ttys[minor];
 
-    if (tty && tty->termios) { // already opened before
-        cflag = tty->termios->c_cflag;
+    termios =
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0)
+        &tty->termios
+#else
+        tty->termios
+#endif
+        ;
+
+    if (tty && termios) { // already opened before
+        cflag = termios->c_cflag;
     } else {
         cflag = tty_driver->init_termios.c_cflag;
     }
@@ -575,24 +584,33 @@ static void ec_tty_set_termios(struct tty_struct *tty,
 {
     ec_tty_t *t = (ec_tty_t *) tty->driver_data;
     int ret;
+    struct ktermios *termios;
 
 #if EC_TTY_DEBUG >= 2
     printk(KERN_INFO PFX "%s().\n", __func__);
 #endif
 
-    if (tty->termios->c_cflag == old_termios->c_cflag)
+    termios =
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0)
+        &tty->termios
+#else
+        tty->termios
+#endif
+        ;
+
+    if (termios->c_cflag == old_termios->c_cflag)
         return;
 
 #if EC_TTY_DEBUG >= 2
     printk(KERN_INFO "cflag changed from %x to %x.\n",
-            old_termios->c_cflag, tty->termios->c_cflag);
+            old_termios->c_cflag, termios->c_cflag);
 #endif
 
-    ret = t->ops.cflag_changed(t->cb_data, tty->termios->c_cflag);
+    ret = t->ops.cflag_changed(t->cb_data, termios->c_cflag);
     if (ret) {
         printk(KERN_ERR PFX "ERROR: cflag 0x%x not accepted.\n",
-                tty->termios->c_cflag);
-        tty->termios->c_cflag = old_termios->c_cflag;
+                termios->c_cflag);
+        termios->c_cflag = old_termios->c_cflag;
     }
 }
 
