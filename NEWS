@@ -22,7 +22,7 @@ Changes since 1.5.1:
     * Added ecrt_slave_config_reg_so_entry_pos() to register non-unique
       PDO entries.
 * Ethernet drivers
-    * Added 8139too driver for 3.0, 3.4.
+    * Added 8139too driver for 3.0, 3.2, 3.4.
     * Added r8169 driver for 2.6.36 (J. Kunz), 3.2 (J. Kunz), 3.4 (F. Pose).
     * Added e1000 driver for 3.0, 3.4.
     * Added e1000e driver for 3.2 (J. Kunz), 3.4 (F. Pose).
