@@ -64,7 +64,7 @@
  *   ecrt_master_reference_clock_time() and the feature flag
  *   EC_HAVE_REF_CLOCK_TIME to have the possibility to synchronize the master
  *   clock to the reference clock.
- * - Changed the datatypes of the shift times in ecrt_slave_config_dc() to
+ * - Changed the data types of the shift times in ecrt_slave_config_dc() to
  *   int32_t to correctly display negative shift times.
  * - Added ecrt_slave_config_reg_pdo_entry_pos() and the feature flag
  *   EC_HAVE_REG_BY_POS for registering PDO entries with non-unique indices
@@ -588,6 +588,11 @@ ec_master_t *ecrt_open_master(
  *
  * After use, a master it has to be released to make it available for other
  * applications.
+ *
+ * This method frees all created data structures. It should not be called in
+ * realtime context.
+ *
+ * If the master was activated, ecrt_master_deactivate() is called internally.
  */
 void ecrt_release_master(
         ec_master_t *master /**< EtherCAT master */
@@ -605,7 +610,6 @@ void ecrt_release_master(
  * request functions on the master, it has to reserve one for exclusive use.
  *
  * \return 0 in case of success, else < 0
- *
  */
 int ecrt_master_reserve(
         ec_master_t *master /**< EtherCAT master */
@@ -629,6 +633,8 @@ int ecrt_master_reserve(
  *
  * The task of the receive callback (\a receive_cb) is to decide, if a call to
  * ecrt_master_receive() is allowed and to execute it respectively.
+ *
+ * \attention This method has to be called before ecrt_master_activate().
  */
 void ecrt_master_callbacks(
         ec_master_t *master, /**< EtherCAT master */
@@ -646,6 +652,9 @@ void ecrt_master_callbacks(
  * This method creates a new process data domain and returns a pointer to the
  * new domain object. This object can be used for registering PDOs and
  * exchanging them in cyclic operation.
+ *
+ * This method allocates memory and should be called in non-realtime context
+ * before ecrt_master_activate().
  *
  * \return Pointer to the new domain on success, else NULL.
  */
@@ -676,6 +685,9 @@ ec_domain_t *ecrt_master_create_domain(
  * If different slave configurations are pointing to the same slave during bus
  * configuration, a warning is raised and only the first configuration is
  * applied.
+ *
+ * This method allocates memory and should be called in non-realtime context
+ * before ecrt_master_activate().
  *
  * \retval >0 Pointer to the slave configuration structure.
  * \retval NULL in the error case.
@@ -899,7 +911,8 @@ int ecrt_master_read_idn(
  * in charge of cyclically calling ecrt_master_send() and
  * ecrt_master_receive() to ensure bus communication. Before calling this
  * function, the master thread is responsible for that, so these functions may
- * not be called!
+ * not be called! The method itself allocates memory and should not be called
+ * in realtime context.
  *
  * \return 0 in case of success, else < 0
  */
@@ -914,6 +927,8 @@ int ecrt_master_activate(
  * ecrt_slave_config_create_sdo_request() and
  * ecrt_slave_config_create_voe_handler() are freed, so pointers to them
  * become invalid.
+ *
+ * This method should not be called in realtime context.
  */
 void ecrt_master_deactivate(
         ec_master_t *master /**< EtherCAT master. */
@@ -921,9 +936,13 @@ void ecrt_master_deactivate(
 
 /** Set interval between calls to ecrt_master_send().
  *
+ * This information helps the master to decide, how much data can be appended
+ * to a frame by the master state machine. When the master is configured with
+ * --enable-hrtimers, this is used to calculate the scheduling of the master
+ * thread.
+ *
  * \retval 0 on success.
  * \retval <0 Error code.
- *
  */
 int ecrt_master_set_send_interval(
         ec_master_t *master, /**< EtherCAT master. */
@@ -996,6 +1015,12 @@ int ecrt_master_link_state(
  * The master has to know the application's time when operating slaves with
  * distributed clocks. The time is not incremented by the master itself, so
  * this method has to be called cyclically.
+ *
+ * \attention The first call of this method is used to calculate the phase
+ * delay for the slaves' SYNC0/1 interrupts. Either the method has to be
+ * called during the realtime cycle *only*, or the first time submitted must
+ * be in-phase with the realtime cycle. Otherwise synchronisation problems can
+ * occur.
  *
  * The time is used when setting the slaves' <tt>System Time Offset</tt> and
  * <tt>Cyclic Operation Start Time</tt> registers and when synchronizing the
@@ -1090,6 +1115,9 @@ void ecrt_master_reset(
  * Sets the direction of a sync manager. This overrides the direction bits
  * from the default control register from SII.
  *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
+ *
  * \return zero on success, else non-zero
  */
 int ecrt_slave_config_sync_manager(
@@ -1101,6 +1129,9 @@ int ecrt_slave_config_sync_manager(
         );
 
 /** Configure a slave's watchdog times.
+ *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
  */
 void ecrt_slave_config_watchdog(
         ec_slave_config_t *sc, /**< Slave configuration. */
@@ -1115,6 +1146,9 @@ void ecrt_slave_config_watchdog(
         );
 
 /** Add a PDO to a sync manager's PDO assignment.
+ *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
  *
  * \see ecrt_slave_config_pdos()
  * \return zero on success, else non-zero
@@ -1132,6 +1166,9 @@ int ecrt_slave_config_pdo_assign_add(
  * ecrt_slave_config_pdo_assign_add(), to clear the default assignment of a
  * sync manager.
  *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
+ *
  * \see ecrt_slave_config_pdos()
  */
 void ecrt_slave_config_pdo_assign_clear(
@@ -1141,6 +1178,9 @@ void ecrt_slave_config_pdo_assign_clear(
         );
 
 /** Add a PDO entry to the given PDO's mapping.
+ *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
  *
  * \see ecrt_slave_config_pdos()
  * \return zero on success, else non-zero
@@ -1159,6 +1199,9 @@ int ecrt_slave_config_pdo_mapping_add(
  *
  * This can be called before mapping PDO entries via
  * ecrt_slave_config_pdo_mapping_add(), to clear the default mapping.
+ *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
  *
  * \see ecrt_slave_config_pdos()
  */
@@ -1233,6 +1276,9 @@ void ecrt_slave_config_pdo_mapping_clear(
  *   \a n_syncs should set to a number greater than the number of list items;
  *   using EC_END is recommended.
  *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
+ *
  * \return zero on success, else non-zero
  */
 int ecrt_slave_config_pdos(
@@ -1255,6 +1301,9 @@ int ecrt_slave_config_pdos(
  * This pointer may be \a NULL, in this case an error is raised if the PDO
  * entry does not byte-align.
  *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
+ *
  * \retval >=0 Success: Offset of the PDO entry's process data.
  * \retval  <0 Error code.
  */
@@ -1273,6 +1322,9 @@ int ecrt_slave_config_reg_pdo_entry(
  * offsets in the PDO mapping, because PDO entry indices may not be unique
  * inside a slave's PDO mapping. An error is raised, if
  * one of the given positions is out of range.
+ *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
  *
  * \retval >=0 Success: Offset of the PDO entry's process data.
  * \retval  <0 Error code.
@@ -1295,6 +1347,9 @@ int ecrt_slave_config_reg_pdo_entry_pos(
  * The AssignActivate word is vendor-specific and can be taken from the XML
  * device description file (Device -> Dc -> AssignActivate). Set this to zero,
  * if the slave shall be operated without distributed clocks (default).
+ *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
  *
  * \attention The \a sync1_shift time is ignored.
  */
@@ -1321,10 +1376,13 @@ void ecrt_slave_config_dc(
  * friends instead.
  *
  * This is the generic function for adding an SDO configuration. Please note
- * that the this function does not do any endianess correction. If
+ * that the this function does not do any endianness correction. If
  * datatype-specific functions are needed (that automatically correct the
- * endianess), have a look at ecrt_slave_config_sdo8(),
+ * endianness), have a look at ecrt_slave_config_sdo8(),
  * ecrt_slave_config_sdo16() and ecrt_slave_config_sdo32().
+ *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
  *
  * \retval  0 Success.
  * \retval <0 Error code.
@@ -1338,6 +1396,9 @@ int ecrt_slave_config_sdo(
         );
 
 /** Add a configuration value for an 8-bit SDO.
+ *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
  *
  * \see ecrt_slave_config_sdo().
  *
@@ -1353,6 +1414,9 @@ int ecrt_slave_config_sdo8(
 
 /** Add a configuration value for a 16-bit SDO.
  *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
+ *
  * \see ecrt_slave_config_sdo().
  *
  * \retval  0 Success.
@@ -1366,6 +1430,9 @@ int ecrt_slave_config_sdo16(
         );
 
 /** Add a configuration value for a 32-bit SDO.
+ *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
  *
  * \see ecrt_slave_config_sdo().
  *
@@ -1384,6 +1451,9 @@ int ecrt_slave_config_sdo32(
  * The SDO data are transferred via CompleteAccess. Data for the first
  * subindex (0) have to be included.
  *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
+ *
  * \see ecrt_slave_config_sdo().
  *
  * \retval  0 Success.
@@ -1400,6 +1470,9 @@ int ecrt_slave_config_complete_sdo(
  *
  * The initial size is zero, so all messages will be dropped. This method can
  * be called even after master activation, but it will clear the ring buffer!
+ *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
  *
  * \return 0 on success, or negative error code.
  */
@@ -1450,6 +1523,9 @@ int ecrt_slave_config_emerg_overruns(
  * The created SDO request object is freed automatically when the master is
  * released.
  *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
+ *
  * \return New SDO request, or NULL on error.
  */
 ec_sdo_request_t *ecrt_slave_config_create_sdo_request(
@@ -1469,6 +1545,9 @@ ec_sdo_request_t *ecrt_slave_config_create_sdo_request(
  * The created VoE handler object is freed automatically when the master is
  * released.
  *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
+ *
  * \return New VoE handler, or NULL on error.
  */
 ec_voe_handler_t *ecrt_slave_config_create_voe_handler(
@@ -1484,6 +1563,9 @@ ec_voe_handler_t *ecrt_slave_config_create_voe_handler(
  *
  * The created register request object is freed automatically when the master
  * is released.
+ *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
  *
  * \return New register request, or NULL on error.
  */
@@ -1519,8 +1601,11 @@ void ecrt_slave_config_state(
  *  - Bit 14 - 12: Parameter set (0 - 7)
  *  - Bit 11 - 0: Data block number (0 - 4095)
  *
- * Please note that the this function does not do any endianess correction.
- * Multi-byte data have to be passed in EtherCAT endianess (little-endian).
+ * Please note that the this function does not do any endianness correction.
+ * Multi-byte data have to be passed in EtherCAT endianness (little-endian).
+ *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
  *
  * \retval  0 Success.
  * \retval <0 Error code.
@@ -1541,7 +1626,11 @@ int ecrt_slave_config_idn(
 
 /** Registers a bunch of PDO entries for a domain.
  *
- * \todo doc
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
+ *
+ * \see ecrt_slave_config_reg_pdo_entry()
+ *
  * \attention The registration array has to be terminated with an empty
  *            structure, or one with the \a index field set to zero!
  * \return 0 on success, else non-zero.
@@ -1569,6 +1658,10 @@ size_t ecrt_domain_size(
  *
  * The size of the allocated memory must be at least ecrt_domain_size(), after
  * all PDO entries have been registered.
+ *
+ * This method has to be called in non-realtime context before
+ * ecrt_master_activate().
+ *
  */
 void ecrt_domain_external_memory(
         ec_domain_t *domain, /**< Domain. */
@@ -1853,8 +1946,8 @@ void ecrt_voe_handler_read_nosync(
 
 /** Execute the handler.
  *
- * This method executes the VoE handler. It has to be called in every bus cycle
- * as long as it returns EC_REQUEST_BUSY.
+ * This method executes the VoE handler. It has to be called in every bus
+ * cycle as long as it returns EC_REQUEST_BUSY.
  *
  * \return Handler state.
  */
@@ -1870,8 +1963,8 @@ ec_request_state_t ecrt_voe_handler_execute(
  *
  * This function returns a pointer to the request's internal memory.
  *
- * - After a read operation was successful, integer data can be evaluated using
- *   the EC_READ_*() macros as usual. Example:
+ * - After a read operation was successful, integer data can be evaluated
+ *   using the EC_READ_*() macros as usual. Example:
  *   \code
  *   uint16_t value = EC_READ_U16(ecrt_reg_request_data(reg_request)));
  *   \endcode
