@@ -175,15 +175,15 @@
  */
 #define EC_HAVE_REG_ACCESS
 
-/* Defined if the method ecrt_master_select_reference_clock() is available.
+/** Defined if the method ecrt_master_select_reference_clock() is available.
  */
 #define EC_HAVE_SELECT_REF_CLOCK
 
-/* Defined if the method ecrt_master_reference_clock_time() is available.
+/** Defined if the method ecrt_master_reference_clock_time() is available.
  */
 #define EC_HAVE_REF_CLOCK_TIME
 
-/* Defined if the method ecrt_slave_config_reg_pdo_entry_pos() is available.
+/** Defined if the method ecrt_slave_config_reg_pdo_entry_pos() is available.
  */
 #define EC_HAVE_REG_BY_POS
 
@@ -1449,6 +1449,8 @@ int ecrt_slave_config_emerg_overruns(
  *
  * The created SDO request object is freed automatically when the master is
  * released.
+ *
+ * \return New SDO request, or NULL on error.
  */
 ec_sdo_request_t *ecrt_slave_config_create_sdo_request(
         ec_slave_config_t *sc, /**< Slave configuration. */
@@ -1466,6 +1468,8 @@ ec_sdo_request_t *ecrt_slave_config_create_sdo_request(
  *
  * The created VoE handler object is freed automatically when the master is
  * released.
+ *
+ * \return New VoE handler, or NULL on error.
  */
 ec_voe_handler_t *ecrt_slave_config_create_voe_handler(
         ec_slave_config_t *sc, /**< Slave configuration. */
@@ -1480,6 +1484,8 @@ ec_voe_handler_t *ecrt_slave_config_create_voe_handler(
  *
  * The created register request object is freed automatically when the master
  * is released.
+ *
+ * \return New register request, or NULL on error.
  */
 ec_reg_request_t *ecrt_slave_config_create_reg_request(
         ec_slave_config_t *sc, /**< Slave configuration. */

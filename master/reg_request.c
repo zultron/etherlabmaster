@@ -42,6 +42,8 @@
 /*****************************************************************************/
 
 /** Register request constructor.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_reg_request_init(
         ec_reg_request_t *reg, /**< Register request. */

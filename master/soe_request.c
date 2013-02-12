@@ -84,6 +84,8 @@ void ec_soe_request_clear(
 /*****************************************************************************/
 
 /** Copy another SoE request.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_soe_request_copy(
         ec_soe_request_t *req, /**< SoE request. */

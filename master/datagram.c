@@ -636,6 +636,8 @@ void ec_datagram_output_stats(
 /*****************************************************************************/
 
 /** Returns a string describing the datagram type.
+ *
+ * \return Pointer on a static memory containing the requested string.
  */
 const char *ec_datagram_type_string(
         const ec_datagram_t *datagram /**< EtherCAT datagram. */

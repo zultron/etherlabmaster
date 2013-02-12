@@ -797,6 +797,8 @@ void ec_slave_attach_pdo_names(
 /*****************************************************************************/
 
 /** Returns the previous connected port of a given port.
+ *
+ * \return Port index.
  */
 unsigned int ec_slave_get_previous_port(
         ec_slave_t *slave, /**< EtherCAT slave. */
@@ -825,6 +827,8 @@ unsigned int ec_slave_get_previous_port(
 /*****************************************************************************/
 
 /** Returns the next connected port of a given port.
+ *
+ * \return Port index.
  */
 unsigned int ec_slave_get_next_port(
         ec_slave_t *slave, /**< EtherCAT slave. */
@@ -853,6 +857,8 @@ unsigned int ec_slave_get_next_port(
 /*****************************************************************************/
 
 /** Calculates the sum of round-trip-times of connected ports 1-3.
+ *
+ * \return Round-trip-time in ns.
  */
 uint32_t ec_slave_calc_rtt_sum(
         ec_slave_t *slave /**< EtherCAT slave. */
@@ -877,6 +883,8 @@ uint32_t ec_slave_calc_rtt_sum(
 /*****************************************************************************/
 
 /** Finds the next slave supporting DC delay measurement.
+ *
+ * \return Next DC slave, or NULL.
  */
 ec_slave_t *ec_slave_find_next_dc_slave(
         ec_slave_t *slave /**< EtherCAT slave. */

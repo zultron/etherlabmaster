@@ -29,10 +29,9 @@
  *
  *****************************************************************************/
 
-/**
-   \file
-   EtherCAT CoE emergency ring buffer methods.
-*/
+/** \file
+ * EtherCAT CoE emergency ring buffer methods.
+ */
 
 /*****************************************************************************/
 
@@ -73,6 +72,8 @@ void ec_coe_emerg_ring_clear(
 /*****************************************************************************/
 
 /** Set the ring size.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_coe_emerg_ring_size(
         ec_coe_emerg_ring_t *ring, /**< Emergency ring. */
@@ -128,6 +129,8 @@ void ec_coe_emerg_ring_push(
 /*****************************************************************************/
 
 /** Remove an emergency message from the ring.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_coe_emerg_ring_pop(
         ec_coe_emerg_ring_t *ring, /**< Emergency ring. */
@@ -146,6 +149,8 @@ int ec_coe_emerg_ring_pop(
 /*****************************************************************************/
 
 /** Clear the ring.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_coe_emerg_ring_clear_ring(
         ec_coe_emerg_ring_t *ring /**< Emergency ring. */
@@ -159,6 +164,8 @@ int ec_coe_emerg_ring_clear_ring(
 /*****************************************************************************/
 
 /** Read the number of overruns.
+ *
+ * \return Number of overruns.
  */
 int ec_coe_emerg_ring_overruns(
         ec_coe_emerg_ring_t *ring /**< Emergency ring. */

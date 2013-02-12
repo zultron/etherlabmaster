@@ -614,6 +614,8 @@ void ec_master_thread_stop(
 /*****************************************************************************/
 
 /** Transition function from ORPHANED to IDLE phase.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_master_enter_idle_phase(
         ec_master_t *master /**< EtherCAT master */
@@ -669,6 +671,8 @@ void ec_master_leave_idle_phase(ec_master_t *master /**< EtherCAT master */)
 /*****************************************************************************/
 
 /** Transition function from IDLE to OPERATION phase.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_master_enter_operation_phase(
         ec_master_t *master /**< EtherCAT master */
@@ -897,6 +901,8 @@ void ec_master_set_send_interval(
 /*****************************************************************************/
 
 /** Searches for a free datagram in the external datagram ring.
+ *
+ * \return Next free datagram, or NULL.
  */
 ec_datagram_t *ec_master_get_external_datagram(
         ec_master_t *master /**< EtherCAT master */
@@ -1779,6 +1785,8 @@ void ec_master_attach_slave_configs(
     } while (0)
 
 /** Finds a slave in the bus, given the alias and position.
+ *
+ * \return Search result, or NULL.
  */
 ec_slave_t *ec_master_find_slave(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1793,6 +1801,8 @@ ec_slave_t *ec_master_find_slave(
 /** Finds a slave in the bus, given the alias and position.
  *
  * Const version.
+ *
+ * \return Search result, or NULL.
  */
 const ec_slave_t *ec_master_find_slave_const(
         const ec_master_t *master, /**< EtherCAT master. */
@@ -2068,6 +2078,8 @@ void ec_master_find_dc_ref_clock(
 /*****************************************************************************/
 
 /** Calculates the bus topology; recursion function.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_master_calc_topology_rec(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2199,6 +2211,8 @@ void ec_master_request_op(
  *****************************************************************************/
 
 /** Same as ecrt_master_create_domain(), but with ERR_PTR() return value.
+ *
+ * \return New domain, or ERR_PTR() return value.
  */
 ec_domain_t *ecrt_master_create_domain_err(
         ec_master_t *master /**< master */

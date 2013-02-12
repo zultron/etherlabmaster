@@ -273,6 +273,8 @@ unsigned int ec_pdo_entry_count(
 /** Finds a PDO entry via its position in the list.
  *
  * Const version.
+ *
+ * \return Search result, or NULL.
  */
 const ec_pdo_entry_t *ec_pdo_find_entry_by_pos_const(
         const ec_pdo_t *pdo, /**< PDO. */

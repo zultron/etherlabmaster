@@ -43,6 +43,8 @@
 #include "domain.h"
 #include "datagram_pair.h"
 
+/** Extra debug output for redundancy functions.
+ */
 #define DEBUG_REDUNDANCY 0
 
 /*****************************************************************************/
@@ -187,6 +189,8 @@ int ec_domain_add_datagram_pair(
  *
  * Walks through the list of all FMMU configurations for the current datagram
  * and ends before the current datagram.
+ *
+ * \return Non-zero if slave connfig was already counted.
  */
 int shall_count(
         const ec_fmmu_config_t *cur_fmmu, /**< Current FMMU with direction to
@@ -340,6 +344,8 @@ unsigned int ec_domain_fmmu_count(const ec_domain_t *domain)
 /*****************************************************************************/
 
 /** Get a certain FMMU configuration via its position in the list.
+ *
+ * \return FMMU at position \a pos, or NULL.
  */
 const ec_fmmu_config_t *ec_domain_find_fmmu(
         const ec_domain_t *domain, /**< EtherCAT domain. */

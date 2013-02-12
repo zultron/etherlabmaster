@@ -388,6 +388,8 @@ unsigned int ec_slave_config_sdo_count(
 /** Finds an SDO configuration via its position in the list.
  *
  * Const version.
+ *
+ * \return Search result, or NULL.
  */
 const ec_sdo_request_t *ec_slave_config_get_sdo_by_pos_const(
         const ec_slave_config_t *sc, /**< Slave configuration. */
@@ -430,6 +432,8 @@ unsigned int ec_slave_config_idn_count(
 /** Finds an IDN configuration via its position in the list.
  *
  * Const version.
+ *
+ * \return Search result, or NULL.
  */
 const ec_soe_request_t *ec_slave_config_get_idn_by_pos_const(
         const ec_slave_config_t *sc, /**< Slave configuration. */
@@ -450,6 +454,8 @@ const ec_soe_request_t *ec_slave_config_get_idn_by_pos_const(
 /*****************************************************************************/
 
 /** Finds a CoE handler via its position in the list.
+ *
+ * \return Search result, or NULL.
  */
 ec_sdo_request_t *ec_slave_config_find_sdo_request(
         ec_slave_config_t *sc, /**< Slave configuration. */
@@ -470,6 +476,8 @@ ec_sdo_request_t *ec_slave_config_find_sdo_request(
 /*****************************************************************************/
 
 /** Finds a register handler via its position in the list.
+ *
+ * \return Search result, or NULL.
  */
 ec_reg_request_t *ec_slave_config_find_reg_request(
         ec_slave_config_t *sc, /**< Slave configuration. */
@@ -490,6 +498,8 @@ ec_reg_request_t *ec_slave_config_find_reg_request(
 /*****************************************************************************/
 
 /** Finds a VoE handler via its position in the list.
+ *
+ * \return Search result, or NULL.
  */
 ec_voe_handler_t *ec_slave_config_find_voe_handler(
         ec_slave_config_t *sc, /**< Slave configuration. */

@@ -103,7 +103,10 @@ void ec_foe_request_clear_data(
 
 /** Pre-allocates the data memory.
  *
- * If the \a buffer_size is already bigger than \a size, nothing is done.
+ * If the internal \a buffer_size is already bigger than \a size, nothing is
+ * done.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_foe_request_alloc(
         ec_foe_request_t *req, /**< FoE request. */
@@ -131,6 +134,8 @@ int ec_foe_request_alloc(
 /** Copies FoE data from an external source.
  *
  * If the \a buffer_size is to small, new memory is allocated.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_foe_request_copy_data(
         ec_foe_request_t *req, /**< FoE request. */

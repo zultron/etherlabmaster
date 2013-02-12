@@ -230,9 +230,11 @@ void ec_fsm_foe_end(
 /*****************************************************************************/
 
 /** Sends a file or the next fragment.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_foe_prepare_data_send(
-        ec_fsm_foe_t *fsm,
+        ec_fsm_foe_t *fsm, /**< Finite state machine. */
         ec_datagram_t *datagram /**< Datagram to use. */
         )
 {
@@ -270,6 +272,8 @@ int ec_foe_prepare_data_send(
 /*****************************************************************************/
 
 /** Prepare a write request (WRQ) with filename
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_foe_prepare_wrq_send(
         ec_fsm_foe_t *fsm, /**< Finite state machine. */
@@ -545,6 +549,8 @@ void ec_fsm_foe_state_data_sent(
 /*****************************************************************************/
 
 /** Prepare a read request (RRQ) with filename
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_foe_prepare_rrq_send(
         ec_fsm_foe_t *fsm, /**< Finite state machine. */
@@ -577,6 +583,8 @@ int ec_foe_prepare_rrq_send(
 /*****************************************************************************/
 
 /** Prepare to send an acknowledge.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_foe_prepare_send_ack(
         ec_fsm_foe_t *fsm, /**< FoE statemachine. */

@@ -98,6 +98,8 @@ static const struct net_device_ops ec_eoedev_ops = {
 /** EoE constructor.
  *
  * Initializes the EoE handler, creates a net_device and registers it.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_eoe_init(
         ec_eoe_t *eoe, /**< EoE handler */
@@ -246,6 +248,8 @@ void ec_eoe_flush(ec_eoe_t *eoe /**< EoE handler */)
 /*****************************************************************************/
 
 /** Sends a frame or the next fragment.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_eoe_send(ec_eoe_t *eoe /**< EoE handler */)
 {
@@ -385,7 +389,7 @@ int ec_eoe_is_idle(const ec_eoe_t *eoe /**< EoE handler */)
  * Starts a new receiving sequence by queueing a datagram that checks the
  * slave's mailbox for a new EoE datagram.
  *
- * \fixme Use both devices.
+ * \todo Use both devices.
  */
 void ec_eoe_state_rx_start(ec_eoe_t *eoe /**< EoE handler */)
 {
@@ -614,7 +618,7 @@ void ec_eoe_state_rx_fetch(ec_eoe_t *eoe /**< EoE handler */)
  * Starts a new transmit sequence. If no data is available, a new receive
  * sequence is started instead.
  *
- * \fixme Use both devices.
+ * \todo Use both devices.
  */
 void ec_eoe_state_tx_start(ec_eoe_t *eoe /**< EoE handler */)
 {
@@ -754,6 +758,8 @@ void ec_eoe_state_tx_sent(ec_eoe_t *eoe /**< EoE handler */)
  *****************************************************************************/
 
 /** Opens the virtual network device.
+ *
+ * \return Always zero (success).
  */
 int ec_eoedev_open(struct net_device *dev /**< EoE net_device */)
 {
@@ -774,6 +780,8 @@ int ec_eoedev_open(struct net_device *dev /**< EoE net_device */)
 /*****************************************************************************/
 
 /** Stops the virtual network device.
+ *
+ * \return Always zero (success).
  */
 int ec_eoedev_stop(struct net_device *dev /**< EoE net_device */)
 {
@@ -794,6 +802,8 @@ int ec_eoedev_stop(struct net_device *dev /**< EoE net_device */)
 /*****************************************************************************/
 
 /** Transmits data via the virtual network device.
+ *
+ * \return Zero on success, non-zero on failure.
  */
 int ec_eoedev_tx(struct sk_buff *skb, /**< transmit socket buffer */
                  struct net_device *dev /**< EoE net_device */
@@ -844,6 +854,8 @@ int ec_eoedev_tx(struct sk_buff *skb, /**< transmit socket buffer */
 /*****************************************************************************/
 
 /** Gets statistics about the virtual network device.
+ *
+ * \return Statistics.
  */
 struct net_device_stats *ec_eoedev_stats(
         struct net_device *dev /**< EoE net_device */

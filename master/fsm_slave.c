@@ -158,6 +158,8 @@ void ec_fsm_slave_set_ready(
 /*****************************************************************************/
 
 /** Returns, if the FSM is currently not busy and ready to execute.
+ *
+ * \return Non-zero if ready.
  */
 int ec_fsm_slave_is_ready(
         const ec_fsm_slave_t *fsm /**< Slave state machine. */

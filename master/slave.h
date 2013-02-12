@@ -98,6 +98,8 @@
  * POSITION is the slave's ring position.
  *
  * \param slave EtherCAT slave
+ * \param level Debug level. Master's debug level must be >= \a level for
+ * output.
  * \param fmt format string (like in printf())
  * \param args arguments (optional)
  */

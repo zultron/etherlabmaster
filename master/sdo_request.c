@@ -85,6 +85,8 @@ void ec_sdo_request_clear(
 /** Copy another SDO request.
  *
  * \attention Only the index subindex and data are copied.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_sdo_request_copy(
         ec_sdo_request_t *req, /**< SDO request. */

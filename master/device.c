@@ -698,6 +698,8 @@ void ecdev_set_link(
 /** Reads the link state.
  *
  * \ingroup DeviceInterface
+ *
+ * \return Link state.
  */
 uint8_t ecdev_get_link(
         const ec_device_t *device /**< EtherCAT device */

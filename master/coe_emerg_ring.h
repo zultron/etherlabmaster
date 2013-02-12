@@ -44,7 +44,7 @@
 /** EtherCAT CoE emergency message record.
  */
 typedef struct {
-    u8 data[EC_COE_EMERGENCY_MSG_SIZE];
+    u8 data[EC_COE_EMERGENCY_MSG_SIZE]; /**< Message data. */
 } ec_coe_emerg_msg_t;
 
 /*****************************************************************************/
@@ -54,12 +54,12 @@ typedef struct {
 typedef struct {
     ec_slave_config_t *sc; /**< Slave configuration  owning the ring. */
 
-    ec_coe_emerg_msg_t *msgs;
-    size_t size;
+    ec_coe_emerg_msg_t *msgs; /**< Message ring. */
+    size_t size; /**< Ring size. */
 
-    unsigned int read_index;
-    unsigned int write_index;
-    unsigned int overruns;
+    unsigned int read_index; /**< Read index. */
+    unsigned int write_index; /**< Write index. */
+    unsigned int overruns; /**< Number of overruns since last reset. */
 } ec_coe_emerg_ring_t;
 
 /*****************************************************************************/
