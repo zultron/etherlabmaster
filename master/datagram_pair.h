@@ -48,7 +48,7 @@
  */
 typedef struct {
     struct list_head list; /**< List header. */
-    ec_domain_t *domain;
+    ec_domain_t *domain; /**< Parent domain. */
     ec_datagram_t datagrams[EC_MAX_NUM_DEVICES]; /**< Datagrams.  */
 #if EC_MAX_NUM_DEVICES > 1
     uint8_t *send_buffer;

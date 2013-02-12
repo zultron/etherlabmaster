@@ -103,6 +103,8 @@
  * where INDEX is the master index.
  *
  * \param master EtherCAT master
+ * \param level Debug level. Master's debug level must be >= \a level for
+ * output.
  * \param fmt format string (like in printf())
  * \param args arguments (optional)
  */
@@ -318,6 +320,8 @@ int ec_master_init(ec_master_t *, unsigned int, const uint8_t *,
         const uint8_t *, dev_t, struct class *, unsigned int);
 void ec_master_clear(ec_master_t *);
 
+/** Number of Ethernet devices.
+ */
 #if EC_MAX_NUM_DEVICES > 1
 #define ec_master_num_devices(MASTER) ((MASTER)->num_devices)
 #else

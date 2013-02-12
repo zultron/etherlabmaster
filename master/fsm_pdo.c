@@ -27,7 +27,8 @@
  *
  *****************************************************************************/
 
-/** \file EtherCAT PDO configuration state machine.
+/** \file
+ * EtherCAT PDO configuration state machine.
  */
 
 /*****************************************************************************/
@@ -396,6 +397,8 @@ void ec_fsm_pdo_conf_state_start(
 /*****************************************************************************/
 
 /** Assign next PDO.
+ *
+ * \return Next PDO, or NULL.
  */
 ec_pdo_t *ec_fsm_pdo_conf_action_next_pdo(
         const ec_fsm_pdo_t *fsm, /**< PDO configuration state machine. */

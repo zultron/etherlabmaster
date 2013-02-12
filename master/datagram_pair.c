@@ -42,12 +42,14 @@
 /*****************************************************************************/
 
 /** Datagram pair constructor.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 int ec_datagram_pair_init(
         ec_datagram_pair_t *pair, /**< Datagram pair. */
         ec_domain_t *domain, /**< Parent domain. */
-        uint32_t logical_offset,
-        uint8_t *data,
+        uint32_t logical_offset, /**< Logical offset. */
+        uint8_t *data, /**< Data pointer. */
         size_t data_size, /**< Data size. */
         const unsigned int used[] /**< input/output use count. */
         )
@@ -168,6 +170,8 @@ void ec_datagram_pair_clear(
 /*****************************************************************************/
 
 /** Process received data.
+ *
+ * \return Working counter sum over all devices.
  */
 uint16_t ec_datagram_pair_process(
         ec_datagram_pair_t *pair, /**< Datagram pair. */

@@ -106,6 +106,8 @@ void ec_voe_handler_clear(
 /*****************************************************************************/
 
 /** Get usable memory size.
+ *
+ * \return Memory size.
  */
 size_t ec_voe_handler_mem_size(
         const ec_voe_handler_t *voe /**< VoE handler. */

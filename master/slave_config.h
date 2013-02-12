@@ -98,6 +98,8 @@
  * and ALIAS and POSITION identify the configuration.
  *
  * \param sc EtherCAT slave configuration
+ * \param level Debug level. Master's debug level must be >= \a level for
+ * output.
  * \param fmt format string (like in printf())
  * \param args arguments (optional)
  */

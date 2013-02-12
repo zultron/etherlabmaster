@@ -222,6 +222,8 @@ long eccdev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
  *
  * The actual mapping will be done in the eccdev_vma_nopage() callback of the
  * virtual memory area.
+ *
+ * \return Always zero (success).
  */
 int eccdev_mmap(
         struct file *filp,
@@ -247,6 +249,8 @@ int eccdev_mmap(
  *
  * Called at the first access on a virtual-memory area retrieved with
  * ecdev_mmap().
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static int eccdev_vma_fault(
         struct vm_area_struct *vma, /**< Virtual memory area. */
@@ -257,12 +261,14 @@ static int eccdev_vma_fault(
     ec_cdev_priv_t *priv = (ec_cdev_priv_t *) vma->vm_private_data;
     struct page *page;
 
-    if (offset >= priv->ctx.process_data_size)
+    if (offset >= priv->ctx.process_data_size) {
         return VM_FAULT_SIGBUS;
+    }
 
     page = vmalloc_to_page(priv->ctx.process_data + offset);
-    if (!page)
+    if (!page) {
         return VM_FAULT_SIGBUS;
+    }
 
     get_page(page);
     vmf->page = page;

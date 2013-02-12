@@ -959,6 +959,8 @@ void ec_fsm_master_enter_write_system_times(
 /*****************************************************************************/
 
 /** Configure 32 bit time offset.
+ *
+ * \return New offset.
  */
 u64 ec_fsm_master_dc_offset32(
         ec_fsm_master_t *fsm, /**< Master state machine. */
@@ -999,6 +1001,8 @@ u64 ec_fsm_master_dc_offset32(
 /*****************************************************************************/
 
 /** Configure 64 bit time offset.
+ *
+ * \return New offset.
  */
 u64 ec_fsm_master_dc_offset64(
         ec_fsm_master_t *fsm, /**< Master state machine. */

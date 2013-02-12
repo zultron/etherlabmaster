@@ -388,6 +388,8 @@ void ec_print_data_diff(const uint8_t *d1, /**< first data */
 /*****************************************************************************/
 
 /** Prints slave states in clear text.
+ *
+ * \return Size of the created string.
  */
 size_t ec_state_string(uint8_t states, /**< slave states */
                        char *buffer, /**< target buffer
@@ -522,6 +524,8 @@ ec_device_t *ecdev_offer(
 /** Request a master.
  *
  * Same as ecrt_request_master(), but with ERR_PTR() return value.
+ *
+ * \return Requested master.
  */
 ec_master_t *ecrt_request_master_err(
         unsigned int master_index /**< Master index. */

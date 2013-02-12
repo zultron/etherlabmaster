@@ -52,7 +52,7 @@ struct ec_reg_request {
     ec_direction_t dir; /**< Direction. EC_DIR_OUTPUT means writing to the
                           slave, EC_DIR_INPUT means reading from the slave. */
     uint16_t address; /**< Register address. */
-    size_t transfer_size; /*< Size of the data to transfer. */
+    size_t transfer_size; /**< Size of the data to transfer. */
     ec_internal_request_state_t state; /**< Request state. */
 };
 

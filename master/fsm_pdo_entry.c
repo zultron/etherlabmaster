@@ -363,6 +363,8 @@ void ec_fsm_pdo_entry_conf_state_start(
 /*****************************************************************************/
 
 /** Process next PDO entry.
+ *
+ * \return Next PDO entry, or NULL.
  */
 ec_pdo_entry_t *ec_fsm_pdo_entry_conf_next_entry(
         const ec_fsm_pdo_entry_t *fsm, /**< PDO mapping state machine. */

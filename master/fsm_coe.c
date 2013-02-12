@@ -27,7 +27,8 @@
  *
  *****************************************************************************/
 
-/** \file EtherCAT CoE state machines.
+/** \file
+ * EtherCAT CoE state machines.
  */
 
 /*****************************************************************************/
@@ -307,6 +308,10 @@ int ec_fsm_coe_check_emergency(
  *  CoE dictionary state machine
  *****************************************************************************/
 
+/** Prepare a dictionary request.
+ *
+ * \return Zero on success, otherwise a negative error code.
+ */
 int ec_fsm_coe_prepare_dict(
         ec_fsm_coe_t *fsm, /**< Finite state machine. */
         ec_datagram_t *datagram /**< Datagram to use. */
@@ -455,6 +460,10 @@ void ec_fsm_coe_dict_check(
 
 /*****************************************************************************/
 
+/** Prepare an object description request.
+ *
+ * \return Zero on success, otherwise a negative error code.
+ */
 int ec_fsm_coe_dict_prepare_desc(
         ec_fsm_coe_t *fsm, /**< Finite state machine. */
         ec_datagram_t *datagram /**< Datagram to use. */
@@ -733,6 +742,10 @@ void ec_fsm_coe_dict_desc_check(
 
 /*****************************************************************************/
 
+/** Prepare an entry description request.
+ *
+ * \return Zero on success, otherwise a negative error code.
+ */
 int ec_fsm_coe_dict_prepare_entry(
         ec_fsm_coe_t *fsm, /**< Finite state machine */
         ec_datagram_t *datagram /**< Datagram to use. */
@@ -1172,6 +1185,10 @@ void ec_fsm_coe_dict_entry_response(
  *  CoE state machine
  *****************************************************************************/
 
+/** Prepare a donwnload request.
+ *
+ * \return Zero on success, otherwise a negative error code.
+ */
 int ec_fsm_coe_prepare_down_start(
         ec_fsm_coe_t *fsm, /**< Finite state machine. */
         ec_datagram_t *datagram /**< Datagram to use. */
@@ -1814,6 +1831,10 @@ void ec_fsm_coe_down_seg_response(
 
 /*****************************************************************************/
 
+/** Prepare an upload request.
+ *
+ * \return Zero on success, otherwise a negative error code.
+ */
 int ec_fsm_coe_prepare_up(
         ec_fsm_coe_t *fsm, /**< Finite state machine. */
         ec_datagram_t *datagram /**< Datagram to use. */

@@ -45,8 +45,8 @@
 /** Context structure for an open RTDM file handle.
  */
 typedef struct {
-    rtdm_user_info_t *user_info;
-    ec_ioctl_context_t ioctl_ctx;
+    rtdm_user_info_t *user_info; /**< RTDM user info. */
+    ec_ioctl_context_t ioctl_ctx; /**< Context structure. */
 } ec_rtdm_context_t;
 
 /****************************************************************************/

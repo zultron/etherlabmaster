@@ -49,6 +49,8 @@
  */
 #define DEBUG_LATENCY 0
 
+/** Optional compiler attributes fo ioctl() functions.
+ */
 #if 0
 #define ATTRIBUTES __attribute__ ((__noinline__))
 #else
@@ -75,6 +77,8 @@ static void ec_ioctl_strcpy(
 /*****************************************************************************/
 
 /** Get module information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_module(
         void *arg /**< Userspace address to store the results. */
@@ -94,6 +98,8 @@ static ATTRIBUTES int ec_ioctl_module(
 /*****************************************************************************/
 
 /** Get master information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_master(
         ec_master_t *master, /**< EtherCAT master. */
@@ -187,6 +193,8 @@ static ATTRIBUTES int ec_ioctl_master(
 /*****************************************************************************/
 
 /** Get slave information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave(
         ec_master_t *master, /**< EtherCAT master. */
@@ -272,6 +280,8 @@ static ATTRIBUTES int ec_ioctl_slave(
 /*****************************************************************************/
 
 /** Get slave sync manager information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_sync(
         ec_master_t *master, /**< EtherCAT master. */
@@ -323,6 +333,8 @@ static ATTRIBUTES int ec_ioctl_slave_sync(
 /*****************************************************************************/
 
 /** Get slave sync manager PDO information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_sync_pdo(
         ec_master_t *master, /**< EtherCAT master. */
@@ -380,6 +392,8 @@ static ATTRIBUTES int ec_ioctl_slave_sync_pdo(
 /*****************************************************************************/
 
 /** Get slave sync manager PDO entry information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_sync_pdo_entry(
         ec_master_t *master, /**< EtherCAT master. */
@@ -447,6 +461,8 @@ static ATTRIBUTES int ec_ioctl_slave_sync_pdo_entry(
 /*****************************************************************************/
 
 /** Get domain information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_domain(
         ec_master_t *master, /**< EtherCAT master. */
@@ -490,6 +506,8 @@ static ATTRIBUTES int ec_ioctl_domain(
 /*****************************************************************************/
 
 /** Get domain FMMU information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_domain_fmmu(
         ec_master_t *master, /**< EtherCAT master. */
@@ -540,6 +558,8 @@ static ATTRIBUTES int ec_ioctl_domain_fmmu(
 /*****************************************************************************/
 
 /** Get domain data.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_domain_data(
         ec_master_t *master, /**< EtherCAT master. */
@@ -583,6 +603,8 @@ static ATTRIBUTES int ec_ioctl_domain_data(
 /*****************************************************************************/
 
 /** Set master debug level.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_master_debug(
         ec_master_t *master, /**< EtherCAT master. */
@@ -595,6 +617,8 @@ static ATTRIBUTES int ec_ioctl_master_debug(
 /*****************************************************************************/
 
 /** Issue a bus scan.
+ *
+ * \return Always zero (success).
  */
 static ATTRIBUTES int ec_ioctl_master_rescan(
         ec_master_t *master, /**< EtherCAT master. */
@@ -608,6 +632,8 @@ static ATTRIBUTES int ec_ioctl_master_rescan(
 /*****************************************************************************/
 
 /** Set slave state.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_state(
         ec_master_t *master, /**< EtherCAT master. */
@@ -641,6 +667,8 @@ static ATTRIBUTES int ec_ioctl_slave_state(
 /*****************************************************************************/
 
 /** Get slave SDO information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_sdo(
         ec_master_t *master, /**< EtherCAT master. */
@@ -688,6 +716,8 @@ static ATTRIBUTES int ec_ioctl_slave_sdo(
 /*****************************************************************************/
 
 /** Get slave SDO entry information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_sdo_entry(
         ec_master_t *master, /**< EtherCAT master. */
@@ -766,6 +796,8 @@ static ATTRIBUTES int ec_ioctl_slave_sdo_entry(
 /*****************************************************************************/
 
 /** Upload SDO.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_sdo_upload(
         ec_master_t *master, /**< EtherCAT master. */
@@ -810,6 +842,8 @@ static ATTRIBUTES int ec_ioctl_slave_sdo_upload(
 /*****************************************************************************/
 
 /** Download SDO.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_sdo_download(
         ec_master_t *master, /**< EtherCAT master. */
@@ -856,6 +890,8 @@ static ATTRIBUTES int ec_ioctl_slave_sdo_download(
 /*****************************************************************************/
 
 /** Read a slave's SII.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_sii_read(
         ec_master_t *master, /**< EtherCAT master. */
@@ -902,6 +938,8 @@ static ATTRIBUTES int ec_ioctl_slave_sii_read(
 /*****************************************************************************/
 
 /** Write a slave's SII.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_sii_write(
         ec_master_t *master, /**< EtherCAT master. */
@@ -988,6 +1026,8 @@ static ATTRIBUTES int ec_ioctl_slave_sii_write(
 /*****************************************************************************/
 
 /** Read a slave's registers.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_reg_read(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1065,6 +1105,8 @@ static ATTRIBUTES int ec_ioctl_slave_reg_read(
 /*****************************************************************************/
 
 /** Write a slave's registers.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_reg_write(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1141,6 +1183,8 @@ static ATTRIBUTES int ec_ioctl_slave_reg_write(
 /*****************************************************************************/
 
 /** Get slave configuration information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_config(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1197,6 +1241,8 @@ static ATTRIBUTES int ec_ioctl_config(
 /*****************************************************************************/
 
 /** Get slave configuration PDO information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_config_pdo(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1251,6 +1297,8 @@ static ATTRIBUTES int ec_ioctl_config_pdo(
 /*****************************************************************************/
 
 /** Get slave configuration PDO entry information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_config_pdo_entry(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1314,6 +1362,8 @@ static ATTRIBUTES int ec_ioctl_config_pdo_entry(
 /*****************************************************************************/
 
 /** Get slave configuration SDO information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_config_sdo(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1376,6 +1426,8 @@ static ATTRIBUTES int ec_ioctl_config_sdo(
 /*****************************************************************************/
 
 /** Get slave configuration IDN information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_config_idn(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1440,6 +1492,8 @@ static ATTRIBUTES int ec_ioctl_config_idn(
 #ifdef EC_EOE
 
 /** Get EoE handler information.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_eoe_handler(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1490,6 +1544,8 @@ static ATTRIBUTES int ec_ioctl_eoe_handler(
 /*****************************************************************************/
 
 /** Request the master from userspace.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_request(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1513,6 +1569,8 @@ static ATTRIBUTES int ec_ioctl_request(
 /*****************************************************************************/
 
 /** Create a domain.
+ *
+ * \return Domain index on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_create_domain(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1535,6 +1593,8 @@ static ATTRIBUTES int ec_ioctl_create_domain(
 /*****************************************************************************/
 
 /** Create a slave configuration.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_create_slave_config(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1579,6 +1639,8 @@ static ATTRIBUTES int ec_ioctl_create_slave_config(
 /*****************************************************************************/
 
 /** Select the DC reference clock.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_select_ref_clock(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1618,6 +1680,8 @@ out_return:
 /*****************************************************************************/
 
 /** Activates the master.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_activate(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1699,6 +1763,8 @@ static ATTRIBUTES int ec_ioctl_activate(
 /*****************************************************************************/
 
 /** Deactivates the master.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_deactivate(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1716,6 +1782,8 @@ static ATTRIBUTES int ec_ioctl_deactivate(
 /*****************************************************************************/
 
 /** Set max. number of databytes in a cycle
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_set_send_interval(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1746,6 +1814,8 @@ static ATTRIBUTES int ec_ioctl_set_send_interval(
 /*****************************************************************************/
 
 /** Send frames.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_send(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1764,6 +1834,8 @@ static ATTRIBUTES int ec_ioctl_send(
 /*****************************************************************************/
 
 /** Receive frames.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_receive(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1782,6 +1854,8 @@ static ATTRIBUTES int ec_ioctl_receive(
 /*****************************************************************************/
 
 /** Get the master state.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_master_state(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1801,7 +1875,9 @@ static ATTRIBUTES int ec_ioctl_master_state(
 
 /*****************************************************************************/
 
-/** Get the master state.
+/** Get the link state.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_master_link_state(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1831,7 +1907,9 @@ static ATTRIBUTES int ec_ioctl_master_link_state(
 
 /*****************************************************************************/
 
-/** Set the master dc app time.
+/** Set the master DC application time.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_app_time(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1855,6 +1933,8 @@ static ATTRIBUTES int ec_ioctl_app_time(
 /*****************************************************************************/
 
 /** Sync the reference clock.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sync_ref(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1873,6 +1953,8 @@ static ATTRIBUTES int ec_ioctl_sync_ref(
 /*****************************************************************************/
 
 /** Sync the slave clocks.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sync_slaves(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1891,6 +1973,8 @@ static ATTRIBUTES int ec_ioctl_sync_slaves(
 /*****************************************************************************/
 
 /** Get the system time of the reference clock.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_ref_clock_time(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1920,6 +2004,8 @@ static ATTRIBUTES int ec_ioctl_ref_clock_time(
 /*****************************************************************************/
 
 /** Queue the sync monitoring datagram.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sync_mon_queue(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1938,6 +2024,8 @@ static ATTRIBUTES int ec_ioctl_sync_mon_queue(
 /*****************************************************************************/
 
 /** Processes the sync monitoring datagram.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sync_mon_process(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1961,6 +2049,8 @@ static ATTRIBUTES int ec_ioctl_sync_mon_process(
 /*****************************************************************************/
 
 /** Reset configuration.
+ *
+ * \return Always zero (success).
  */
 static ATTRIBUTES int ec_ioctl_reset(
         ec_master_t *master, /**< EtherCAT master. */
@@ -1977,6 +2067,8 @@ static ATTRIBUTES int ec_ioctl_reset(
 /*****************************************************************************/
 
 /** Configure a sync manager.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_sync(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2028,6 +2120,8 @@ out_return:
 /*****************************************************************************/
 
 /** Configure a slave's watchdogs.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_watchdog(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2071,6 +2165,8 @@ out_return:
 /*****************************************************************************/
 
 /** Add a PDO to the assignment.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_add_pdo(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2095,7 +2191,7 @@ static ATTRIBUTES int ec_ioctl_sc_add_pdo(
         return -ENOENT;
     }
 
-    up(&master->master_sem); /** \fixme sc could be invalidated */
+    up(&master->master_sem); /** \todo sc could be invalidated */
 
     return ecrt_slave_config_pdo_assign_add(sc, data.sync_index, data.index);
 }
@@ -2103,6 +2199,8 @@ static ATTRIBUTES int ec_ioctl_sc_add_pdo(
 /*****************************************************************************/
 
 /** Clears the PDO assignment.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_clear_pdos(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2127,7 +2225,7 @@ static ATTRIBUTES int ec_ioctl_sc_clear_pdos(
         return -ENOENT;
     }
 
-    up(&master->master_sem); /** \fixme sc could be invalidated */
+    up(&master->master_sem); /** \todo sc could be invalidated */
 
     ecrt_slave_config_pdo_assign_clear(sc, data.sync_index);
     return 0;
@@ -2136,6 +2234,8 @@ static ATTRIBUTES int ec_ioctl_sc_clear_pdos(
 /*****************************************************************************/
 
 /** Add an entry to a PDO's mapping.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_add_entry(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2160,7 +2260,7 @@ static ATTRIBUTES int ec_ioctl_sc_add_entry(
         return -ENOENT;
     }
 
-    up(&master->master_sem); /** \fixme sc could be invalidated */
+    up(&master->master_sem); /** \todo sc could be invalidated */
 
     return ecrt_slave_config_pdo_mapping_add(sc, data.pdo_index,
             data.entry_index, data.entry_subindex, data.entry_bit_length);
@@ -2169,6 +2269,8 @@ static ATTRIBUTES int ec_ioctl_sc_add_entry(
 /*****************************************************************************/
 
 /** Clears the mapping of a PDO.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_clear_entries(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2193,7 +2295,7 @@ static ATTRIBUTES int ec_ioctl_sc_clear_entries(
         return -ENOENT;
     }
 
-    up(&master->master_sem); /** \fixme sc could be invalidated */
+    up(&master->master_sem); /** \todo sc could be invalidated */
 
     ecrt_slave_config_pdo_mapping_clear(sc, data.index);
     return 0;
@@ -2202,6 +2304,8 @@ static ATTRIBUTES int ec_ioctl_sc_clear_entries(
 /*****************************************************************************/
 
 /** Registers a PDO entry.
+ *
+ * \return Process data offset on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_reg_pdo_entry(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2233,7 +2337,7 @@ static ATTRIBUTES int ec_ioctl_sc_reg_pdo_entry(
         return -ENOENT;
     }
 
-    up(&master->master_sem); /** \fixme sc or domain could be invalidated */
+    up(&master->master_sem); /** \todo sc or domain could be invalidated */
 
     ret = ecrt_slave_config_reg_pdo_entry(sc, data.entry_index,
             data.entry_subindex, domain, &data.bit_position);
@@ -2247,6 +2351,8 @@ static ATTRIBUTES int ec_ioctl_sc_reg_pdo_entry(
 /*****************************************************************************/
 
 /** Registers a PDO entry by its position.
+ *
+ * \return Process data offset on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_reg_pdo_pos(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2281,7 +2387,7 @@ static ATTRIBUTES int ec_ioctl_sc_reg_pdo_pos(
         return -ENOENT;
     }
 
-    up(&master->master_sem); /** \fixme sc or domain could be invalidated */
+    up(&master->master_sem); /** \todo sc or domain could be invalidated */
 
     ret = ecrt_slave_config_reg_pdo_entry_pos(sc, io.sync_index,
             io.pdo_pos, io.entry_pos, domain, &io.bit_position);
@@ -2295,6 +2401,8 @@ static ATTRIBUTES int ec_ioctl_sc_reg_pdo_pos(
 /*****************************************************************************/
 
 /** Sets the DC AssignActivate word and the sync signal times.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_dc(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2333,6 +2441,8 @@ static ATTRIBUTES int ec_ioctl_sc_dc(
 /*****************************************************************************/
 
 /** Configures an SDO.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_sdo(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2374,7 +2484,7 @@ static ATTRIBUTES int ec_ioctl_sc_sdo(
         return -ENOENT;
     }
 
-    up(&master->master_sem); /** \fixme sc could be invalidated */
+    up(&master->master_sem); /** \todo sc could be invalidated */
 
     if (data.complete_access) {
         ret = ecrt_slave_config_complete_sdo(sc,
@@ -2390,6 +2500,8 @@ static ATTRIBUTES int ec_ioctl_sc_sdo(
 /*****************************************************************************/
 
 /** Set the emergency ring buffer size.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_emerg_size(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2426,6 +2538,8 @@ static ATTRIBUTES int ec_ioctl_sc_emerg_size(
 /*****************************************************************************/
 
 /** Get an emergency message from the ring.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_emerg_pop(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2468,6 +2582,8 @@ static ATTRIBUTES int ec_ioctl_sc_emerg_pop(
 /*****************************************************************************/
 
 /** Clear the emergency ring.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_emerg_clear(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2499,6 +2615,8 @@ static ATTRIBUTES int ec_ioctl_sc_emerg_clear(
 /*****************************************************************************/
 
 /** Get the number of emergency overruns.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_emerg_overruns(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2542,6 +2660,8 @@ static ATTRIBUTES int ec_ioctl_sc_emerg_overruns(
 /*****************************************************************************/
 
 /** Create an SDO request.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_create_sdo_request(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2575,7 +2695,7 @@ static ATTRIBUTES int ec_ioctl_sc_create_sdo_request(
         data.request_index++;
     }
 
-    up(&master->master_sem); /** \fixme sc could be invalidated */
+    up(&master->master_sem); /** \todo sc could be invalidated */
 
     req = ecrt_slave_config_create_sdo_request_err(sc, data.sdo_index,
             data.sdo_subindex, data.size);
@@ -2591,6 +2711,8 @@ static ATTRIBUTES int ec_ioctl_sc_create_sdo_request(
 /*****************************************************************************/
 
 /** Create a register request.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_create_reg_request(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2626,7 +2748,7 @@ static ATTRIBUTES int ec_ioctl_sc_create_reg_request(
         io.request_index++;
     }
 
-    up(&master->master_sem); /** \fixme sc could be invalidated */
+    up(&master->master_sem); /** \todo sc could be invalidated */
 
     reg = ecrt_slave_config_create_reg_request_err(sc, io.mem_size);
     if (IS_ERR(reg)) {
@@ -2643,6 +2765,8 @@ static ATTRIBUTES int ec_ioctl_sc_create_reg_request(
 /*****************************************************************************/
 
 /** Create a VoE handler.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_create_voe_handler(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2676,7 +2800,7 @@ static ATTRIBUTES int ec_ioctl_sc_create_voe_handler(
         data.voe_index++;
     }
 
-    up(&master->master_sem); /** \fixme sc could be invalidated */
+    up(&master->master_sem); /** \todo sc could be invalidated */
 
     voe = ecrt_slave_config_create_voe_handler_err(sc, data.size);
     if (IS_ERR(voe))
@@ -2691,6 +2815,8 @@ static ATTRIBUTES int ec_ioctl_sc_create_voe_handler(
 /*****************************************************************************/
 
 /** Get the slave configuration's state.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_state(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2727,6 +2853,8 @@ static ATTRIBUTES int ec_ioctl_sc_state(
 /*****************************************************************************/
 
 /** Configures an IDN.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sc_idn(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2768,7 +2896,7 @@ static ATTRIBUTES int ec_ioctl_sc_idn(
         return -ENOENT;
     }
 
-    up(&master->master_sem); /** \fixme sc could be invalidated */
+    up(&master->master_sem); /** \todo sc could be invalidated */
 
     ret = ecrt_slave_config_idn(
             sc, ioctl.drive_no, ioctl.idn, ioctl.al_state, data, ioctl.size);
@@ -2779,6 +2907,8 @@ static ATTRIBUTES int ec_ioctl_sc_idn(
 /*****************************************************************************/
 
 /** Gets the domain's data size.
+ *
+ * \return Domain size, or a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_domain_size(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2811,6 +2941,8 @@ static ATTRIBUTES int ec_ioctl_domain_size(
 /*****************************************************************************/
 
 /** Gets the domain's offset in the total process data.
+ *
+ * \return Domain offset, or a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_domain_offset(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2843,6 +2975,8 @@ static ATTRIBUTES int ec_ioctl_domain_offset(
 /*****************************************************************************/
 
 /** Process the domain.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_domain_process(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2869,6 +3003,8 @@ static ATTRIBUTES int ec_ioctl_domain_process(
 /*****************************************************************************/
 
 /** Queue the domain.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_domain_queue(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2895,6 +3031,8 @@ static ATTRIBUTES int ec_ioctl_domain_queue(
 /*****************************************************************************/
 
 /** Get the domain state.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_domain_state(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2931,6 +3069,8 @@ static ATTRIBUTES int ec_ioctl_domain_state(
 /*****************************************************************************/
 
 /** Sets an SDO request's SDO index and subindex.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sdo_request_index(
         ec_master_t *master, /**< EtherCAT master. */
@@ -2966,6 +3106,8 @@ static ATTRIBUTES int ec_ioctl_sdo_request_index(
 /*****************************************************************************/
 
 /** Sets an SDO request's timeout.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sdo_request_timeout(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3001,6 +3143,8 @@ static ATTRIBUTES int ec_ioctl_sdo_request_timeout(
 /*****************************************************************************/
 
 /** Gets an SDO request's state.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sdo_request_state(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3044,6 +3188,8 @@ static ATTRIBUTES int ec_ioctl_sdo_request_state(
 /*****************************************************************************/
 
 /** Starts an SDO read operation.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sdo_request_read(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3079,6 +3225,8 @@ static ATTRIBUTES int ec_ioctl_sdo_request_read(
 /*****************************************************************************/
 
 /** Starts an SDO write operation.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sdo_request_write(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3128,6 +3276,8 @@ static ATTRIBUTES int ec_ioctl_sdo_request_write(
 /*****************************************************************************/
 
 /** Read SDO data.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_sdo_request_data(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3166,6 +3316,8 @@ static ATTRIBUTES int ec_ioctl_sdo_request_data(
 /*****************************************************************************/
 
 /** Read register data.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_reg_request_data(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3211,6 +3363,8 @@ static ATTRIBUTES int ec_ioctl_reg_request_data(
 /*****************************************************************************/
 
 /** Gets an register request's state.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_reg_request_state(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3254,6 +3408,8 @@ static ATTRIBUTES int ec_ioctl_reg_request_state(
 /*****************************************************************************/
 
 /** Starts an register write operation.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_reg_request_write(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3300,6 +3456,8 @@ static ATTRIBUTES int ec_ioctl_reg_request_write(
 /*****************************************************************************/
 
 /** Starts an register read operation.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_reg_request_read(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3341,6 +3499,8 @@ static ATTRIBUTES int ec_ioctl_reg_request_read(
 /*****************************************************************************/
 
 /** Sets the VoE send header.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_voe_send_header(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3384,6 +3544,8 @@ static ATTRIBUTES int ec_ioctl_voe_send_header(
 /*****************************************************************************/
 
 /** Gets the received VoE header.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_voe_rec_header(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3430,6 +3592,8 @@ static ATTRIBUTES int ec_ioctl_voe_rec_header(
 /*****************************************************************************/
 
 /** Starts a VoE read operation.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_voe_read(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3465,6 +3629,8 @@ static ATTRIBUTES int ec_ioctl_voe_read(
 /*****************************************************************************/
 
 /** Starts a VoE read operation without sending a sync message first.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_voe_read_nosync(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3500,6 +3666,8 @@ static ATTRIBUTES int ec_ioctl_voe_read_nosync(
 /*****************************************************************************/
 
 /** Starts a VoE write operation.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_voe_write(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3544,6 +3712,8 @@ static ATTRIBUTES int ec_ioctl_voe_write(
 /*****************************************************************************/
 
 /** Executes the VoE state machine.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_voe_exec(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3587,6 +3757,8 @@ static ATTRIBUTES int ec_ioctl_voe_exec(
 /*****************************************************************************/
 
 /** Reads the received VoE data.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_voe_data(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3625,6 +3797,8 @@ static ATTRIBUTES int ec_ioctl_voe_data(
 /*****************************************************************************/
 
 /** Read a file from a slave via FoE.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_foe_read(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3719,6 +3893,8 @@ static ATTRIBUTES int ec_ioctl_slave_foe_read(
 /*****************************************************************************/
 
 /** Write a file to a slave via FoE
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_foe_write(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3805,6 +3981,8 @@ static ATTRIBUTES int ec_ioctl_slave_foe_write(
 /*****************************************************************************/
 
 /** Read an SoE IDN.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_soe_read(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3852,6 +4030,8 @@ static ATTRIBUTES int ec_ioctl_slave_soe_read(
 /*****************************************************************************/
 
 /** Write an IDN to a slave via SoE.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
 static ATTRIBUTES int ec_ioctl_slave_soe_write(
         ec_master_t *master, /**< EtherCAT master. */
@@ -3895,6 +4075,8 @@ static ATTRIBUTES int ec_ioctl_slave_soe_write(
 
 /*****************************************************************************/
 
+/** ioctl() function to use.
+ */
 #ifdef EC_IOCTL_RTDM
 #define EC_IOCTL ec_ioctl_rtdm
 #else
@@ -3902,9 +4084,15 @@ static ATTRIBUTES int ec_ioctl_slave_soe_write(
 #endif
 
 /** Called when an ioctl() command is issued.
+ *
+ * \return ioctl() return code.
  */
-long EC_IOCTL(ec_master_t *master, ec_ioctl_context_t *ctx,
-        unsigned int cmd, void *arg)
+long EC_IOCTL(
+        ec_master_t *master, /**< EtherCAT master. */
+        ec_ioctl_context_t *ctx, /**< Device context. */
+        unsigned int cmd, /**< ioctl() command identifier. */
+        void *arg /**< ioctl() argument. */
+        )
 {
 #if DEBUG_LATENCY
     cycles_t a = get_cycles(), b;
