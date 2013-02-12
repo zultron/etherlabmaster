@@ -43,6 +43,7 @@ libethercat_la_SOURCES = \
 
 noinst_HEADERS = \
 	domain.h \
+	ioctl.h \
 	master.h \
 	reg_request.h \
 	sdo_request.h \
