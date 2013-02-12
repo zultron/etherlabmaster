@@ -39,7 +39,7 @@
  * request a master, to map process data, to communicate with slaves via CoE
  * and to configure and activate the bus.
  *
- * Changed since 1.5:
+ * Changes in version 1.5.2:
  *
  * - Added redundancy_active flag to ec_domain_state_t.
  * - Added ecrt_master_link_state() method and ec_master_link_state_t to query

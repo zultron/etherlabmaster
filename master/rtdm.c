@@ -26,6 +26,10 @@
  *
  ****************************************************************************/
 
+/** \file
+ * RTDM interface.
+ */
+
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/mman.h>
@@ -45,7 +49,7 @@
 /** Context structure for an open RTDM file handle.
  */
 typedef struct {
-    rtdm_user_info_t *user_info; /**< RTDM user info. */
+    rtdm_user_info_t *user_info; /**< RTDM user data. */
     ec_ioctl_context_t ioctl_ctx; /**< Context structure. */
 } ec_rtdm_context_t;
 
@@ -58,9 +62,13 @@ int ec_rtdm_ioctl(struct rtdm_dev_context *, rtdm_user_info_t *,
 
 /****************************************************************************/
 
+/** Initialize an RTDM device.
+ *
+ * \return Zero on success, otherwise a negative error code.
+ */
 int ec_rtdm_dev_init(
-        ec_rtdm_dev_t *rtdm_dev,
-        ec_master_t *master
+        ec_rtdm_dev_t *rtdm_dev, /**< EtherCAT RTDM device. */
+        ec_master_t *master /**< EtherCAT master. */
         )
 {
     int ret;
@@ -105,8 +113,10 @@ int ec_rtdm_dev_init(
 
 /****************************************************************************/
 
+/** Clear an RTDM device.
+ */
 void ec_rtdm_dev_clear(
-        ec_rtdm_dev_t *rtdm_dev
+        ec_rtdm_dev_t *rtdm_dev /**< EtherCAT RTDM device. */
         )
 {
     int ret;
@@ -125,11 +135,13 @@ void ec_rtdm_dev_clear(
 /****************************************************************************/
 
 /** Driver open.
+ *
+ * \return Always zero (success).
  */
 int ec_rtdm_open(
-        struct rtdm_dev_context *context,
-        rtdm_user_info_t *user_info,
-        int oflags
+        struct rtdm_dev_context *context, /**< Context. */
+        rtdm_user_info_t *user_info, /**< User data. */
+        int oflags /**< Open flags. */
         )
 {
     ec_rtdm_context_t *ctx = (ec_rtdm_context_t *) context->dev_private;
@@ -153,9 +165,13 @@ int ec_rtdm_open(
 /****************************************************************************/
 
 /** Driver close.
+ *
+ * \return Always zero (success).
  */
-int ec_rtdm_close(struct rtdm_dev_context *context,
-        rtdm_user_info_t *user_info)
+int ec_rtdm_close(
+        struct rtdm_dev_context *context, /**< Context. */
+        rtdm_user_info_t *user_info /**< User data. */
+        )
 {
     ec_rtdm_context_t *ctx = (ec_rtdm_context_t *) context->dev_private;
     ec_rtdm_dev_t *rtdm_dev = (ec_rtdm_dev_t *) context->device->device_data;
@@ -174,6 +190,8 @@ int ec_rtdm_close(struct rtdm_dev_context *context,
 /****************************************************************************/
 
 /** Driver ioctl.
+ *
+ * \return ioctl() return code.
  */
 int ec_rtdm_ioctl(
         struct rtdm_dev_context *context, /**< Context. */
@@ -196,8 +214,13 @@ int ec_rtdm_ioctl(
 /****************************************************************************/
 
 /** Memory-map process data to user space.
+ *
+ * \return Zero on success, otherwise a negative error code.
  */
-int ec_rtdm_mmap(ec_ioctl_context_t *ioctl_ctx, void **user_address)
+int ec_rtdm_mmap(
+        ec_ioctl_context_t *ioctl_ctx, /**< Context. */
+        void **user_address /**< Userspace address. */
+        )
 {
     ec_rtdm_context_t *ctx =
         container_of(ioctl_ctx, ec_rtdm_context_t, ioctl_ctx);
