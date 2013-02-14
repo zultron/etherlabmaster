@@ -3,6 +3,7 @@
  *  $Id$
  *
  *  Copyright (C) 2008  Olav Zarges, imc Messsysteme GmbH
+ *                2013  Florian Pose <fp@igh-essen.com>
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -27,10 +28,9 @@
  *
  *****************************************************************************/
 
-/**
-   \file
-   EtherCAT FoE state machines.
-*/
+/** \file
+ * EtherCAT FoE state machines.
+ */
 
 /*****************************************************************************/
 
@@ -209,7 +209,7 @@ void ec_fsm_foe_error(
         )
 {
 #ifdef DEBUG_FOE
-    printk("ec_fsm_foe_error()\n");
+    EC_SLAVE_DBG(fsm->slave, 0, "%s()\n", __func__);
 #endif
 }
 
@@ -223,7 +223,7 @@ void ec_fsm_foe_end(
         )
 {
 #ifdef DEBUG_FOE
-    printk("ec_fsm_foe_end\n");
+    EC_SLAVE_DBG(fsm->slave, 0, "%s()\n", __func__);
 #endif
 }
 
@@ -321,7 +321,7 @@ void ec_fsm_foe_write_start(
     fsm->tx_last_packet = 0;
 
 #ifdef DEBUG_FOE
-    printk("ec_fsm_foe_write_start()\n");
+    EC_SLAVE_DBG(fsm->slave, 0, "%s()\n", __func__);
 #endif
 
     if (!(slave->sii.mailbox_protocols & EC_MBOX_FOE)) {
@@ -350,7 +350,7 @@ void ec_fsm_foe_state_ack_check(
     ec_slave_t *slave = fsm->slave;
 
 #ifdef DEBUG_FOE
-    printk("ec_fsm_foe_ack_check()\n");
+    EC_SLAVE_DBG(fsm->slave, 0, "%s()\n", __func__);
 #endif
 
     if (fsm->datagram->state != EC_DATAGRAM_RECEIVED) {
@@ -405,7 +405,7 @@ void ec_fsm_foe_state_ack_read(
     size_t rec_size;
 
 #ifdef DEBUG_FOE
-    printk("ec_fsm_foe_ack_read()\n");
+    EC_SLAVE_DBG(fsm->slave, 0, "%s()\n", __func__);
 #endif
 
     if (fsm->datagram->state != EC_DATAGRAM_RECEIVED) {
@@ -482,7 +482,7 @@ void ec_fsm_foe_state_wrq_sent(
     ec_slave_t *slave = fsm->slave;
 
 #ifdef DEBUG_FOE
-    printk("ec_foe_state_sent_wrq()\n");
+    EC_SLAVE_DBG(fsm->slave, 0, "%s()\n", __func__);
 #endif
 
     if (fsm->datagram->state != EC_DATAGRAM_RECEIVED) {
@@ -523,7 +523,7 @@ void ec_fsm_foe_state_data_sent(
     ec_slave_t *slave = fsm->slave;
 
 #ifdef DEBUG_FOE
-    printk("ec_fsm_foe_state_data_sent()\n");
+    EC_SLAVE_DBG(fsm->slave, 0, "%s()\n", __func__);
 #endif
 
     if (fsm->datagram->state != EC_DATAGRAM_RECEIVED) {
@@ -620,7 +620,7 @@ void ec_fsm_foe_state_rrq_sent(
     ec_slave_t *slave = fsm->slave;
 
 #ifdef DEBUG_FOE
-    printk("ec_foe_state_rrq_sent()\n");
+    EC_SLAVE_DBG(fsm->slave, 0, "%s()\n", __func__);
 #endif
 
     if (fsm->datagram->state != EC_DATAGRAM_RECEIVED) {
@@ -662,7 +662,7 @@ void ec_fsm_foe_read_start(
     fsm->rx_last_packet = 0;
 
 #ifdef DEBUG_FOE
-    printk("ec_fsm_foe_read_start()\n");
+    EC_SLAVE_DBG(fsm->slave, 0, "%s()\n", __func__);
 #endif
 
     if (!(slave->sii.mailbox_protocols & EC_MBOX_FOE)) {
@@ -691,7 +691,7 @@ void ec_fsm_foe_state_data_check(
     ec_slave_t *slave = fsm->slave;
 
 #ifdef DEBUG_FOE
-    printk("ec_fsm_foe_state_data_check()\n");
+    EC_SLAVE_DBG(fsm->slave, 0, "%s()\n", __func__);
 #endif
 
     if (fsm->datagram->state != EC_DATAGRAM_RECEIVED) {
@@ -728,7 +728,6 @@ void ec_fsm_foe_state_data_check(
 
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_foe_state_data_read;
-
 }
 
 /*****************************************************************************/
@@ -746,7 +745,7 @@ void ec_fsm_foe_state_data_read(
     ec_slave_t *slave = fsm->slave;
 
 #ifdef DEBUG_FOE
-    printk("ec_fsm_foe_state_data_read()\n");
+    EC_SLAVE_DBG(fsm->slave, 0, "%s()\n", __func__);
 #endif
 
     if (fsm->datagram->state != EC_DATAGRAM_RECEIVED) {
@@ -832,7 +831,7 @@ void ec_fsm_foe_state_data_read(
         // either it was the last packet or a new packet will fit into the
         // delivered buffer
 #ifdef DEBUG_FOE
-        printk ("last_packet=true\n");
+        EC_SLAVE_DBG(fsm->slave, 0, "last_packet=true\n");
 #endif
         if (ec_foe_prepare_send_ack(fsm, datagram)) {
             ec_foe_set_rx_error(fsm, FOE_RX_DATA_ACK_ERROR);
@@ -844,13 +843,12 @@ void ec_fsm_foe_state_data_read(
     else {
         // no more data fits into the delivered buffer
         // ... wait for new read request
-        printk ("ERROR: data doesn't fit in receive buffer\n");
-        printk ("       rx_buffer_size  = %d\n", fsm->rx_buffer_size);
-        printk ("       rx_buffer_offset= %d\n", fsm->rx_buffer_offset);
-        printk ("       rec_size        = %zd\n", rec_size);
-        printk ("       rx_mailbox_size = %d\n",
-                slave->configured_rx_mailbox_size);
-        printk ("       rx_last_packet  = %d\n", fsm->rx_last_packet);
+        EC_SLAVE_ERR(slave, "Data do not fit in receive buffer!\n");
+        printk("  rx_buffer_size = %d\n", fsm->rx_buffer_size);
+        printk("rx_buffer_offset = %d\n", fsm->rx_buffer_offset);
+        printk("        rec_size = %zd\n", rec_size);
+        printk(" rx_mailbox_size = %d\n", slave->configured_rx_mailbox_size);
+        printk("  rx_last_packet = %d\n", fsm->rx_last_packet);
         fsm->request->result = FOE_READY;
     }
 }
@@ -867,7 +865,7 @@ void ec_fsm_foe_state_sent_ack(
     ec_slave_t *slave = fsm->slave;
 
 #ifdef DEBUG_FOE
-    printk("ec_foe_state_sent_ack()\n");
+    EC_SLAVE_DBG(fsm->slave, 0, "%s()\n", __func__);
 #endif
 
     if (fsm->datagram->state != EC_DATAGRAM_RECEIVED) {
