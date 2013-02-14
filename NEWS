@@ -6,7 +6,11 @@ vim: spelllang=en spell tw=78
 
 -------------------------------------------------------------------------------
 
-Changes since 1.5.1:
+Changes since 1.5.2:
+
+* Fixed FoE timeout calculation bug.
+
+Changes in 1.5.2:
 
 * API extensions (find the complete description in include/ecrt.h)
     * Added redundancy features; enable using --with-devices.
