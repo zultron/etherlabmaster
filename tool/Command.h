@@ -107,6 +107,9 @@ class Command
         void setDataType(const string &);
         const string &getDataType() const;
 
+        void setEmergency(bool);
+        bool getEmergency() const;
+
         void setForce(bool);
         bool getForce() const;
 
@@ -140,6 +143,7 @@ class Command
         ConfigList selectedConfigs(MasterDevice &);
         typedef list<ec_ioctl_domain_t> DomainList;
         DomainList selectedDomains(MasterDevice &, const ec_ioctl_master_t &);
+        int emergencySlave() const;
 
         static string alStateString(uint8_t);
 
@@ -152,6 +156,7 @@ class Command
         string positions;
         string domains;
         string dataType;
+        bool emergency;
         bool force;
         string outputFile;
         string skin;
@@ -185,6 +190,13 @@ inline Command::Verbosity Command::getVerbosity() const
 inline const string &Command::getDataType() const
 {
     return dataType;
+}
+
+/****************************************************************************/
+
+inline bool Command::getEmergency() const
+{
+    return emergency;
 }
 
 /****************************************************************************/

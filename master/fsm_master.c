@@ -198,7 +198,47 @@ void ec_fsm_master_state_start(
         ec_fsm_master_t *fsm /**< Master state machine. */
         )
 {
+    ec_master_t *master = fsm->master;
+
     fsm->idle = 1;
+
+    // check for emergency requests
+    if (!list_empty(&master->emerg_reg_requests)) {
+        ec_reg_request_t *request;
+
+        // get first request
+        request = list_entry(master->emerg_reg_requests.next,
+                ec_reg_request_t, list);
+        list_del_init(&request->list); // dequeue
+        request->state = EC_INT_REQUEST_BUSY;
+
+        if (request->transfer_size > fsm->datagram->mem_size) {
+            EC_MASTER_ERR(master, "Emergency request data too large!\n");
+            request->state = EC_INT_REQUEST_FAILURE;
+            wake_up_all(&master->request_queue);
+            fsm->state(fsm); // continue
+            return;
+        }
+
+        if (request->dir != EC_DIR_OUTPUT) {
+            EC_MASTER_ERR(master, "Emergency requests must be"
+                    " write requests!\n");
+            request->state = EC_INT_REQUEST_FAILURE;
+            wake_up_all(&master->request_queue);
+            fsm->state(fsm); // continue
+            return;
+        }
+
+        EC_MASTER_DBG(master, 1, "Writing emergency register request...\n");
+        ec_datagram_apwr(fsm->datagram, request->ring_position,
+                request->address, request->transfer_size);
+        memcpy(fsm->datagram->data, request->data, request->transfer_size);
+        fsm->datagram->device_index = EC_DEVICE_MAIN;
+        request->state = EC_INT_REQUEST_SUCCESS;
+        wake_up_all(&master->request_queue);
+        return;
+    }
+
     ec_datagram_brd(fsm->datagram, 0x0130, 2);
     ec_datagram_zero(fsm->datagram);
     fsm->datagram->device_index = fsm->dev_idx;

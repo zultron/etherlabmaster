@@ -232,6 +232,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     master->app_cb_data = NULL;
 
     INIT_LIST_HEAD(&master->sii_requests);
+    INIT_LIST_HEAD(&master->emerg_reg_requests);
 
     init_waitqueue_head(&master->request_queue);
 

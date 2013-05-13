@@ -62,6 +62,7 @@ int ec_reg_request_init(
     reg->address = 0;
     reg->transfer_size = 0;
     reg->state = EC_INT_REQUEST_INIT;
+    reg->ring_position = 0;
     return 0;
 }
 

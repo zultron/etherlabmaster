@@ -149,6 +149,7 @@ void CommandRegRead::execute(const StringVector &args)
         throwSingleSlaveRequired(slaves.size());
     }
     io.slave_position = slaves.front().position;
+    io.emergency = false;
 
     io.data = new uint8_t[io.size];
 
