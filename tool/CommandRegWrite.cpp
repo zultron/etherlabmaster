@@ -68,10 +68,12 @@ string CommandRegWrite::helpString(const string &binaryBaseName) const
         << typeInfo()
         << endl
         << "Command-specific options:" << endl
-        << "  --alias    -a <alias>" << endl
-        << "  --position -p <pos>    Slave selection. See the help of" << endl
-        << "                         the 'slaves' command." << endl
-        << "  --type     -t <type>   Data type (see above)." << endl
+        << "  --alias     -a <alias>" << endl
+        << "  --position  -p <pos>    Slave selection. See the help of"
+        << endl
+        << "                          the 'slaves' command." << endl
+        << "  --type      -t <type>   Data type (see above)." << endl
+        << "  --emergency -e          Send as emergency request." << endl
         << endl
         << numericInfo();
 
@@ -85,7 +87,6 @@ void CommandRegWrite::execute(const StringVector &args)
     stringstream strOffset, err;
     ec_ioctl_slave_reg_t io;
     ifstream file;
-    SlaveList slaves;
 
     if (args.size() != 2) {
         err << "'" << getName() << "' takes exactly two arguments!";
@@ -158,12 +159,19 @@ void CommandRegWrite::execute(const StringVector &args)
         throw e;
     }
 
-    slaves = selectedSlaves(m);
-    if (slaves.size() != 1) {
-        delete [] io.data;
-        throwSingleSlaveRequired(slaves.size());
+    if (getEmergency()) {
+        io.slave_position = emergencySlave();
+        io.emergency = true;
     }
-    io.slave_position = slaves.front().position;
+    else {
+        SlaveList slaves = selectedSlaves(m);
+        if (slaves.size() != 1) {
+            delete [] io.data;
+            throwSingleSlaveRequired(slaves.size());
+        }
+        io.slave_position = slaves.front().position;
+        io.emergency = false;
+    }
 
     // send data to master
     try {

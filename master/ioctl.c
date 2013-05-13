@@ -1144,16 +1144,23 @@ static ATTRIBUTES int ec_ioctl_slave_reg_write(
         return -EINTR;
     }
 
-    if (!(slave = ec_master_find_slave(master, 0, io.slave_position))) {
-        up(&master->master_sem);
-        ec_reg_request_clear(&request);
-        EC_MASTER_ERR(master, "Slave %u does not exist!\n",
-                io.slave_position);
-        return -EINVAL;
+    if (io.emergency) {
+        request.ring_position = io.slave_position;
+        // schedule request.
+        list_add_tail(&request.list, &master->emerg_reg_requests);
     }
+    else {
+        if (!(slave = ec_master_find_slave(master, 0, io.slave_position))) {
+            up(&master->master_sem);
+            ec_reg_request_clear(&request);
+            EC_MASTER_ERR(master, "Slave %u does not exist!\n",
+                    io.slave_position);
+            return -EINVAL;
+        }
 
-    // schedule request.
-    list_add_tail(&request.list, &slave->reg_requests);
+        // schedule request.
+        list_add_tail(&request.list, &slave->reg_requests);
+    }
 
     up(&master->master_sem);
 

@@ -305,6 +305,8 @@ struct ec_master {
     void *app_cb_data; /**< Application callback data. */
 
     struct list_head sii_requests; /**< SII write requests. */
+    struct list_head emerg_reg_requests; /**< Emergency register access
+                                           requests. */
 
     wait_queue_head_t request_queue; /**< Wait queue for external requests
                                        from user space. */

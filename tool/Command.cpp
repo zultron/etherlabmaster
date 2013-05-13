@@ -150,7 +150,9 @@ class AliasPositionParser:
 Command::Command(const string &name, const string &briefDesc):
     name(name),
     briefDesc(briefDesc),
-    verbosity(Normal)
+    verbosity(Normal),
+    emergency(false),
+    force(false)
 {
 }
 
@@ -200,6 +202,13 @@ void Command::setDomains(const string &d)
 void Command::setDataType(const string &t)
 {
     dataType = t;
+};
+
+/*****************************************************************************/
+
+void Command::setEmergency(bool e)
+{
+    emergency = e;
 };
 
 /*****************************************************************************/
@@ -485,6 +494,19 @@ Command::DomainList Command::selectedDomains(MasterDevice &m,
     }
 
     return list;
+}
+
+/****************************************************************************/
+
+int Command::emergencySlave() const
+{
+    unsigned int ret;
+
+    stringstream str;
+    str << positions;
+    str >> ret;
+
+    return ret;
 }
 
 /****************************************************************************/

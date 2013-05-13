@@ -56,7 +56,7 @@
  *
  * Increment this when changing the ioctl interface!
  */
-#define EC_IOCTL_VERSION_MAGIC 27
+#define EC_IOCTL_VERSION_MAGIC 28
 
 // Command-line tool
 #define EC_IOCTL_MODULE                EC_IOR(0x00, ec_ioctl_module_t)
@@ -419,6 +419,7 @@ typedef struct {
 typedef struct {
     // inputs
     uint16_t slave_position;
+    uint8_t emergency;
     uint16_t address;
     size_t size;
     uint8_t *data;
