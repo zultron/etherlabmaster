@@ -60,6 +60,10 @@
  */
 #define DEBUG_INJECT 0
 
+/** Always output corrupted frames.
+ */
+#define FORCE_OUTPUT_CORRUPTED 0
+
 #ifdef EC_HAVE_CYCLES
 
 /** Frame timeout in cycles.
@@ -1107,10 +1111,12 @@ void ec_master_send_datagrams(
  *
  * \return 0 in case of success, else < 0
  */
-void ec_master_receive_datagrams(ec_master_t *master, /**< EtherCAT master */
-                                 const uint8_t *frame_data, /**< frame data */
-                                 size_t size /**< size of the received data */
-                                 )
+void ec_master_receive_datagrams(
+        ec_master_t *master, /**< EtherCAT master */
+        ec_device_t *device, /**< EtherCAT device */
+        const uint8_t *frame_data, /**< frame data */
+        size_t size /**< size of the received data */
+        )
 {
     size_t frame_size, data_size;
     uint8_t datagram_type, datagram_index;
@@ -1119,10 +1125,10 @@ void ec_master_receive_datagrams(ec_master_t *master, /**< EtherCAT master */
     ec_datagram_t *datagram;
 
     if (unlikely(size < EC_FRAME_HEADER_SIZE)) {
-        if (master->debug_level) {
+        if (master->debug_level || FORCE_OUTPUT_CORRUPTED) {
             EC_MASTER_DBG(master, 0, "Corrupted frame received"
-                    " (size %zu < %u byte):\n",
-                    size, EC_FRAME_HEADER_SIZE);
+                    " on %s (size %zu < %u byte):\n",
+                    device->dev->name, size, EC_FRAME_HEADER_SIZE);
             ec_print_data(frame_data, size);
         }
         master->stats.corrupted++;
@@ -1137,10 +1143,11 @@ void ec_master_receive_datagrams(ec_master_t *master, /**< EtherCAT master */
     cur_data += EC_FRAME_HEADER_SIZE;
 
     if (unlikely(frame_size > size)) {
-        if (master->debug_level) {
+        if (master->debug_level || FORCE_OUTPUT_CORRUPTED) {
             EC_MASTER_DBG(master, 0, "Corrupted frame received"
-                    " (invalid frame size %zu for "
-                    "received size %zu):\n", frame_size, size);
+                    " on %s (invalid frame size %zu for "
+                    "received size %zu):\n", device->dev->name,
+                    frame_size, size);
             ec_print_data(frame_data, size);
         }
         master->stats.corrupted++;
@@ -1159,9 +1166,10 @@ void ec_master_receive_datagrams(ec_master_t *master, /**< EtherCAT master */
 
         if (unlikely(cur_data - frame_data
                      + data_size + EC_DATAGRAM_FOOTER_SIZE > size)) {
-            if (master->debug_level) {
+            if (master->debug_level || FORCE_OUTPUT_CORRUPTED) {
                 EC_MASTER_DBG(master, 0, "Corrupted frame received"
-                        " (invalid data size %zu):\n", data_size);
+                        " on %s (invalid data size %zu):\n",
+                        device->dev->name, data_size);
                 ec_print_data(frame_data, size);
             }
             master->stats.corrupted++;

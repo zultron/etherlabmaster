@@ -343,7 +343,8 @@ void ec_master_eoe_stop(ec_master_t *);
 #endif
 
 // datagram IO
-void ec_master_receive_datagrams(ec_master_t *, const uint8_t *, size_t);
+void ec_master_receive_datagrams(ec_master_t *, ec_device_t *,
+        const uint8_t *, size_t);
 void ec_master_queue_datagram(ec_master_t *, ec_datagram_t *);
 void ec_master_queue_datagram_ext(ec_master_t *, ec_datagram_t *);
 
