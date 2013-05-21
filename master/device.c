@@ -663,7 +663,7 @@ void ecdev_receive(
     ec_device_debug_ring_append(device, RX, ec_data, ec_size);
 #endif
 
-    ec_master_receive_datagrams(device->master, ec_data, ec_size);
+    ec_master_receive_datagrams(device->master, device, ec_data, ec_size);
 }
 
 /*****************************************************************************/
