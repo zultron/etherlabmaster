@@ -2122,7 +2122,9 @@ process_skb:
 
 			// No need to detect link status as
 			// long as frames are received: Reset watchdog.
-			nic->ec_watchdog_jiffies = jiffies;
+			if (ecdev_get_link(nic->ecdev)) {
+				nic->ec_watchdog_jiffies = jiffies;
+			}
 		} else {
 			netif_receive_skb(skb);
 		}
