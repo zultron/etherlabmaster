@@ -932,6 +932,35 @@ else
 fi
 
 #------------------------------------------------------------------------------
+# syslog output in realtime context
+#------------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to syslog in realtime context])
+
+AC_ARG_ENABLE([rt-syslog],
+    AS_HELP_STRING([--enable-rt-syslog],
+                   [Enable RT syslog (default: yes)]),
+    [
+        case "${enableval}" in
+            yes) rtsyslog=1
+                ;;
+            no) rtsyslog=0
+                ;;
+            *) AC_MSG_ERROR([Invalid value for --enable-rt-syslog])
+                ;;
+        esac
+    ],
+    [rtsyslog=1]
+)
+
+if test "x${rtsyslog}" = "x1"; then
+    AC_DEFINE([EC_RT_SYSLOG], [1], [Output to syslog in RT context])
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
+
+#------------------------------------------------------------------------------
 
 AC_CONFIG_FILES([
         Doxyfile
