@@ -852,9 +852,13 @@ void ec_master_inject_external_datagrams(
                     > ext_injection_timeout_jiffies)
 #endif
             {
+#if defined EC_RT_SYSLOG || DEBUG_INJECT
                 unsigned int time_us;
+#endif
 
                 datagram->state = EC_DATAGRAM_ERROR;
+
+#if defined EC_RT_SYSLOG || DEBUG_INJECT
 #ifdef EC_HAVE_CYCLES
                 time_us = (unsigned int)
                     ((cycles_now - datagram->cycles_sent) * 1000LL)
@@ -867,6 +871,7 @@ void ec_master_inject_external_datagrams(
                         " external datagram %s size=%zu,"
                         " max_queue_size=%zu\n", time_us, datagram->name,
                         datagram->data_size, master->max_queue_size);
+#endif
             }
             else {
 #if DEBUG_INJECT
@@ -944,8 +949,10 @@ void ec_master_queue_datagram(
     list_for_each_entry(queued_datagram, &master->datagram_queue, queue) {
         if (queued_datagram == datagram) {
             datagram->skip_count++;
+#ifdef EC_RT_SYSLOG
             EC_MASTER_DBG(master, 1,
                     "Datagram %p already queued (skipping).\n", datagram);
+#endif
             datagram->state = EC_DATAGRAM_QUEUED;
             return;
         }
@@ -1132,7 +1139,9 @@ void ec_master_receive_datagrams(
             ec_print_data(frame_data, size);
         }
         master->stats.corrupted++;
+#ifdef EC_RT_SYSLOG
         ec_master_output_stats(master);
+#endif
         return;
     }
 
@@ -1151,7 +1160,9 @@ void ec_master_receive_datagrams(
             ec_print_data(frame_data, size);
         }
         master->stats.corrupted++;
+#ifdef EC_RT_SYSLOG
         ec_master_output_stats(master);
+#endif
         return;
     }
 
@@ -1173,7 +1184,9 @@ void ec_master_receive_datagrams(
                 ec_print_data(frame_data, size);
             }
             master->stats.corrupted++;
+#ifdef EC_RT_SYSLOG
             ec_master_output_stats(master);
+#endif
             return;
         }
 
@@ -1192,7 +1205,9 @@ void ec_master_receive_datagrams(
         // no matching datagram was found
         if (!matched) {
             master->stats.unmatched++;
+#ifdef EC_RT_SYSLOG
             ec_master_output_stats(master);
+#endif
 
             if (unlikely(master->debug_level > 0)) {
                 EC_MASTER_DBG(master, 0, "UNMATCHED datagram:\n");
@@ -2485,6 +2500,8 @@ void ecrt_master_receive(ec_master_t *master)
             list_del_init(&datagram->queue);
             datagram->state = EC_DATAGRAM_TIMED_OUT;
             master->stats.timeouts++;
+
+#ifdef EC_RT_SYSLOG
             ec_master_output_stats(master);
 
             if (unlikely(master->debug_level > 0)) {
@@ -2502,6 +2519,7 @@ void ecrt_master_receive(ec_master_t *master)
                         " index %02X waited %u us.\n",
                         datagram, datagram->index, time_us);
             }
+#endif /* RT_SYSLOG */
         }
     }
 }
