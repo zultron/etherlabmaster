@@ -1,9 +1,9 @@
 /*
-* r8169.c: RealTek 8169/8168/8101 ethernet driver.
-*
-* Copyright (c) 2002 ShuChen <shuchen@realtek.com.tw>
-* Copyright (c) 2003 - 2007 Francois Romieu <romieu@fr.zoreil.com>
-* Copyright (c) a lot of people too. Please respect their work.
+ * r8169.c: RealTek 8169/8168/8101 ethernet driver.
+ *
+ * Copyright (c) 2002 ShuChen <shuchen@realtek.com.tw>
+ * Copyright (c) 2003 - 2007 Francois Romieu <romieu@fr.zoreil.com>
+ * Copyright (c) a lot of people too. Please respect their work.
  *
  * See MAINTAINERS file for support contact information.
  */
@@ -31,6 +31,7 @@
 
 #include <asm/io.h>
 #include <asm/irq.h>
+
 #include "../globals.h"
 #include "ecdev.h"
 
@@ -744,9 +745,6 @@ struct rtl8169_private {
 	struct mii_if_info mii;
 	struct rtl8169_counters counters;
 	u32 saved_wolopts;
-
-	ec_device_t *ecdev;
-	unsigned long ec_watchdog_jiffies;
 	u32 opts1_mask;
 
 	struct rtl_fw {
@@ -762,6 +760,9 @@ struct rtl8169_private {
 		} phy_action;
 	} *rtl_fw;
 #define RTL_FIRMWARE_UNKNOWN	ERR_PTR(-EAGAIN)
+
+	ec_device_t *ecdev;
+	unsigned long ec_watchdog_jiffies;
 };
 
 MODULE_AUTHOR("Realtek and the Linux r8169 crew <netdev@vger.kernel.org>");
@@ -5548,7 +5549,7 @@ static void rtl_slow_event_work(struct rtl8169_private *tp)
 	status = rtl_get_events(tp) & tp->event_slow;
 	rtl_ack_events(tp, status);
 
-	if (unlikely(!tp->ecdev && status & RxFIFOOver)) {
+	if (unlikely(!tp->ecdev && (status & RxFIFOOver))) {
 		switch (tp->mac_version) {
 		/* Work around for rx fifo overflow */
 		case RTL_GIGA_MAC_VER_11:
@@ -5560,7 +5561,7 @@ static void rtl_slow_event_work(struct rtl8169_private *tp)
 		}
 	}
 
-	if (unlikely(!tp->ecdev && status & SYSErr))
+	if (unlikely(!tp->ecdev && (status & SYSErr)))
 		rtl8169_pcierr_interrupt(dev);
 
 	if (status & LinkChg)
