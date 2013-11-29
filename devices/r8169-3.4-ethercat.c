@@ -5782,7 +5782,7 @@ static int rtl_open(struct net_device *dev)
 	rtl_request_firmware(tp);
 
 	if (!tp->ecdev) {
-		retval = request_irq(dev->irq, rtl8169_interrupt,
+		retval = request_irq(pdev->irq, rtl8169_interrupt,
 				(tp->features & RTL_FEATURE_MSI) ? 0 : IRQF_SHARED,
 				dev->name, dev);
 		if (retval < 0)
