@@ -1239,6 +1239,25 @@ allocations and other things, that could cause the system to freeze in
 realtime context.
 \end{itemize}
 
+\paragraph{Device Activation} In order to send and receive frames through a
+socket, the Ethernet device linked to that socket has to be activated,
+otherwise all frames will be rejected. Activation has to take place before the
+master module is loaded and can happen in several ways:
+
+\begin{itemize}
+
+\item Ad-hoc, using the command \lstinline+ip link set dev ethX up+ (or the
+older \lstinline+ifconfig ethX up+),
+
+\item Configured, depending on the distribution, for example using
+\lstinline+ifcfg+ files (\lstinline+/etc/sysconfig/network/ifcfg-ethX+) in
+openSUSE and others. This is the better choice, if the EtherCAT master shall
+start at system boot time. Since the Ethernet device shall only be activated,
+but no IP address etc.\ shall be assigned, it is enough to use
+\lstinline+STARTMODE=auto+ as configuration.
+
+\end{itemize}
+
 %------------------------------------------------------------------------------
 
 \section{Providing Ethernet Devices}
