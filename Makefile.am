@@ -30,10 +30,13 @@
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = \
-	devices \
 	include \
-	master \
 	script
+
+if ENABLE_KERNEL
+SUBDIRS += devices
+SUBDIRS += master
+endif
 
 if BUILD_TOOL
 SUBDIRS += tool

@@ -57,8 +57,41 @@ AC_PROG_CXX
 AC_PROG_LIBTOOL
 
 #------------------------------------------------------------------------------
+# Kernel modules
+#------------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to build kernel modules])
+
+AC_ARG_ENABLE([kernel],
+    AS_HELP_STRING([--enable-kernel],
+                   [Enable building kernel modules]),
+    [
+        case "${enableval}" in
+            yes) enablekernel=1
+                ;;
+            no) enablekernel=0
+                ;;
+            *) AC_MSG_ERROR([Invalid value for --enable-generic])
+                ;;
+        esac
+    ],
+    [enablekernel=1]
+)
+
+if test "x$enablekernel" = "x1"; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
+
+AM_CONDITIONAL(ENABLE_KERNEL, test "x$enablekernel" = "x1")
+AC_SUBST(ENABLE_KERNEL,[$enablekernel])
+
+#------------------------------------------------------------------------------
 # Linux sources
 #------------------------------------------------------------------------------
+
+if test "x$enablekernel" = "x1"; then
 
 AC_ARG_WITH([linux-dir],
     AC_HELP_STRING(
@@ -116,6 +149,8 @@ linuxversion=`echo $kernelrelease | grep -oE "$regex"`
 AC_SUBST(LINUX_SOURCE_DIR,[$sourcedir])
 AC_MSG_RESULT([$LINUX_SOURCE_DIR (Kernel $linuxversion)])
 
+fi
+
 #------------------------------------------------------------------------------
 # Linux module installation subdirectory
 #------------------------------------------------------------------------------
@@ -150,7 +185,7 @@ AC_ARG_ENABLE([generic],
                 ;;
         esac
     ],
-    [enablegeneric=1]
+    [enablegeneric=$enablekernel]
 )
 
 AM_CONDITIONAL(ENABLE_GENERIC, test "x$enablegeneric" = "x1")
@@ -173,7 +208,7 @@ AC_ARG_ENABLE([8139too],
                 ;;
         esac
     ],
-    [enable8139too=1]
+    [enable8139too=$enablekernel]
 )
 
 AM_CONDITIONAL(ENABLE_8139TOO, test "x$enable8139too" = "x1")
