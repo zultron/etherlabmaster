@@ -25,60 +25,31 @@
 #  EtherCAT technology and brand is only permitted in compliance with the
 #  industrial property and similar rights of Beckhoff Automation GmbH.
 #
-#  ---
-#
-#  vim: syntax=make
-#
 #------------------------------------------------------------------------------
 
-REV := $(shell if test -s $(src)/../revision; then \
-		cat $(src)/../revision; \
-	else \
-		hg id -i $(src)/.. 2>/dev/null || echo "unknown"; \
-	fi)
+EXTRA_DIST = \
+	Kbuild.in \
+	COPYING \
+	module-3.4-ethercat.h \
+	module.h \
+	netdev-3.4-ethercat.h \
+	netdev.h \
+	print-3.4-ethercat.h \
+	print.h \
+	update-3.4-ethercat.h \
+	update.h
 
-ifeq (@ENABLE_GENERIC@,1)
-	EC_GENERIC_OBJ := generic.o
-	obj-m += ec_generic.o
-	ec_generic-objs := $(EC_GENERIC_OBJ)
-	CFLAGS_$(EC_GENERIC_OBJ) = -DREV=$(REV)
-endif
+BUILT_SOURCES = \
+	Kbuild
 
-ifeq (@ENABLE_8139TOO@,1)
-	EC_8139TOO_OBJ := 8139too-@KERNEL_8139TOO@-ethercat.o
-	obj-m += ec_8139too.o
-	ec_8139too-objs := $(EC_8139TOO_OBJ)
-	CFLAGS_$(EC_8139TOO_OBJ) = -DREV=$(REV)
-endif
+modules:
+	$(MAKE) -C "$(LINUX_SOURCE_DIR)" M="@abs_srcdir@" modules
 
-ifeq (@ENABLE_CCAT@,1)
-	obj-m += ccat/
-endif
+modules_install:
+	$(MAKE) -C "$(LINUX_SOURCE_DIR)" M="@abs_srcdir@" \
+		INSTALL_MOD_DIR="$(INSTALL_MOD_DIR)" modules_install
 
-ifeq (@ENABLE_E100@,1)
-	EC_E100_OBJ := e100-@KERNEL_E100@-ethercat.o
-	obj-m += ec_e100.o
-	ec_e100-objs := $(EC_E100_OBJ)
-	CFLAGS_$(EC_E100_OBJ) = -DREV=$(REV)
-endif
-
-ifeq (@ENABLE_E1000@,1)
-	obj-m += e1000/
-endif
-
-ifeq (@ENABLE_E1000E@,1)
-	obj-m += e1000e/
-endif
-
-ifeq (@ENABLE_R8169@,1)
-	EC_R8169_OBJ := r8169-@KERNEL_R8169@-ethercat.o
-	obj-m += ec_r8169.o
-	ec_r8169-objs := $(EC_R8169_OBJ)
-	CFLAGS_$(EC_R8169_OBJ) = -DREV=$(REV)
-endif
-
-KBUILD_EXTRA_SYMBOLS := \
-	@abs_top_builddir@/$(LINUX_SYMVERS) \
-	@abs_top_builddir@/master/$(LINUX_SYMVERS)
+clean-local:
+	$(MAKE) -C "$(LINUX_SOURCE_DIR)" M="@abs_srcdir@" clean
 
 #------------------------------------------------------------------------------
