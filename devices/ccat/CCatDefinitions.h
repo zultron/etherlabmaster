@@ -29,18 +29,14 @@ typedef uint8_t UINT8;
 typedef uint16_t UINT16;
 typedef uint32_t UINT32;
 typedef uint64_t UINT64;
-
-#undef pr_fmt
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #endif
+
+#define CCAT_DMA_FRAME_HEADER_LENGTH (196 / 8) // 196 bit
 
 typedef struct _ETHERNET_ADDRESS
 {
 	UINT8 b[6];
 }ETHERNET_ADDRESS;
-
-
-typedef uint64_t LIST_ENTRY;
 
 typedef enum CCatInfoTypes
 {
@@ -78,14 +74,14 @@ typedef struct
 	union
 	{
 		ULONG		nParam;
-		struct 
+		struct
 		{
 			BYTE nMaxEntries;
 			BYTE compileDay;
 			BYTE compileMonth;
 			BYTE compileYear;
 		};
-		struct 
+		struct
 		{
 			BYTE txDmaChn;
 			BYTE rxDmaChn;
@@ -102,55 +98,6 @@ typedef struct
 	ULONG		nSize;
 } CCatInfoBlock, *PCCatInfoBlock;
 
-typedef struct _CCAT_HEADER_TAG
-{
-	UINT16	length; // not used in header // required for 64 Bit Alignment in CCAT
-	UINT8		port0				: 1;
-	UINT8		port1				: 1;					
-	UINT8		reserved1		: 6;
-	UINT8		tsEnable			: 1;
-	UINT8		reserved2		: 7;
-	UINT32	sent				: 1;
-	UINT32	reserved3		: 31;
-	UINT64   TimeStamp;	
-}CCAT_HEADER_TAG;
-
-typedef struct _CCatDmaTxFrame
-{
-	LIST_ENTRY			list;
-	CCAT_HEADER_TAG	head;
-	UINT8					data[0x800-sizeof(LIST_ENTRY)-sizeof(CCAT_HEADER_TAG)];
-}CCatDmaTxFrame;
-
-typedef struct _CCatRxDesc
-{
-	union
-	{
-		struct 
-		{
-			UINT32			nextDesc		: 24;
-			UINT32			reserved1	: 7;
-			UINT32			nextValid	: 1;
-			UINT32			received		: 1;
-			UINT32			reserved2	: 31;
-		};
-		UINT32			head[2];
-	};
-	union
-	{
-		struct
-		{
-			UINT16		length		: 12;
-			UINT16		reserved3	: 4;
-		};
-		UINT16 uLength;
-	};
-	UINT16		port;
-	UINT32		reserved4;
-	UINT64		timestamp;
-	UINT8			data[0x7e8];
-}CCatRxDesc;
-
 typedef struct _CCatMacRegs
 {
 	union
@@ -166,7 +113,7 @@ typedef struct _CCatMacRegs
 	};
 	UINT32			reserved1;
 	UINT8				dropFrameErrCnt; // 0x08
-	UINT8				reserved2[7];	
+	UINT8				reserved2[7];
 	UINT32			txFrameCnt;		  // 0x10
 	UINT32			rxFrameCnt;		  // 0x14
 	UINT32   reserved3[2];
@@ -204,7 +151,7 @@ typedef struct _CCatMii
 	ULONG       led2[2];
 	ULONG       systimeInsertion[4];
 	ULONG		interruptState[2];
-	ULONG		interruptMask[2];	
+	ULONG		interruptMask[2];
 }CCatMii;
 
 typedef struct _CCatDmaTxFifo
@@ -216,23 +163,20 @@ typedef struct _CCatDmaTxFifo
 	UINT8    reserved2[7];
 }CCatDmaTxFifo;
 
-typedef struct _CCatDmaRxActBuf
+typedef union _CCatDmaRxActBuf
 {
-	union
+	struct
 	{
-		struct 
-		{
-			UINT32			startAddr	: 24;
-			UINT32			reserved1	: 7;
-			UINT32			nextValid	: 1;
-			UINT32			lastAddr		: 24;
-			UINT32			reserved2	: 8;
-			UINT32			FifoLevel	: 24;
-			UINT32			bufferLevel	: 8;
-			UINT32			nextAddr;
-		};
-		UINT32			rxActBuf;
+		UINT32			startAddr	: 24;
+		UINT32			reserved1	: 7;
+		UINT32			nextValid	: 1;
+		UINT32			lastAddr		: 24;
+		UINT32			reserved2	: 8;
+		UINT32			FifoLevel	: 24;
+		UINT32			bufferLevel	: 8;
+		UINT32			nextAddr;
 	};
+	UINT32			rxActBuf;
 }CCatDmaRxActBuf;
 
 typedef struct _CCatInfoBlockOffs
