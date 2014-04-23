@@ -41,10 +41,10 @@ REV := $(shell if test -s $(TOPDIR)/revision; then \
 
 ifeq (@ENABLE_CCAT@,1)
 	EC_CCAT_OBJ := \
-		module-@KERNEL_E1000@-ethercat.o \
-		netdev-@KERNEL_E1000@-ethercat.o \
-		print-@KERNEL_E1000@-ethercat.o \
-		update-@KERNEL_E1000@-ethercat.o
+		module.o \
+		netdev.o \
+		print.o \
+		update.o
 	obj-m += ec_ccat.o
 	ec_ccat-objs := $(EC_CCAT_OBJ)
 	CFLAGS_ccat_main-@KERNEL_CCAT@-ethercat.o = -DREV=$(REV)

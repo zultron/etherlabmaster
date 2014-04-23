@@ -247,23 +247,6 @@ AC_ARG_WITH([ccat-kernel],
     ]
 )
 
-if test "x${enableccat}" = "x1"; then
-    AC_MSG_CHECKING([for kernel for ccat driver])
-
-    kernels=`ls -1 ${srcdir}/devices/ccat/ | grep -oE "^netdev-.*" | cut -d "-" -f 2 | uniq`
-    found=0
-    for k in $kernels; do
-        if test "$kernelccat" = "$k"; then
-            found=1
-        fi
-    done
-    if test $found -ne 1; then
-        AC_MSG_ERROR([kernel $kernelccat not available for ccat driver!])
-    fi
-
-    AC_MSG_RESULT([$kernelccat])
-fi
-
 AC_SUBST(KERNEL_CCAT,[$kernelccat])
 
 #------------------------------------------------------------------------------
