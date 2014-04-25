@@ -33,12 +33,6 @@
 
 TOPDIR := $(src)/../..
 
-REV := $(shell if test -s $(TOPDIR)/revision; then \
-		cat $(TOPDIR)/revision; \
-	else \
-		hg id -i $(TOPDIR) 2>/dev/null || echo "unknown"; \
-	fi)
-
 ifeq (@ENABLE_CCAT@,1)
 	EC_CCAT_OBJ := \
 		module.o \
@@ -47,7 +41,7 @@ ifeq (@ENABLE_CCAT@,1)
 		update.o
 	obj-m += ec_ccat.o
 	ec_ccat-objs := $(EC_CCAT_OBJ)
-	CFLAGS_ccat_main-@KERNEL_CCAT@-ethercat.o = -DREV=$(REV)
+	CFLAGS_ccat_main-ethercat.o = -DREV=$(REV)
 endif
 
 KBUILD_EXTRA_SYMBOLS := \
