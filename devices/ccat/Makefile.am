@@ -28,15 +28,11 @@
 #------------------------------------------------------------------------------
 
 EXTRA_DIST = \
-	Kbuild.in \
 	COPYING \
-	module-3.4-ethercat.h \
+	Kbuild.in \
 	module.h \
-	netdev-3.4-ethercat.h \
 	netdev.h \
-	print-3.4-ethercat.h \
 	print.h \
-	update-3.4-ethercat.h \
 	update.h
 
 BUILT_SOURCES = \
