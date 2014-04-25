@@ -47,11 +47,11 @@ MASTER0_DEVICE=""
 # the EtherCAT-capable ones. If a certain (EtherCAT-capable) driver is not
 # found, a warning will appear.
 #
-# Possible values: 8139too, e100, e1000, e1000e, r8169, generic. Separate
-# multiple drivers with spaces.
+# Possible values: 8139too, e100, e1000, e1000e, r8169, generic, ccat.
+# Separate multiple drivers with spaces.
 #
-# Note: The e100, e1000, e1000e and r8169 drivers are not built by default.
-# Enable them with the --enable-<driver> configure switches.
+# Note: The e100, e1000, e1000e, r8169 and ccat drivers are not built by
+# default. Enable them with the --enable-<driver> configure switches.
 #
 # Attention: When using the generic driver, the corresponding Ethernet device
 # has to be activated (with OS methods, for example 'ip link set ethX up'),
