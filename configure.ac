@@ -247,6 +247,44 @@ fi
 AC_SUBST(KERNEL_8139TOO,[$kernel8139too])
 
 #------------------------------------------------------------------------------
+# CCAT driver
+#------------------------------------------------------------------------------
+
+AC_ARG_ENABLE([ccat],
+    AS_HELP_STRING([--enable-ccat],
+                   [Enable CCAT driver]),
+    [
+        case "${enableval}" in
+            yes) enableccat=1
+                ;;
+            no) enableccat=0
+                ;;
+            *) AC_MSG_ERROR([Invalid value for --enable-ccat])
+                ;;
+        esac
+    ],
+    [enableccat=0] # disabled by default
+)
+
+AM_CONDITIONAL(ENABLE_CCAT, test "x$enableccat" = "x1")
+AC_SUBST(ENABLE_CCAT,[$enableccat])
+
+AC_ARG_WITH([ccat-kernel],
+    AC_HELP_STRING(
+        [--with-ccat-kernel=<X.Y.Z>],
+        [ccat kernel (only if differing)]
+    ),
+    [
+        kernelccat=[$withval]
+    ],
+    [
+        kernelccat=$linuxversion
+    ]
+)
+
+AC_SUBST(KERNEL_CCAT,[$kernelccat])
+
+#------------------------------------------------------------------------------
 # e100 driver
 #------------------------------------------------------------------------------
 
@@ -1003,6 +1041,8 @@ AC_CONFIG_FILES([
         Makefile
         devices/Kbuild
         devices/Makefile
+        devices/ccat/Kbuild
+        devices/ccat/Makefile
         devices/e1000/Kbuild
         devices/e1000/Makefile
         devices/e1000e/Kbuild
