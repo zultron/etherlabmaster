@@ -269,21 +269,6 @@ AC_ARG_ENABLE([ccat],
 AM_CONDITIONAL(ENABLE_CCAT, test "x$enableccat" = "x1")
 AC_SUBST(ENABLE_CCAT,[$enableccat])
 
-AC_ARG_WITH([ccat-kernel],
-    AC_HELP_STRING(
-        [--with-ccat-kernel=<X.Y.Z>],
-        [ccat kernel (only if differing)]
-    ),
-    [
-        kernelccat=[$withval]
-    ],
-    [
-        kernelccat=$linuxversion
-    ]
-)
-
-AC_SUBST(KERNEL_CCAT,[$kernelccat])
-
 #------------------------------------------------------------------------------
 # e100 driver
 #------------------------------------------------------------------------------
