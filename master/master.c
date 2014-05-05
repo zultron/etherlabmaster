@@ -2651,12 +2651,18 @@ int ecrt_master_get_slave(ec_master_t *master, uint16_t slave_position,
 {
     const ec_slave_t *slave;
     unsigned int i;
+    int ret = 0;
 
     if (down_interruptible(&master->master_sem)) {
         return -EINTR;
     }
 
     slave = ec_master_find_slave_const(master, 0, slave_position);
+
+    if (slave == NULL) {
+       ret = -ENOENT;
+       goto out_get_slave;
+    }
 
     slave_info->position = slave->ring_position;
     slave_info->vendor_id = slave->sii.vendor_id;
@@ -2694,9 +2700,10 @@ int ecrt_master_get_slave(ec_master_t *master, uint16_t slave_position,
         slave_info->name[0] = 0;
     }
 
+out_get_slave:
     up(&master->master_sem);
 
-    return 0;
+    return ret;
 }
 
 /*****************************************************************************/
