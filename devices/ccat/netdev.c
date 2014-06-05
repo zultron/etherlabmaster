@@ -425,7 +425,6 @@ static struct rtnl_link_stats64 *ccat_eth_get_stats64(struct net_device *dev, st
 {
 	struct ccat_eth_priv *const priv = netdev_priv(dev);
 	struct ccat_mac_register mac;
-
 	memcpy_fromio(&mac, priv->reg.mac, sizeof(mac));
 	storage->rx_packets = mac.rx_frames;	/* total packets received       */
 	storage->tx_packets = mac.tx_frames;	/* total packets transmitted    */
@@ -500,9 +499,6 @@ struct ccat_eth_priv *ccat_eth_init(const struct ccat_device *const ccatdev,
 	/* ccat register mappings */
 	memcpy_fromio(&priv->info, addr, sizeof(priv->info));
 	ccat_eth_priv_init_mappings(priv);
-	/* XXX disabled in release
-	 * ccat_print_function_info(priv);
-	 */
 
 	if (ccat_eth_priv_init_dma(priv)) {
 		pr_warn("%s(): DMA initialization failed.\n", __FUNCTION__);
