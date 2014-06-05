@@ -21,8 +21,6 @@
 #include <linux/etherdevice.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/kfifo.h>
-#include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
 #include <linux/spinlock.h>
@@ -35,7 +33,7 @@
 /**
  * EtherCAT frame to enable forwarding on EtherCAT Terminals
  */
-static const UINT8 frameForwardEthernetFrames[] = {
+static const u8 frameForwardEthernetFrames[] = {
 	0x01, 0x01, 0x05, 0x01, 0x00, 0x00,
 	0x00, 0x1b, 0x21, 0x36, 0x1b, 0xce,
 	0x88, 0xa4, 0x0e, 0x10,
@@ -50,13 +48,8 @@ static const UINT8 frameForwardEthernetFrames[] = {
 };
 
 #define FIFO_LENGTH 64
-#define DMA_POLL_DELAY_RANGE_USECS 100, 100	/* time to sleep between rx/tx DMA polls */
-#define POLL_DELAY_RANGE_USECS 500, 1000	/* time to sleep between link state polls */
-
 static void ec_poll(struct net_device *dev);
-static int run_poll_thread(void *data);
-static int run_rx_thread(void *data);
-static int run_tx_thread(void *data);
+static enum hrtimer_restart poll_timer_callback(struct hrtimer *timer);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35)
 static struct rtnl_link_stats64 *ccat_eth_get_stats64(struct net_device *dev, struct rtnl_link_stats64
@@ -83,6 +76,12 @@ static void ecdev_kfree_skb_any(struct sk_buff *skb)
 	/* never release a skb in EtherCAT mode */
 }
 
+static bool ecdev_carrier_ok(struct net_device *const netdev)
+{
+	struct ccat_eth_priv *const priv = netdev_priv(netdev);
+	return ecdev_get_link(priv->ecdev);
+}
+
 static void ecdev_carrier_on(struct net_device *const netdev)
 {
 	struct ccat_eth_priv *const priv = netdev_priv(netdev);
@@ -100,7 +99,7 @@ static void ecdev_nop(struct net_device *const netdev)
 	/* dummy called if nothing has to be done in EtherCAT operation mode */
 }
 
-static void ecdev_tx_fifo_full(struct net_device *const dev,
+static void ecdev_tx_fifo_full(struct ccat_eth_priv *const priv,
 			       const struct ccat_eth_frame *const frame)
 {
 	/* we are polled -> there is nothing we can do in EtherCAT mode */
@@ -120,7 +119,8 @@ static void ccat_eth_rx_fifo_add(struct ccat_eth_frame *frame,
 				 struct ccat_eth_dma_fifo *fifo)
 {
 	const size_t offset = ((void *)(frame) - fifo->dma.virt);
-	const uint32_t addr_and_length = (1 << 31) | offset;
+	const u32 addr_and_length = (1 << 31) | offset;
+
 	frame->received = 0;
 	iowrite32(addr_and_length, fifo->reg);
 }
@@ -132,13 +132,11 @@ static void ccat_eth_tx_fifo_add_free(struct ccat_eth_frame *frame,
 	frame->sent = 1;
 }
 
-static void ccat_eth_tx_fifo_full(struct net_device *const dev,
+static void ccat_eth_tx_fifo_full(struct ccat_eth_priv *const priv,
 				  const struct ccat_eth_frame *const frame)
 {
-	struct ccat_eth_priv *const priv = netdev_priv(dev);
-	netif_stop_queue(dev);
+	priv->stop_queue(priv->netdev);
 	priv->next_tx_frame = frame;
-	wake_up_process(priv->tx_thread);
 }
 
 static void ccat_eth_dma_fifo_reset(struct ccat_eth_dma_fifo *fifo)
@@ -166,7 +164,7 @@ static int ccat_eth_dma_fifo_init(struct ccat_eth_dma_fifo *fifo,
 	if (0 !=
 	    ccat_dma_init(&fifo->dma, channel, priv->ccatdev->bar[2].ioaddr,
 			  &priv->ccatdev->pdev->dev)) {
-		pr_info("init DMA%llu memory failed.\n", (uint64_t) channel);
+		pr_info("init DMA%llu memory failed.\n", (u64) channel);
 		return -1;
 	}
 	fifo->add = add;
@@ -187,7 +185,6 @@ static void ccat_eth_priv_free_dma(struct ccat_eth_priv *priv)
 	/* release dma */
 	ccat_dma_free(&priv->rx_fifo.dma);
 	ccat_dma_free(&priv->tx_fifo.dma);
-	pr_debug("DMA fifo's stopped.\n");
 }
 
 /**
@@ -225,6 +222,7 @@ static void ccat_eth_priv_init_mappings(struct ccat_eth_priv *priv)
 	CCatInfoBlockOffs offsets;
 	void __iomem *const func_base =
 	    priv->ccatdev->bar[0].ioaddr + priv->info.nAddr;
+
 	memcpy_fromio(&offsets, func_base, sizeof(offsets));
 	priv->reg.mii = func_base + offsets.nMMIOffs;
 	priv->reg.tx_fifo = func_base + offsets.nTxFifoOffs;
@@ -251,6 +249,7 @@ static struct rtnl_link_stats64 *ccat_eth_get_stats64(struct net_device *dev, st
 {
 	struct ccat_eth_priv *const priv = netdev_priv(dev);
 	CCatMacRegs mac;
+
 	memcpy_fromio(&mac, priv->reg.mac, sizeof(mac));
 	storage->rx_packets = mac.rxFrameCnt;	/* total packets received       */
 	storage->tx_packets = mac.txFrameCnt;	/* total packets transmitted    */
@@ -290,6 +289,7 @@ struct ccat_eth_priv *ccat_eth_init(const struct ccat_device *const ccatdev,
 {
 	struct ccat_eth_priv *priv;
 	struct net_device *const netdev = alloc_etherdev(sizeof(*priv));
+
 	priv = netdev_priv(netdev);
 	priv->netdev = netdev;
 	priv->ccatdev = ccatdev;
@@ -313,6 +313,7 @@ struct ccat_eth_priv *ccat_eth_init(const struct ccat_device *const ccatdev,
 	priv->ecdev = ecdev_offer(netdev, ec_poll, THIS_MODULE);
 	if (priv->ecdev) {
 		priv->carrier_off = ecdev_carrier_off;
+		priv->carrier_ok = ecdev_carrier_ok;
 		priv->carrier_on = ecdev_carrier_on;
 		priv->kfree_skb_any = ecdev_kfree_skb_any;
 		priv->start_queue = ecdev_nop;
@@ -331,6 +332,7 @@ struct ccat_eth_priv *ccat_eth_init(const struct ccat_device *const ccatdev,
 
 	/* EtherCAT disabled -> prepare normal ethernet mode */
 	priv->carrier_off = netif_carrier_off;
+	priv->carrier_ok = netif_carrier_ok;
 	priv->carrier_on = netif_carrier_on;
 	priv->kfree_skb_any = dev_kfree_skb_any;
 	priv->start_queue = netif_start_queue;
@@ -344,19 +346,11 @@ struct ccat_eth_priv *ccat_eth_init(const struct ccat_device *const ccatdev,
 		return NULL;
 	}
 	pr_info("registered %s as network device.\n", netdev->name);
-	priv->rx_thread = kthread_run(run_rx_thread, netdev, "%s_rx", KBUILD_MODNAME);
-	priv->tx_thread = kthread_run(run_tx_thread, netdev, "%s_tx", KBUILD_MODNAME);
 	return priv;
 }
 
 void ccat_eth_remove(struct ccat_eth_priv *const priv)
 {
-	if (priv->rx_thread) {
-		kthread_stop(priv->rx_thread);
-	}
-	if (priv->tx_thread) {
-		kthread_stop(priv->tx_thread);
-	}
 	priv->unregister(priv->netdev);
 	ccat_eth_priv_free_dma(priv);
 	free_netdev(priv->netdev);
@@ -366,11 +360,12 @@ void ccat_eth_remove(struct ccat_eth_priv *const priv)
 static int ccat_eth_open(struct net_device *dev)
 {
 	struct ccat_eth_priv *const priv = netdev_priv(dev);
-	priv->carrier_off(dev);
-	priv->poll_thread =
-	    kthread_run(run_poll_thread, dev, "%s_poll", KBUILD_MODNAME);
 
-	//TODO
+	priv->carrier_off(dev);
+	hrtimer_init(&priv->poll_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	priv->poll_timer.function = poll_timer_callback;
+	hrtimer_start(&priv->poll_timer, ktime_set(0, 100000),
+		      HRTIMER_MODE_REL);
 	return 0;
 }
 
@@ -381,6 +376,7 @@ static void ccat_eth_receive(struct net_device *const dev,
 	struct ccat_eth_priv *const priv = netdev_priv(dev);
 	const size_t len = frame->length - CCATRXDESC_HEADER_LEN;
 	struct sk_buff *skb = dev_alloc_skb(len + NET_IP_ALIGN);
+
 	if (!skb) {
 		pr_info("%s() out of memory :-(\n", __FUNCTION__);
 		atomic64_inc(&priv->rx_dropped);
@@ -424,7 +420,7 @@ static netdev_tx_t ccat_eth_start_xmit(struct sk_buff *skb,
 	struct ccat_eth_priv *const priv = netdev_priv(dev);
 	struct ccat_eth_frame *const frame =
 	    ((struct ccat_eth_frame *)priv->tx_fifo.dma.virt);
-	uint32_t addr_and_length;
+	u32 addr_and_length;
 
 	if (skb_is_nonlinear(skb)) {
 		pr_warn("Non linear skb not supported -> drop frame.\n");
@@ -435,7 +431,7 @@ static netdev_tx_t ccat_eth_start_xmit(struct sk_buff *skb,
 
 	if (skb->len > sizeof(frame->data)) {
 		pr_warn("skb.len %llu exceeds dma buffer %llu -> drop frame.\n",
-			(uint64_t) skb->len, (uint64_t) sizeof(frame->data));
+			(u64) skb->len, (u64) sizeof(frame->data));
 		atomic64_inc(&priv->tx_dropped);
 		priv->kfree_skb_any(skb);
 		return NETDEV_TX_OK;
@@ -443,7 +439,7 @@ static netdev_tx_t ccat_eth_start_xmit(struct sk_buff *skb,
 
 	if (!frame[next].sent) {
 		netdev_err(dev, "BUG! Tx Ring full when queue awake!\n");
-		ccat_eth_tx_fifo_full(dev, &frame[next]);
+		ccat_eth_tx_fifo_full(priv, &frame[next]);
 		return NETDEV_TX_BUSY;
 	}
 
@@ -463,7 +459,7 @@ static netdev_tx_t ccat_eth_start_xmit(struct sk_buff *skb,
 	next = (next + 1) % FIFO_LENGTH;
 	/* stop queue if tx ring is full */
 	if (!frame[next].sent) {
-		ccat_eth_tx_fifo_full(dev, &frame[next]);
+		ccat_eth_tx_fifo_full(priv, &frame[next]);
 	}
 	return NETDEV_TX_OK;
 }
@@ -471,12 +467,9 @@ static netdev_tx_t ccat_eth_start_xmit(struct sk_buff *skb,
 static int ccat_eth_stop(struct net_device *dev)
 {
 	struct ccat_eth_priv *const priv = netdev_priv(dev);
+
 	priv->stop_queue(dev);
-	if (priv->poll_thread) {
-		/* TODO care about smp context? */
-		kthread_stop(priv->poll_thread);
-		priv->poll_thread = NULL;
-	}
+	hrtimer_cancel(&priv->poll_timer);
 	netdev_info(dev, "stopped.\n");
 	return 0;
 }
@@ -484,6 +477,7 @@ static int ccat_eth_stop(struct net_device *dev)
 static void ccat_eth_link_down(struct net_device *dev)
 {
 	struct ccat_eth_priv *const priv = netdev_priv(dev);
+
 	priv->stop_queue(dev);
 	priv->carrier_off(dev);
 	netdev_info(dev, "NIC Link is Down\n");
@@ -492,6 +486,7 @@ static void ccat_eth_link_down(struct net_device *dev)
 static void ccat_eth_link_up(struct net_device *const dev)
 {
 	struct ccat_eth_priv *const priv = netdev_priv(dev);
+
 	netdev_info(dev, "NIC Link is Up\n");
 	/* TODO netdev_info(dev, "NIC Link is Up %u Mbps %s Duplex\n",
 	   speed == SPEED_100 ? 100 : 10,
@@ -515,6 +510,7 @@ static void ccat_eth_xmit_raw(struct net_device *dev, const char *const data,
 			      size_t len)
 {
 	struct sk_buff *skb = dev_alloc_skb(len);
+
 	skb->dev = dev;
 	skb_copy_to_linear_data(skb, data, len);
 	skb_put(skb, len);
@@ -522,74 +518,61 @@ static void ccat_eth_xmit_raw(struct net_device *dev, const char *const data,
 }
 
 /**
- * Since CCAT doesn't support interrupts until now, we have to poll
- * some status bits to recognize things like link change etc.
+ * Poll for link state changes
  */
-static int run_poll_thread(void *data)
+static void poll_link(struct ccat_eth_priv *const priv)
 {
-	struct net_device *const dev = (struct net_device *)data;
-	struct ccat_eth_priv *const priv = netdev_priv(dev);
-	size_t link = 0;
+	const size_t link = ccat_eth_priv_read_link_state(priv);
 
-	while (!kthread_should_stop()) {
-		if (ccat_eth_priv_read_link_state(priv) != link) {
-			link = !link;
-			link ? ccat_eth_link_up(dev) : ccat_eth_link_down(dev);
-		}
-		usleep_range(POLL_DELAY_RANGE_USECS);
+	if (link != priv->carrier_ok(priv->netdev)) {
+		if (link)
+			ccat_eth_link_up(priv->netdev);
+		else
+			ccat_eth_link_down(priv->netdev);
 	}
-	pr_debug("%s() stopped.\n", __FUNCTION__);
-	return 0;
-}
-
-static int run_rx_thread(void *data)
-{
-	struct net_device *const dev = (struct net_device *)data;
-	struct ccat_eth_priv *const priv = netdev_priv(dev);
-	struct ccat_eth_frame *frame = priv->rx_fifo.dma.virt;
-	const struct ccat_eth_frame *const end = frame + FIFO_LENGTH;
-
-	while (!kthread_should_stop()) {
-		/* wait until frame was used by DMA for Rx */
-		while (!kthread_should_stop() && !frame->received) {
-			usleep_range(DMA_POLL_DELAY_RANGE_USECS);
-		}
-
-		/* can be NULL, if we are asked to stop! */
-		if (frame->received) {
-			ccat_eth_receive(dev, frame);
-			frame->received = 0;
-			ccat_eth_rx_fifo_add(frame, &priv->rx_fifo);
-		}
-		if (++frame >= end) {
-			frame = priv->rx_fifo.dma.virt;
-		}
-	}
-	pr_debug("%s() stopped.\n", __FUNCTION__);
-	return 0;
 }
 
 /**
- * Polling of tx dma descriptors in ethernet operating mode
+ * Poll for available rx dma descriptors in ethernet operating mode
  */
-static int run_tx_thread(void *data)
+static void poll_rx(struct ccat_eth_priv *const priv)
 {
-	struct net_device *const dev = (struct net_device *)data;
-	struct ccat_eth_priv *const priv = netdev_priv(dev);
+	struct ccat_eth_frame *const frame = priv->rx_fifo.dma.virt;
+	static size_t next = 0;
 
-	set_current_state(TASK_INTERRUPTIBLE);
-	while (!kthread_should_stop()) {
-		const struct ccat_eth_frame *const frame = priv->next_tx_frame;
-		if (frame) {
-			while (!kthread_should_stop() && !frame->sent) {
-				usleep_range(DMA_POLL_DELAY_RANGE_USECS);
-			}
-		}
-		netif_wake_queue(dev);
-		schedule();
-		set_current_state(TASK_INTERRUPTIBLE);
+	/* TODO omit possible deadlock in situations with heavy traffic */
+	while (frame[next].received) {
+		ccat_eth_receive(priv->netdev, frame + next);
+		frame[next].received = 0;
+		ccat_eth_rx_fifo_add(frame + next, &priv->rx_fifo);
+		next = (next + 1) % FIFO_LENGTH;
 	}
-	set_current_state(TASK_RUNNING);
-	pr_debug("%s() stopped.\n", __FUNCTION__);
-	return 0;
+}
+
+/**
+ * Poll for available tx dma descriptors in ethernet operating mode
+ */
+static void poll_tx(struct ccat_eth_priv *const priv)
+{
+	if (priv->next_tx_frame && priv->next_tx_frame->sent) {
+		priv->next_tx_frame = NULL;
+		netif_wake_queue(priv->netdev);
+	}
+}
+
+/**
+ * Since CCAT doesn't support interrupts until now, we have to poll
+ * some status bits to recognize things like link change etc.
+ */
+static enum hrtimer_restart poll_timer_callback(struct hrtimer *timer)
+{
+	struct ccat_eth_priv *priv = container_of(timer, struct ccat_eth_priv,
+						  poll_timer);
+
+	poll_link(priv);
+	if(!priv->ecdev)
+		poll_rx(priv);
+	poll_tx(priv);
+	hrtimer_forward_now(timer, ktime_set(0, 100 * NSEC_PER_USEC));
+	return HRTIMER_RESTART;
 }
