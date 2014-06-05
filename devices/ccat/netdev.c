@@ -320,6 +320,8 @@ struct ccat_eth_priv *ccat_eth_init(const struct ccat_device *const ccatdev,
 		priv->stop_queue = ecdev_nop;
 		priv->tx_fifo_full = ecdev_tx_fifo_full;
 		priv->unregister = unregister_ecdev;
+
+		priv->carrier_off(netdev);
 		if (ecdev_open(priv->ecdev)) {
 			pr_info("unable to register network device.\n");
 			ecdev_withdraw(priv->ecdev);
@@ -339,6 +341,8 @@ struct ccat_eth_priv *ccat_eth_init(const struct ccat_device *const ccatdev,
 	priv->stop_queue = netif_stop_queue;
 	priv->tx_fifo_full = ccat_eth_tx_fifo_full;
 	priv->unregister = unregister_netdev;
+
+	priv->carrier_off(netdev);
 	if (register_netdev(netdev)) {
 		pr_info("unable to register network device.\n");
 		ccat_eth_priv_free_dma(priv);
@@ -361,7 +365,6 @@ static int ccat_eth_open(struct net_device *dev)
 {
 	struct ccat_eth_priv *const priv = netdev_priv(dev);
 
-	priv->carrier_off(dev);
 	hrtimer_init(&priv->poll_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	priv->poll_timer.function = poll_timer_callback;
 	hrtimer_start(&priv->poll_timer, ktime_set(0, 100000),
