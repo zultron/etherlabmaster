@@ -200,15 +200,15 @@ struct ccat_eth_priv {
 	atomic64_t tx_bytes;
 	atomic64_t tx_dropped;
 	ec_device_t *ecdev;
-	void (*carrier_off) (struct net_device * const netdev);
-	bool (*carrier_ok) (struct net_device *const netdev);
-	void (*carrier_on) (struct net_device * const netdev);
+	void (*carrier_off) (struct net_device * netdev);
+	bool (*carrier_ok) (const struct net_device * netdev);
+	void (*carrier_on) (struct net_device * netdev);
 	void (*kfree_skb_any) (struct sk_buff * skb);
-	void (*start_queue) (struct net_device * const netdev);
-	void (*stop_queue) (struct net_device * const netdev);
-	void (*tx_fifo_full) (struct ccat_eth_priv * const priv,
-			      const struct ccat_eth_frame * const frame);
-	void (*unregister) (struct net_device * const netdev);
+	void (*start_queue) (struct net_device * netdev);
+	void (*stop_queue) (struct net_device * netdev);
+	void (*tx_fifo_full) (struct ccat_eth_priv * priv,
+			      const struct ccat_eth_frame * frame);
+	void (*unregister) (struct net_device * netdev);
 };
 
 /**
