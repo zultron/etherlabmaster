@@ -19,11 +19,9 @@
 */
 
 #include <linux/etherdevice.h>
-#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
-#include <linux/spinlock.h>
 
 #include "module.h"
 #include "netdev.h"
@@ -46,6 +44,24 @@ static const u8 frameForwardEthernetFrames[] = {
 };
 
 #define FIFO_LENGTH 64
+#define POLL_TIME ktime_set(0, 100 * NSEC_PER_USEC)
+
+/**
+ * Helper to check if frame in tx dma memory was already marked as sent by CCAT
+ */
+static inline bool ccat_eth_frame_sent(const struct ccat_eth_frame *const frame)
+{
+	return le32_to_cpu(frame->tx_flags) & CCAT_FRAME_SENT;
+}
+
+/**
+ * Helper to check if frame in tx dma memory was already marked as sent by CCAT
+ */
+static inline bool ccat_eth_frame_received(const struct ccat_eth_frame *const
+					   frame)
+{
+	return le32_to_cpu(frame->rx_flags) & CCAT_FRAME_RECEIVED;
+}
 
 static void ecdev_kfree_skb_any(struct sk_buff *skb)
 {
@@ -75,12 +91,6 @@ static void ecdev_nop(struct net_device *const netdev)
 	/* dummy called if nothing has to be done in EtherCAT operation mode */
 }
 
-static void ecdev_tx_fifo_full(struct ccat_eth_priv *const priv,
-			       const struct ccat_eth_frame *const frame)
-{
-	/* we are polled -> there is nothing we can do in EtherCAT mode */
-}
-
 static void unregister_ecdev(struct net_device *const netdev)
 {
 	struct ccat_eth_priv *const priv = netdev_priv(netdev);
@@ -88,47 +98,44 @@ static void unregister_ecdev(struct net_device *const netdev)
 	ecdev_withdraw(priv->ecdev);
 }
 
-typedef void (*fifo_add_function) (struct ccat_eth_frame *,
-				   struct ccat_eth_dma_fifo *);
+static void ccat_eth_fifo_inc(struct ccat_eth_dma_fifo *fifo)
+{
+	if (++fifo->next >= fifo->end)
+		fifo->next = fifo->dma.virt;
+}
 
-static void ccat_eth_rx_fifo_add(struct ccat_eth_frame *frame,
-				 struct ccat_eth_dma_fifo *fifo)
+typedef void (*fifo_add_function) (struct ccat_eth_dma_fifo *,
+				   struct ccat_eth_frame *);
+
+static void ccat_eth_rx_fifo_add(struct ccat_eth_dma_fifo *fifo,
+				 struct ccat_eth_frame *frame)
 {
 	const size_t offset = ((void *)(frame) - fifo->dma.virt);
 	const u32 addr_and_length = (1 << 31) | offset;
 
-	frame->received = 0;
+	frame->rx_flags = cpu_to_le32(0);
 	iowrite32(addr_and_length, fifo->reg);
 }
 
-static void ccat_eth_tx_fifo_add_free(struct ccat_eth_frame *frame,
-				      struct ccat_eth_dma_fifo *fifo)
+static void ccat_eth_tx_fifo_add_free(struct ccat_eth_dma_fifo *fifo,
+				      struct ccat_eth_frame *frame)
 {
 	/* mark frame as ready to use for tx */
-	frame->sent = 1;
-}
-
-static void ccat_eth_tx_fifo_full(struct ccat_eth_priv *const priv,
-				  const struct ccat_eth_frame *const frame)
-{
-	priv->stop_queue(priv->netdev);
-	priv->next_tx_frame = frame;
+	frame->tx_flags = cpu_to_le32(CCAT_FRAME_SENT);
 }
 
 static void ccat_eth_dma_fifo_reset(struct ccat_eth_dma_fifo *fifo)
 {
-	struct ccat_eth_frame *frame = fifo->dma.virt;
-	const struct ccat_eth_frame *const end = frame + FIFO_LENGTH;
-
 	/* reset hw fifo */
 	iowrite32(0, fifo->reg + 0x8);
 	wmb();
 
 	if (fifo->add) {
-		while (frame < end) {
-			fifo->add(frame, fifo);
-			++frame;
-		}
+		fifo->next = fifo->dma.virt;
+		do {
+			fifo->add(fifo, fifo->next);
+			ccat_eth_fifo_inc(fifo);
+		} while (fifo->next != fifo->dma.virt);
 	}
 }
 
@@ -144,6 +151,7 @@ static int ccat_eth_dma_fifo_init(struct ccat_eth_dma_fifo *fifo,
 		return -1;
 	}
 	fifo->add = add;
+	fifo->end = ((struct ccat_eth_frame *)fifo->dma.virt) + FIFO_LENGTH;
 	fifo->reg = fifo_reg;
 	return 0;
 }
@@ -212,10 +220,8 @@ static void ccat_eth_priv_init_mappings(struct ccat_eth_priv *priv)
 static netdev_tx_t ccat_eth_start_xmit(struct sk_buff *skb,
 				       struct net_device *dev)
 {
-	static size_t next = 0;
 	struct ccat_eth_priv *const priv = netdev_priv(dev);
-	struct ccat_eth_frame *const frame =
-	    ((struct ccat_eth_frame *)priv->tx_fifo.dma.virt);
+	struct ccat_eth_dma_fifo *const fifo = &priv->tx_fifo;
 	u32 addr_and_length;
 
 	if (skb_is_nonlinear(skb)) {
@@ -225,37 +231,40 @@ static netdev_tx_t ccat_eth_start_xmit(struct sk_buff *skb,
 		return NETDEV_TX_OK;
 	}
 
-	if (skb->len > sizeof(frame->data)) {
+	if (skb->len > sizeof(fifo->next->data)) {
 		pr_warn("skb.len %llu exceeds dma buffer %llu -> drop frame.\n",
-			(u64) skb->len, (u64) sizeof(frame->data));
+			(u64) skb->len, (u64) sizeof(fifo->next->data));
 		atomic64_inc(&priv->tx_dropped);
 		priv->kfree_skb_any(skb);
 		return NETDEV_TX_OK;
 	}
 
-	if (!frame[next].sent) {
+	if (!ccat_eth_frame_sent(fifo->next)) {
 		netdev_err(dev, "BUG! Tx Ring full when queue awake!\n");
-		ccat_eth_tx_fifo_full(priv, &frame[next]);
+		priv->stop_queue(priv->netdev);
 		return NETDEV_TX_BUSY;
 	}
 
 	/* prepare frame in DMA memory */
-	frame[next].sent = 0;
-	frame[next].length = skb->len;
-	memcpy(frame[next].data, skb->data, skb->len);
+	fifo->next->tx_flags = cpu_to_le32(0);
+	fifo->next->length = cpu_to_le16(skb->len);
+	memcpy(fifo->next->data, skb->data, skb->len);
+
+	/* Queue frame into CCAT TX-FIFO, CCAT ignores the first 8 bytes of the tx descriptor */
+	addr_and_length = offsetof(struct ccat_eth_frame, length);
+	addr_and_length += ((void*)fifo->next - fifo->dma.virt);
+	addr_and_length += ((skb->len + CCAT_ETH_FRAME_HEAD_LEN) / 8) << 24;
+	iowrite32(addr_and_length, priv->reg.tx_fifo);
+
+	/* update stats */
+	atomic64_add(skb->len, &priv->tx_bytes);
 
 	priv->kfree_skb_any(skb);
 
-	addr_and_length = 8 + (next * sizeof(*frame));
-	addr_and_length +=
-	    ((frame[next].length + CCAT_ETH_FRAME_HEAD_LEN) / 8) << 24;
-	iowrite32(addr_and_length, priv->reg.tx_fifo);	/* add to DMA fifo */
-	atomic64_add(frame[next].length, &priv->tx_bytes);	/* update stats */
-
-	next = (next + 1) % FIFO_LENGTH;
+	ccat_eth_fifo_inc(fifo);
 	/* stop queue if tx ring is full */
-	if (!frame[next].sent) {
-		ccat_eth_tx_fifo_full(priv, &frame[next]);
+	if (!ccat_eth_frame_sent(fifo->next)) {
+		priv->stop_queue(priv->netdev);
 	}
 	return NETDEV_TX_OK;
 }
@@ -277,13 +286,11 @@ static void ccat_eth_xmit_raw(struct net_device *dev, const char *const data,
 	ccat_eth_start_xmit(skb, dev);
 }
 
-static const size_t CCATRXDESC_HEADER_LEN = 20;
 static void ccat_eth_receive(struct net_device *const dev,
-			     const struct ccat_eth_frame *const frame)
+			     const void *const data, const size_t len)
 {
+	struct sk_buff *const skb = dev_alloc_skb(len + NET_IP_ALIGN);
 	struct ccat_eth_priv *const priv = netdev_priv(dev);
-	const size_t len = frame->length - CCATRXDESC_HEADER_LEN;
-	struct sk_buff *skb = dev_alloc_skb(len + NET_IP_ALIGN);
 
 	if (!skb) {
 		pr_info("%s() out of memory :-(\n", __FUNCTION__);
@@ -292,7 +299,7 @@ static void ccat_eth_receive(struct net_device *const dev,
 	}
 	skb->dev = dev;
 	skb_reserve(skb, NET_IP_ALIGN);
-	skb_copy_to_linear_data(skb, frame->data, len);
+	skb_copy_to_linear_data(skb, data, len);
 	skb_put(skb, len);
 	skb->protocol = eth_type_trans(skb, dev);
 	skb->ip_summed = CHECKSUM_UNNECESSARY;
@@ -300,7 +307,7 @@ static void ccat_eth_receive(struct net_device *const dev,
 	netif_rx(skb);
 }
 
-static void ccat_eth_link_down(struct net_device *dev)
+static void ccat_eth_link_down(struct net_device *const dev)
 {
 	struct ccat_eth_priv *const priv = netdev_priv(dev);
 
@@ -355,41 +362,30 @@ static void poll_link(struct ccat_eth_priv *const priv)
 }
 
 /**
- * Rx handler in EtherCAT operation mode
- * priv->ecdev should always be valid!
- */
-static void ec_poll_rx(struct net_device *dev)
-{
-	static size_t next = 0;
-	struct ccat_eth_priv *const priv = netdev_priv(dev);
-	struct ccat_eth_frame *frame =
-	    ((struct ccat_eth_frame *)priv->rx_fifo.dma.virt) + next;
-	if (frame->received) {
-		ecdev_receive(priv->ecdev, frame->data,
-			      frame->length - CCATRXDESC_HEADER_LEN);
-		frame->received = 0;
-		ccat_eth_rx_fifo_add(frame, &priv->rx_fifo);
-		next = (next + 1) % FIFO_LENGTH;
-	} else {
-		//TODO dev_warn(&dev->dev, "%s(): frame was not ready\n", __FUNCTION__);
-	}
-}
-
-/**
  * Poll for available rx dma descriptors in ethernet operating mode
  */
 static void poll_rx(struct ccat_eth_priv *const priv)
 {
-	struct ccat_eth_frame *const frame = priv->rx_fifo.dma.virt;
-	static size_t next = 0;
+	static const size_t overhead = CCAT_ETH_FRAME_HEAD_LEN - 4;
+	struct ccat_eth_dma_fifo *const fifo = &priv->rx_fifo;
 
 	/* TODO omit possible deadlock in situations with heavy traffic */
-	while (frame[next].received) {
-		ccat_eth_receive(priv->netdev, frame + next);
-		frame[next].received = 0;
-		ccat_eth_rx_fifo_add(frame + next, &priv->rx_fifo);
-		next = (next + 1) % FIFO_LENGTH;
+	while (ccat_eth_frame_received(fifo->next)) {
+		const size_t len = le16_to_cpu(fifo->next->length) - overhead;
+		if (priv->ecdev) {
+			ecdev_receive(priv->ecdev, fifo->next->data, len);
+		} else {
+			ccat_eth_receive(priv->netdev, fifo->next->data, len);
+		}
+		ccat_eth_rx_fifo_add(fifo, fifo->next);
+		ccat_eth_fifo_inc(fifo);
 	}
+}
+
+static void ec_poll_rx(struct net_device *dev)
+{
+	struct ccat_eth_priv *const priv = netdev_priv(dev);
+	poll_rx(priv);
 }
 
 /**
@@ -397,8 +393,7 @@ static void poll_rx(struct ccat_eth_priv *const priv)
  */
 static void poll_tx(struct ccat_eth_priv *const priv)
 {
-	if (priv->next_tx_frame && priv->next_tx_frame->sent) {
-		priv->next_tx_frame = NULL;
+	if (ccat_eth_frame_sent(priv->tx_fifo.next)) {
 		netif_wake_queue(priv->netdev);
 	}
 }
@@ -409,14 +404,15 @@ static void poll_tx(struct ccat_eth_priv *const priv)
  */
 static enum hrtimer_restart poll_timer_callback(struct hrtimer *timer)
 {
-	struct ccat_eth_priv *priv = container_of(timer, struct ccat_eth_priv,
-						  poll_timer);
+	struct ccat_eth_priv *const priv =
+	    container_of(timer, struct ccat_eth_priv, poll_timer);
 
 	poll_link(priv);
-	if(!priv->ecdev)
+	if(!priv->ecdev) {
 		poll_rx(priv);
-	poll_tx(priv);
-	hrtimer_forward_now(timer, ktime_set(0, 100 * NSEC_PER_USEC));
+		poll_tx(priv);
+	}
+	hrtimer_forward_now(timer, POLL_TIME);
 	return HRTIMER_RESTART;
 }
 
@@ -464,8 +460,7 @@ static int ccat_eth_open(struct net_device *dev)
 
 	hrtimer_init(&priv->poll_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	priv->poll_timer.function = poll_timer_callback;
-	hrtimer_start(&priv->poll_timer, ktime_set(0, 100000),
-		      HRTIMER_MODE_REL);
+	hrtimer_start(&priv->poll_timer, POLL_TIME, HRTIMER_MODE_REL);
 	return 0;
 }
 
@@ -475,7 +470,6 @@ static int ccat_eth_stop(struct net_device *dev)
 
 	priv->stop_queue(dev);
 	hrtimer_cancel(&priv->poll_timer);
-	netdev_info(dev, "stopped.\n");
 	return 0;
 }
 
@@ -519,7 +513,6 @@ struct ccat_eth_priv *ccat_eth_init(const struct ccat_device *const ccatdev,
 		priv->kfree_skb_any = ecdev_kfree_skb_any;
 		priv->start_queue = ecdev_nop;
 		priv->stop_queue = ecdev_nop;
-		priv->tx_fifo_full = ecdev_tx_fifo_full;
 		priv->unregister = unregister_ecdev;
 
 		priv->carrier_off(netdev);
@@ -540,7 +533,6 @@ struct ccat_eth_priv *ccat_eth_init(const struct ccat_device *const ccatdev,
 	priv->kfree_skb_any = dev_kfree_skb_any;
 	priv->start_queue = netif_start_queue;
 	priv->stop_queue = netif_stop_queue;
-	priv->tx_fifo_full = ccat_eth_tx_fifo_full;
 	priv->unregister = unregister_netdev;
 
 	priv->carrier_off(netdev);
@@ -559,5 +551,4 @@ void ccat_eth_remove(struct ccat_eth_priv *const priv)
 	priv->unregister(priv->netdev);
 	ccat_eth_priv_free_dma(priv);
 	free_netdev(priv->netdev);
-	pr_debug("%s(): done\n", __FUNCTION__);
 }
