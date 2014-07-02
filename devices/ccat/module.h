@@ -91,14 +91,14 @@ extern int ccat_dma_init(struct ccat_dma *const dma, size_t channel,
  * @data: the bytes of the ethernet frame
  */
 struct ccat_eth_frame {
-	u32 reserved1;
-	u32 received:1;
-	u32 reserved2:31;
-	u16 length;
-	u16 reserved3;
-	u32 sent:1;
-	u32 reserved4:31;
-	u64 timestamp;
+	__le32 reserved1;
+	__le32 rx_flags;
+#define CCAT_FRAME_RECEIVED 0x1
+	__le16 length;
+	__le16 reserved3;
+	__le32 tx_flags;
+#define CCAT_FRAME_SENT 0x1
+	__le64 timestamp;
 	u8 data[0x800 - 3 * sizeof(u64)];
 #define CCAT_ETH_FRAME_HEAD_LEN offsetof(struct ccat_eth_frame, data)
 };
@@ -130,8 +130,10 @@ struct ccat_eth_register {
  * @dma: information about the associated DMA memory
  */
 struct ccat_eth_dma_fifo {
-	void (*add) (struct ccat_eth_frame *, struct ccat_eth_dma_fifo *);
+	void (*add) (struct ccat_eth_dma_fifo *, struct ccat_eth_frame *);
 	void __iomem *reg;
+	const struct ccat_eth_frame *end;
+	struct ccat_eth_frame *next;
 	struct ccat_dma dma;
 };
 
@@ -174,7 +176,6 @@ struct ccat_info_block {
  * struct ccat_eth_priv - CCAT Ethernet/EtherCAT Master function (netdev)
  * @ccatdev: pointer to the parent struct ccat_device
  * @netdev: the net_device structure used by the kernel networking stack
- * @next_tx_frame: pointer to the next TX DMA descriptor, which the tx_thread should check for availablity
  * @info: holds a copy of the CCAT Ethernet/EtherCAT Master function information block (read from PCI config space)
  * @reg: register addresses in PCI config space of the Ethernet/EtherCAT Master function
  * @rx_fifo: DMA fifo used for RX DMA descriptors
@@ -188,7 +189,6 @@ struct ccat_info_block {
 struct ccat_eth_priv {
 	const struct ccat_device *ccatdev;
 	struct net_device *netdev;
-	const struct ccat_eth_frame *next_tx_frame;
 	struct ccat_info_block info;
 	struct ccat_eth_register reg;
 	struct ccat_eth_dma_fifo rx_fifo;
@@ -205,8 +205,6 @@ struct ccat_eth_priv {
 	void (*kfree_skb_any) (struct sk_buff * skb);
 	void (*start_queue) (struct net_device * netdev);
 	void (*stop_queue) (struct net_device * netdev);
-	void (*tx_fifo_full) (struct ccat_eth_priv * priv,
-			      const struct ccat_eth_frame * frame);
 	void (*unregister) (struct net_device * netdev);
 };
 
