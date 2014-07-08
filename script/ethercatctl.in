@@ -33,6 +33,7 @@
 #
 #------------------------------------------------------------------------------
 
+LSMOD=/sbin/lsmod
 MODPROBE=/sbin/modprobe
 RMMOD=/sbin/rmmod
 MODINFO=/sbin/modinfo
@@ -109,7 +110,7 @@ start)
 
         if [ ${MODULE} != "generic" ]; then
             # try to unload standard module
-            if lsmod | grep "^${MODULE} " > /dev/null; then
+            if ${LSMOD} | grep "^${MODULE} " > /dev/null; then
                 if ! ${RMMOD} ${MODULE}; then
                     ${RMMOD} ${LOADED_MODULES}
                     exit 1
@@ -137,7 +138,7 @@ stop)
     # unload EtherCAT device modules
     for MODULE in ${DEVICE_MODULES} master; do
         ECMODULE=ec_${MODULE}
-        if ! lsmod | grep -q "^${ECMODULE} "; then
+        if ! ${LSMOD} | grep -q "^${ECMODULE} "; then
             continue # ec_* module not loaded
         fi
         if ! ${RMMOD} ${ECMODULE}; then
