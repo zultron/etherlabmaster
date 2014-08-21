@@ -153,6 +153,7 @@
 #define EC_IOCTL_DEACTIVATE_SLAVES      EC_IO(0x5f)
 #define EC_IOCTL_64_REF_CLK_TIME_QUEUE  EC_IO(0x60)
 #define EC_IOCTL_64_REF_CLK_TIME       EC_IOR(0x61, uint64_t)
+#define EC_IOCTL_SLAVE_DICT_UPLOAD     EC_IOW(0x62, ec_ioctl_slave_dict_upload_t)
 
 /*****************************************************************************/
 
@@ -809,6 +810,13 @@ typedef struct {
     // outputs
     ec_master_link_state_t *state;
 } ec_ioctl_link_state_t;
+
+/*****************************************************************************/
+
+typedef struct {
+    // inputs
+    uint16_t slave_position;
+} ec_ioctl_slave_dict_upload_t;
 
 /*****************************************************************************/
 
