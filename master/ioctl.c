@@ -57,6 +57,16 @@
 #define ATTRIBUTES
 #endif
 
+/** Ioctl locking is disabled for RTDM as the RT app needs to use RTAI locks.
+ */
+#ifdef EC_IOCTL_RTDM
+#define ec_ioctl_lock_down_interruptible(p) 0
+#define ec_ioctl_lock_up(p)                 do {} while (0)
+#else
+#define ec_ioctl_lock_down_interruptible(p) ec_lock_down_interruptible(p)
+#define ec_ioctl_lock_up(p)                 ec_lock_up(p)
+#endif
+
 /*****************************************************************************/
 
 /** Copies a string to an ioctl structure.
@@ -2100,15 +2110,18 @@ static ATTRIBUTES int ec_ioctl_send(
         return -EPERM;
     }
 
-    down( & master->io_sem );
+    /* Locking added as send is likely to be used by more than
+        one application tasks */
+    if (ec_ioctl_lock_down_interruptible(&master->master_sem))
+        return -EINTR;
     sent_bytes = ecrt_master_send(master);
 
     if (copy_to_user((void __user *) arg, &sent_bytes, sizeof(sent_bytes))) {
-        up( & master->io_sem );
+        ec_ioctl_lock_up(&master->master_sem);
         return -EFAULT;
     }
 
-    up( & master->io_sem );
+    ec_ioctl_lock_up(&master->master_sem);
     return 0;
 }
 
@@ -2128,9 +2141,12 @@ static ATTRIBUTES int ec_ioctl_receive(
         return -EPERM;
     }
 
-    down( & master->io_sem );
+    /* Locking added as receive is likely to be used by more than
+       one application tasks */
+    if (ec_ioctl_lock_down_interruptible(&master->master_sem))
+        return -EINTR;
     ecrt_master_receive(master);
-    up( & master->io_sem );
+    ec_ioctl_lock_up(&master->master_sem);
     return 0;
 }
 
@@ -3454,14 +3470,19 @@ static ATTRIBUTES int ec_ioctl_domain_process(
     if (unlikely(!ctx->requested))
         return -EPERM;
 
-    /* no locking of master_sem needed, because domain will not be deleted in
-     * the meantime. */
+    /* Locking added as domain processing is likely to be used by more than
+       one application tasks */
+    if (ec_ioctl_lock_down_interruptible(&master->master_sem)) {
+        return -EINTR;
+    }
 
     if (!(domain = ec_master_find_domain(master, (unsigned long) arg))) {
+        ec_ioctl_lock_up(&master->master_sem);
         return -ENOENT;
     }
 
     ecrt_domain_process(domain);
+    ec_ioctl_lock_up(&master->master_sem);
     return 0;
 }
 
@@ -3482,16 +3503,20 @@ static ATTRIBUTES int ec_ioctl_domain_queue(
     if (unlikely(!ctx->requested))
         return -EPERM;
 
-    /* no locking of master_sem needed, because domain will not be deleted in
-     * the meantime. */
+    /* Locking added as domain queing is likely to be used by more than
+       one application tasks */
+    if (ec_ioctl_lock_down_interruptible(&master->master_sem))
+        return -EINTR;
 
     if (!(domain = ec_master_find_domain(master, (unsigned long) arg))) {
+        ec_ioctl_lock_up(&master->master_sem);
         return -ENOENT;
     }
 
     ec_lock_down( & master->io_sem );
     ecrt_domain_queue(domain);
     ec_lock_up( & master->io_sem );
+    ec_ioctl_lock_up(&master->master_sem);
     return 0;
 }
 
