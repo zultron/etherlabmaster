@@ -37,7 +37,6 @@ ifeq (@ENABLE_CCAT@,1)
 	EC_CCAT_OBJ := \
 		module.o \
 		netdev.o \
-		print.o \
 		update.o
 	obj-m += ec_ccat.o
 	ec_ccat-objs := $(EC_CCAT_OBJ)
