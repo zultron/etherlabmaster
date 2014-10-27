@@ -280,7 +280,9 @@ static const struct pci_device_id pci_ids[] = {
 	{0,},
 };
 
+#if 0 /* prevent auto-loading */
 MODULE_DEVICE_TABLE(pci, pci_ids);
+#endif
 
 static struct pci_driver pci_driver = {
 	.name = DRV_NAME,
