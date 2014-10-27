@@ -22,18 +22,28 @@
 #define _CCAT_H_
 
 #include <linux/cdev.h>
+#include <linux/hrtimer.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
-#include "CCatDefinitions.h"
 #include "../ecdev.h"
 
-#define DRV_NAME         "ec_ccat"
 #define DRV_EXTRAVERSION "-ec"
-#define DRV_VERSION      "0.8" DRV_EXTRAVERSION
+#define DRV_VERSION      "0.10" DRV_EXTRAVERSION
 #define DRV_DESCRIPTION  "Beckhoff CCAT Ethernet/EtherCAT Network Driver"
 
 #undef pr_fmt
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
+/**
+ * CCAT function type identifiers (u16)
+ */
+enum ccat_info_t {
+	CCATINFO_NOTUSED = 0,
+	CCATINFO_EPCS_PROM = 0xf,
+	CCATINFO_ETHERCAT_MASTER_DMA = 0x14,
+	CCATINFO_COPY_BLOCK = 0x17,
+	CCATINFO_MAX
+};
 
 /**
  * struct ccat_bar - CCAT PCI Base Address Register(BAR) configuration
@@ -81,15 +91,16 @@ extern int ccat_dma_init(struct ccat_dma *const dma, size_t channel,
  * @data: the bytes of the ethernet frame
  */
 struct ccat_eth_frame {
-	uint32_t reserved1;
-	uint32_t received:1;
-	uint32_t reserved2:31;
-	uint16_t length;
-	uint16_t reserved3;
-	uint32_t sent:1;
-	uint32_t reserved4:31;
-	uint64_t timestamp;
-	uint8_t data[0x800 - 3 * sizeof(uint64_t)];
+	__le32 reserved1;
+	__le32 rx_flags;
+#define CCAT_FRAME_RECEIVED 0x1
+	__le16 length;
+	__le16 reserved3;
+	__le32 tx_flags;
+#define CCAT_FRAME_SENT 0x1
+	__le64 timestamp;
+	u8 data[0x800 - 3 * sizeof(u64)];
+#define CCAT_ETH_FRAME_HEAD_LEN offsetof(struct ccat_eth_frame, data)
 };
 
 /**
@@ -119,8 +130,10 @@ struct ccat_eth_register {
  * @dma: information about the associated DMA memory
  */
 struct ccat_eth_dma_fifo {
-	void (*add) (struct ccat_eth_frame *, struct ccat_eth_dma_fifo *);
+	void (*add) (struct ccat_eth_dma_fifo *, struct ccat_eth_frame *);
 	void __iomem *reg;
+	const struct ccat_eth_frame *end;
+	struct ccat_eth_frame *next;
 	struct ccat_dma dma;
 };
 
@@ -145,18 +158,29 @@ struct ccat_device {
 	struct ccat_bar bar[3];	//TODO optimize this
 };
 
+struct ccat_info_block {
+	u16 type;
+	u16 rev;
+	union {
+		u32 config;
+		struct {
+			u8 tx_dma_chan;
+			u8 rx_dma_chan;
+		};
+	};
+	u32 addr;
+	u32 size;
+};
+
 /**
  * struct ccat_eth_priv - CCAT Ethernet/EtherCAT Master function (netdev)
  * @ccatdev: pointer to the parent struct ccat_device
  * @netdev: the net_device structure used by the kernel networking stack
- * @poll_thread: is used to poll status registers like link state
- * @rx_thread: thread which does housekeeping of RX DMA descriptors
- * @tx_thread: thread which does housekeeping of TX DMA descriptors
- * @next_tx_frame: pointer to the next TX DMA descriptor, which the tx_thread should check for availablity
  * @info: holds a copy of the CCAT Ethernet/EtherCAT Master function information block (read from PCI config space)
  * @reg: register addresses in PCI config space of the Ethernet/EtherCAT Master function
  * @rx_fifo: DMA fifo used for RX DMA descriptors
  * @tx_fifo: DMA fifo used for TX DMA descriptors
+ * @poll_timer: interval timer used to poll CCAT for events like link changed, rx done, tx done
  * @rx_bytes: number of bytes received -> reported with ndo_get_stats64()
  * @rx_dropped: number of received frames, which were dropped -> reported with ndo_get_stats64()
  * @tx_bytes: number of bytes send -> reported with ndo_get_stats64()
@@ -165,27 +189,63 @@ struct ccat_device {
 struct ccat_eth_priv {
 	const struct ccat_device *ccatdev;
 	struct net_device *netdev;
-	struct task_struct *poll_thread;
-	struct task_struct *rx_thread;
-	struct task_struct *tx_thread;
-	const struct ccat_eth_frame *next_tx_frame;	/* next frame the tx_thread should check for availability */
-	CCatInfoBlock info;
+	struct ccat_info_block info;
 	struct ccat_eth_register reg;
 	struct ccat_eth_dma_fifo rx_fifo;
 	struct ccat_eth_dma_fifo tx_fifo;
+	struct hrtimer poll_timer;
 	atomic64_t rx_bytes;
 	atomic64_t rx_dropped;
 	atomic64_t tx_bytes;
 	atomic64_t tx_dropped;
 	ec_device_t *ecdev;
-	void (*carrier_off) (struct net_device * const netdev);
-	void (*carrier_on) (struct net_device * const netdev);
+	void (*carrier_off) (struct net_device * netdev);
+	bool (*carrier_ok) (const struct net_device * netdev);
+	void (*carrier_on) (struct net_device * netdev);
 	void (*kfree_skb_any) (struct sk_buff * skb);
-	void (*start_queue) (struct net_device * const netdev);
-	void (*stop_queue) (struct net_device * const netdev);
-	void (*tx_fifo_full) (struct net_device * const dev,
-			      const struct ccat_eth_frame * const frame);
-	void (*unregister) (struct net_device * const netdev);
+	void (*start_queue) (struct net_device * netdev);
+	void (*stop_queue) (struct net_device * netdev);
+	void (*unregister) (struct net_device * netdev);
+};
+
+/**
+ * same as: typedef struct _CCatInfoBlockOffs from CCatDefinitions.h
+ * TODO add some checking facility outside of the linux tree
+ */
+struct ccat_mac_infoblock {
+	u32 reserved;
+	u32 mii;
+	u32 tx_fifo;
+	u32 mac;
+	u32 rx_mem;
+	u32 tx_mem;
+	u32 misc;
+};
+
+struct ccat_mac_register {
+	/** MAC error register     @+0x0 */
+	u8 frame_len_err;
+	u8 rx_err;
+	u8 crc_err;
+	u8 link_lost_err;
+	u32 reserved1;
+	/** Buffer overflow errors @+0x8 */
+	u8 rx_mem_full;
+	u8 reserved2[7];
+	/** MAC frame counter      @+0x10 */
+	u32 tx_frames;
+	u32 rx_frames;
+	u64 reserved3;
+	/** MAC fifo level         @+0x20 */
+	u8 tx_fifo_level:7;
+	u8 reserved4:1;
+	u8 reserved5[7];
+	/** TX memory full error   @+0x28 */
+	u8 tx_mem_full;
+	u8 reserved6[7];
+	u64 reserved8[9];
+	/** Connection             @+0x78 */
+	u8 mii_connected;
 };
 
 /**
@@ -203,6 +263,6 @@ struct ccat_update {
 	dev_t dev;
 	struct cdev cdev;
 	struct class *class;
-	CCatInfoBlock info;
+	struct ccat_info_block info;
 };
 #endif /* #ifndef _CCAT_H_ */

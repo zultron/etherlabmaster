@@ -28,11 +28,9 @@
 #------------------------------------------------------------------------------
 
 EXTRA_DIST = \
-	COPYING \
 	Kbuild.in \
 	module.h \
 	netdev.h \
-	print.h \
 	update.h
 
 BUILT_SOURCES = \

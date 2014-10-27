@@ -22,7 +22,6 @@
 #include <linux/etherdevice.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
-#include "compat.h"
 #include "module.h"
 #include "netdev.h"
 #include "update.h"
@@ -56,38 +55,38 @@ static int ccat_bar_init(struct ccat_bar *bar, size_t index,
 			 struct pci_dev *pdev)
 {
 	struct resource *res;
+
 	bar->start = pci_resource_start(pdev, index);
 	bar->end = pci_resource_end(pdev, index);
 	bar->len = pci_resource_len(pdev, index);
 	bar->flags = pci_resource_flags(pdev, index);
 	if (!(IORESOURCE_MEM & bar->flags)) {
-		pr_info("bar%llu is no mem_region -> abort.\n",
-			(uint64_t) index);
+		pr_info("bar%llu is no mem_region -> abort.\n", (u64) index);
 		return -EIO;
 	}
 
-	res = request_mem_region(bar->start, bar->len, DRV_NAME);
+	res = request_mem_region(bar->start, bar->len, KBUILD_MODNAME);
 	if (!res) {
 		pr_info("allocate mem_region failed.\n");
 		return -EIO;
 	}
-	pr_debug("bar%llu at [%lx,%lx] len=%lu res: %p.\n", (uint64_t) index,
+	pr_debug("bar%llu at [%lx,%lx] len=%lu res: %p.\n", (u64) index,
 		 bar->start, bar->end, bar->len, res);
 
 	bar->ioaddr = ioremap(bar->start, bar->len);
 	if (!bar->ioaddr) {
-		pr_info("bar%llu ioremap failed.\n", (uint64_t) index);
+		pr_info("bar%llu ioremap failed.\n", (u64) index);
 		release_mem_region(bar->start, bar->len);
 		return -EIO;
 	}
-	pr_debug("bar%llu I/O mem mapped to %p.\n", (uint64_t) index,
-		 bar->ioaddr);
+	pr_debug("bar%llu I/O mem mapped to %p.\n", (u64) index, bar->ioaddr);
 	return 0;
 }
 
 void ccat_dma_free(struct ccat_dma *const dma)
 {
 	const struct ccat_dma tmp = *dma;
+
 	free_dma(dma->channel);
 	memset(dma, 0, sizeof(*dma));
 	dma_free_coherent(tmp.dev, tmp.size, tmp.virt, tmp.phys);
@@ -104,12 +103,12 @@ int ccat_dma_init(struct ccat_dma *const dma, size_t channel,
 		  void __iomem * const ioaddr, struct device *const dev)
 {
 	void *frame;
-	uint64_t addr;
-	uint32_t translateAddr;
-	uint32_t memTranslate;
-	uint32_t memSize;
-	uint32_t data = 0xffffffff;
-	uint32_t offset = (sizeof(uint64_t) * channel) + 0x1000;
+	u64 addr;
+	u32 translateAddr;
+	u32 memTranslate;
+	u32 memSize;
+	u32 data = 0xffffffff;
+	u32 offset = (sizeof(u64) * channel) + 0x1000;
 
 	dma->channel = channel;
 	dma->dev = dev;
@@ -123,13 +122,12 @@ int ccat_dma_init(struct ccat_dma *const dma, size_t channel,
 	dma->size = 2 * memSize - PAGE_SIZE;
 	dma->virt = dma_zalloc_coherent(dev, dma->size, &dma->phys, GFP_KERNEL);
 	if (!dma->virt || !dma->phys) {
-		pr_info("init DMA%llu memory failed.\n", (uint64_t) channel);
+		pr_info("init DMA%llu memory failed.\n", (u64) channel);
 		return -1;
 	}
 
-	if (request_dma(channel, DRV_NAME)) {
-		pr_info("request dma channel %llu failed\n",
-			(uint64_t) channel);
+	if (request_dma(channel, KBUILD_MODNAME)) {
+		pr_info("request dma channel %llu failed\n", (u64) channel);
 		ccat_dma_free(dma);
 		return -1;
 	}
@@ -140,9 +138,9 @@ int ccat_dma_init(struct ccat_dma *const dma, size_t channel,
 	frame = dma->virt + translateAddr - dma->phys;
 	pr_debug
 	    ("DMA%llu mem initialized\n virt:         0x%p\n phys:         0x%llx\n translated:   0x%llx\n pci addr:     0x%08x%x\n memTranslate: 0x%x\n size:         %llu bytes.\n",
-	     (uint64_t) channel, dma->virt, (uint64_t) (dma->phys), addr,
+	     (u64) channel, dma->virt, (u64) (dma->phys), addr,
 	     ioread32(ioaddr + offset + 4), ioread32(ioaddr + offset),
-	     memTranslate, (uint64_t) dma->size);
+	     memTranslate, (u64) dma->size);
 	return 0;
 }
 
@@ -153,14 +151,14 @@ int ccat_dma_init(struct ccat_dma *const dma, size_t channel,
  */
 static int ccat_functions_init(struct ccat_device *const ccatdev)
 {
-	/* read CCatInfoBlock.nMaxEntries from ccat */
-	const uint8_t num_func = ioread8(ccatdev->bar[0].ioaddr + 4);
-	void __iomem *addr = ccatdev->bar[0].ioaddr;
-	const void __iomem *end = addr + (sizeof(CCatInfoBlock) * num_func);
-	int status = 0;		//count init function failures
+	static const size_t block_size = sizeof(struct ccat_info_block);
+	void __iomem *addr = ccatdev->bar[0].ioaddr; /** first block is the CCAT information block entry */
+	const u8 num_func = ioread8(addr + 4); /** number of CCAT function blocks is at offset 0x4 */
+	const void __iomem *end = addr + (block_size * num_func);
+	int status = 0;	/** count init function failures */
 
 	while (addr < end) {
-		const uint8_t type = ioread16(addr);
+		const u8 type = ioread16(addr);
 		switch (type) {
 		case CCATINFO_NOTUSED:
 			break;
@@ -178,7 +176,7 @@ static int ccat_functions_init(struct ccat_device *const ccatdev)
 			pr_info("Found: 0x%04x not supported\n", type);
 			break;
 		}
-		addr += sizeof(CCatInfoBlock);
+		addr += block_size;
 	}
 	return status;
 }
@@ -209,6 +207,7 @@ static int ccat_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	int status;
 	u8 revision;
 	struct ccat_device *ccatdev = kmalloc(sizeof(*ccatdev), GFP_KERNEL);
+
 	if (!ccatdev) {
 		pr_err("%s() out of memory.\n", __FUNCTION__);
 		return -ENOMEM;
@@ -229,13 +228,9 @@ static int ccat_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return status;
 	}
 
-	/* FIXME upgrade to a newer kernel to get support of dma_set_mask_and_coherent()
-	 * (!dma_set_mask_and_coherent(&dev->dev, DMA_BIT_MASK(64))) {
-	 */
-	if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(64))) {
+	if (!dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64))) {
 		pr_debug("64 bit DMA supported, pci rev: %u\n", revision);
-		/*} else if (!dma_set_mask_and_coherent(&dev->dev, DMA_BIT_MASK(32))) { */
-	} else if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(32))) {
+	} else if (!dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32))) {
 		pr_debug("32 bit DMA supported, pci rev: %u\n", revision);
 	} else {
 		pr_warn("No suitable DMA available, pci rev: %u\n", revision);
@@ -261,6 +256,7 @@ static int ccat_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 static void ccat_remove(struct pci_dev *pdev)
 {
 	struct ccat_device *ccatdev = pci_get_drvdata(pdev);
+
 	if (ccatdev) {
 		ccat_functions_remove(ccatdev);
 		ccat_bar_free(&ccatdev->bar[2]);
@@ -285,21 +281,19 @@ MODULE_DEVICE_TABLE(pci, pci_ids);
 #endif
 
 static struct pci_driver pci_driver = {
-	.name = DRV_NAME,
+	.name = KBUILD_MODNAME,
 	.id_table = pci_ids,
 	.probe = ccat_probe,
 	.remove = ccat_remove,
 };
 
-static void ccat_exit_module(void)
+static void __exit ccat_exit_module(void)
 {
 	pci_unregister_driver(&pci_driver);
 }
 
-static int ccat_init_module(void)
+static int __init ccat_init_module(void)
 {
-	BUILD_BUG_ON(offsetof(struct ccat_eth_frame, data) !=
-		     CCAT_DMA_FRAME_HEADER_LENGTH);
 	pr_info("%s, %s\n", DRV_DESCRIPTION, DRV_VERSION);
 	return pci_register_driver(&pci_driver);
 }
