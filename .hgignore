@@ -1,5 +1,6 @@
 syntax: glob
 
+**.dirstamp
 **.ko
 **.ko.cmd
 **.lo
