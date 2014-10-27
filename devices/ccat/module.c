@@ -22,6 +22,7 @@
 #include <linux/etherdevice.h>
 #include <linux/module.h>
 #include <linux/netdevice.h>
+#include <linux/version.h>
 #include "module.h"
 #include "netdev.h"
 #include "update.h"
@@ -228,6 +229,7 @@ static int ccat_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		return status;
 	}
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
 	if (!dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64))) {
 		pr_debug("64 bit DMA supported, pci rev: %u\n", revision);
 	} else if (!dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32))) {
@@ -235,6 +237,15 @@ static int ccat_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	} else {
 		pr_warn("No suitable DMA available, pci rev: %u\n", revision);
 	}
+#else
+	if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(64))) {
+		pr_debug("64 bit DMA supported, pci rev: %u\n", revision);
+	} else if (!dma_set_mask(&pdev->dev, DMA_BIT_MASK(32))) {
+		pr_debug("32 bit DMA supported, pci rev: %u\n", revision);
+	} else {
+		pr_warn("No suitable DMA available, pci rev: %u\n", revision);
+	}
+#endif
 
 	if (ccat_bar_init(&ccatdev->bar[0], 0, pdev)) {
 		pr_warn("initialization of bar0 failed.\n");
