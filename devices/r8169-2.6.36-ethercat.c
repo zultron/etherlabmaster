@@ -3239,15 +3239,18 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		RTL_W16(CPlusCmd, RTL_R16(CPlusCmd) | RxVlan);
 
 	device_set_wakeup_enable(&pdev->dev, tp->features & RTL_FEATURE_WOL);
-	if (tp->ecdev && ecdev_open(tp->ecdev)) {
-		ecdev_withdraw(tp->ecdev);
-		goto err_out_msi_4;
+
+	if (pci_dev_run_wake(pdev))
+		pm_runtime_put_noidle(&pdev->dev);
+
+	if (tp->ecdev) {
+		rc = ecdev_open(tp->ecdev);
+		if (rc) {
+			ecdev_withdraw(tp->ecdev);
+			goto err_out_msi_4;
+		}
 	}
 
-	if(!tp->ecdev) {
-		if (pci_dev_run_wake(pdev))
-			pm_runtime_put_noidle(&pdev->dev);
-	}
 out:
 	return rc;
 
