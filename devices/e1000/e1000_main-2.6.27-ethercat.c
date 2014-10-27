@@ -1248,7 +1248,8 @@ static int __devinit e1000_probe(struct pci_dev *pdev,
  	// offer device to EtherCAT master module
  	adapter->ecdev = ecdev_offer(netdev, ec_poll, THIS_MODULE);
  	if (adapter->ecdev) {
- 		if (ecdev_open(adapter->ecdev)) {
+		err = ecdev_open(adapter->ecdev);
+		if (err) {
  			ecdev_withdraw(adapter->ecdev);
  			goto err_register;
  		}

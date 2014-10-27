@@ -3234,9 +3234,12 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	device_set_wakeup_enable(&pdev->dev, tp->features & RTL_FEATURE_WOL);
 
-	if (tp->ecdev && ecdev_open(tp->ecdev)) {
-		ecdev_withdraw(tp->ecdev);
-		goto err_out_msi_5;
+	if (tp->ecdev) {
+		rc = ecdev_open(tp->ecdev);
+		if (rc) {
+			ecdev_withdraw(tp->ecdev);
+			goto err_out_msi_5;
+		}
 	}
 
 out:
