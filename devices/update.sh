@@ -6,7 +6,7 @@ KERNELDIR=/data/kernel/linux-3.6.11
 PREVER=3.4
 KERNELVER=3.6
 
-for f in $KERNELDIR/drivers/net/ethernet/realtek/{8139too,r8169}.c; do
+for f in $KERNELDIR/drivers/net/ethernet/{realtek/8139too,realtek/r8169,intel/e100}.c; do
     echo $f
     b=$(basename $f)
     o=${b/\./-$KERNELVER-orig.}
