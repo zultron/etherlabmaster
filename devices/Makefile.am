@@ -83,6 +83,8 @@ noinst_HEADERS = \
 	8139too-3.2-orig.c \
 	8139too-3.4-ethercat.c \
 	8139too-3.4-orig.c \
+	8139too-3.6-ethercat.c \
+	8139too-3.6-orig.c \
 	e100-2.6.20-ethercat.c \
 	e100-2.6.20-orig.c \
 	e100-2.6.24-ethercat.c \
@@ -109,6 +111,8 @@ noinst_HEADERS = \
 	e100-3.0-orig.c \
 	e100-3.4-ethercat.c \
 	e100-3.4-orig.c \
+	e100-3.6-ethercat.c \
+	e100-3.6-orig.c \
 	ecdev.h \
 	generic.c \
 	r8169-2.6.24-ethercat.c \
@@ -134,7 +138,9 @@ noinst_HEADERS = \
 	r8169-3.2-ethercat.c \
 	r8169-3.2-orig.c \
 	r8169-3.4-ethercat.c \
-	r8169-3.4-orig.c
+	r8169-3.4-orig.c \
+	r8169-3.6-ethercat.c \
+	r8169-3.6-orig.c
 
 EXTRA_DIST = \
 	Kbuild.in
