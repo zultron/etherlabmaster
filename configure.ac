@@ -247,29 +247,6 @@ fi
 AC_SUBST(KERNEL_8139TOO,[$kernel8139too])
 
 #------------------------------------------------------------------------------
-# CCAT driver
-#------------------------------------------------------------------------------
-
-AC_ARG_ENABLE([ccat],
-    AS_HELP_STRING([--enable-ccat],
-                   [Enable CCAT driver]),
-    [
-        case "${enableval}" in
-            yes) enableccat=1
-                ;;
-            no) enableccat=0
-                ;;
-            *) AC_MSG_ERROR([Invalid value for --enable-ccat])
-                ;;
-        esac
-    ],
-    [enableccat=0] # disabled by default
-)
-
-AM_CONDITIONAL(ENABLE_CCAT, test "x$enableccat" = "x1")
-AC_SUBST(ENABLE_CCAT,[$enableccat])
-
-#------------------------------------------------------------------------------
 # e100 driver
 #------------------------------------------------------------------------------
 
@@ -504,6 +481,37 @@ if test "x${enable_r8169}" = "x1"; then
 fi
 
 AC_SUBST(KERNEL_R8169,[$kernel_r8169])
+
+#------------------------------------------------------------------------------
+# CCAT driver
+#------------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to build the CCAT driver])
+
+AC_ARG_ENABLE([ccat],
+    AS_HELP_STRING([--enable-ccat],
+                   [Enable CCAT driver]),
+    [
+        case "${enableval}" in
+            yes) enableccat=1
+                ;;
+            no) enableccat=0
+                ;;
+            *) AC_MSG_ERROR([Invalid value for --enable-ccat])
+                ;;
+        esac
+    ],
+    [enableccat=0] # disabled by default
+)
+
+if test "x${enableccat}" = "x1"; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
+
+AM_CONDITIONAL(ENABLE_CCAT, test "x$enableccat" = "x1")
+AC_SUBST(ENABLE_CCAT,[$enableccat])
 
 #------------------------------------------------------------------------------
 # RTAI path (optional)
