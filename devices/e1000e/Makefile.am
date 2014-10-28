@@ -36,6 +36,10 @@ EXTRA_DIST = \
 	80003es2lan-3.12-ethercat.h \
 	80003es2lan-3.12-orig.c \
 	80003es2lan-3.12-orig.h \
+	80003es2lan-3.14-ethercat.c \
+	80003es2lan-3.14-ethercat.h \
+	80003es2lan-3.14-orig.c \
+	80003es2lan-3.14-orig.h \
 	80003es2lan-3.4-ethercat.c \
 	80003es2lan-3.4-orig.c \
 	80003es2lan-3.6-ethercat.c \
@@ -60,6 +64,10 @@ EXTRA_DIST = \
 	82571-3.12-ethercat.h \
 	82571-3.12-orig.c \
 	82571-3.12-orig.h \
+	82571-3.14-ethercat.c \
+	82571-3.14-ethercat.h \
+	82571-3.14-orig.c \
+	82571-3.14-orig.h \
 	82571-3.2-ethercat.c \
 	82571-3.2-orig.c \
 	82571-3.4-ethercat.c \
@@ -83,6 +91,8 @@ EXTRA_DIST = \
 	defines-3.10-orig.h \
 	defines-3.12-ethercat.h \
 	defines-3.12-orig.h \
+	defines-3.14-ethercat.h \
+	defines-3.14-orig.h \
 	defines-3.2-ethercat.h \
 	defines-3.2-orig.h \
 	defines-3.4-ethercat.h \
@@ -105,6 +115,8 @@ EXTRA_DIST = \
 	e1000-3.10-orig.h \
 	e1000-3.12-ethercat.h \
 	e1000-3.12-orig.h \
+	e1000-3.14-ethercat.h \
+	e1000-3.14-orig.h \
 	e1000-3.2-ethercat.h \
 	e1000-3.2-orig.h \
 	e1000-3.4-ethercat.h \
@@ -139,6 +151,8 @@ EXTRA_DIST = \
 	ethtool-3.10-orig.c \
 	ethtool-3.12-ethercat.c \
 	ethtool-3.12-orig.c \
+	ethtool-3.14-ethercat.c \
+	ethtool-3.14-orig.c \
 	ethtool-3.2-ethercat.c \
 	ethtool-3.2-orig.c \
 	ethtool-3.4-ethercat.c \
@@ -161,6 +175,8 @@ EXTRA_DIST = \
 	hw-3.10-orig.h \
 	hw-3.12-ethercat.h \
 	hw-3.12-orig.h \
+	hw-3.14-ethercat.h \
+	hw-3.14-orig.h \
 	hw-3.2-ethercat.h \
 	hw-3.2-orig.h \
 	hw-3.4-ethercat.h \
@@ -187,6 +203,10 @@ EXTRA_DIST = \
 	ich8lan-3.12-ethercat.h \
 	ich8lan-3.12-orig.c \
 	ich8lan-3.12-orig.h \
+	ich8lan-3.14-ethercat.c \
+	ich8lan-3.14-ethercat.h \
+	ich8lan-3.14-orig.c \
+	ich8lan-3.14-orig.h \
 	ich8lan-3.2-ethercat.c \
 	ich8lan-3.2-orig.c \
 	ich8lan-3.4-ethercat.c \
@@ -215,6 +235,10 @@ EXTRA_DIST = \
 	mac-3.12-ethercat.h \
 	mac-3.12-orig.c \
 	mac-3.12-orig.h \
+	mac-3.14-ethercat.c \
+	mac-3.14-ethercat.h \
+	mac-3.14-orig.c \
+	mac-3.14-orig.h \
 	mac-3.4-ethercat.c \
 	mac-3.4-orig.c \
 	mac-3.6-ethercat.c \
@@ -229,6 +253,10 @@ EXTRA_DIST = \
 	manage-3.12-ethercat.h \
 	manage-3.12-orig.c \
 	manage-3.12-orig.h \
+	manage-3.14-ethercat.c \
+	manage-3.14-ethercat.h \
+	manage-3.14-orig.c \
+	manage-3.14-orig.h \
 	manage-3.4-ethercat.c \
 	manage-3.4-orig.c \
 	manage-3.6-ethercat.c \
@@ -249,6 +277,8 @@ EXTRA_DIST = \
 	netdev-3.10-orig.c \
 	netdev-3.12-ethercat.c \
 	netdev-3.12-orig.c \
+	netdev-3.14-ethercat.c \
+	netdev-3.14-orig.c \
 	netdev-3.2-ethercat.c \
 	netdev-3.2-orig.c \
 	netdev-3.4-ethercat.c \
@@ -265,6 +295,10 @@ EXTRA_DIST = \
 	nvm-3.12-ethercat.h \
 	nvm-3.12-orig.c \
 	nvm-3.12-orig.h \
+	nvm-3.14-ethercat.c \
+	nvm-3.14-ethercat.h \
+	nvm-3.14-orig.c \
+	nvm-3.14-orig.h \
 	nvm-3.4-ethercat.c \
 	nvm-3.4-orig.c \
 	nvm-3.6-ethercat.c \
@@ -285,6 +319,8 @@ EXTRA_DIST = \
 	param-3.10-orig.c \
 	param-3.12-ethercat.c \
 	param-3.12-orig.c \
+	param-3.14-ethercat.c \
+	param-3.14-orig.c \
 	param-3.2-ethercat.c \
 	param-3.2-orig.c \
 	param-3.4-ethercat.c \
@@ -311,6 +347,10 @@ EXTRA_DIST = \
 	phy-3.12-ethercat.h \
 	phy-3.12-orig.c \
 	phy-3.12-orig.h \
+	phy-3.14-ethercat.c \
+	phy-3.14-ethercat.h \
+	phy-3.14-orig.c \
+	phy-3.14-orig.h \
 	phy-3.2-ethercat.c \
 	phy-3.2-orig.c \
 	phy-3.4-ethercat.c \
@@ -323,10 +363,14 @@ EXTRA_DIST = \
 	ptp-3.10-orig.c \
 	ptp-3.12-ethercat.c \
 	ptp-3.12-orig.c \
+	ptp-3.14-ethercat.c \
+	ptp-3.14-orig.c \
 	regs-3.10-ethercat.h \
 	regs-3.10-orig.h \
 	regs-3.12-ethercat.h \
 	regs-3.12-orig.h \
+	regs-3.14-ethercat.h \
+	regs-3.14-orig.h \
 	update.sh
 
 BUILT_SOURCES = \
