@@ -32,6 +32,8 @@ EXTRA_DIST = \
 	80003es2lan-3.4-orig.c \
 	80003es2lan-3.6-ethercat.c \
 	80003es2lan-3.6-orig.c \
+	80003es2lan-3.8-ethercat.c \
+	80003es2lan-3.8-orig.c \
 	82571-2.6.32-ethercat.c \
 	82571-2.6.32-orig.c \
 	82571-2.6.33-ethercat.c \
@@ -48,6 +50,8 @@ EXTRA_DIST = \
 	82571-3.4-orig.c \
 	82571-3.6-ethercat.c \
 	82571-3.6-orig.c \
+	82571-3.8-ethercat.c \
+	82571-3.8-orig.c \
 	Kbuild.in \
 	defines-2.6.32-ethercat.h \
 	defines-2.6.32-orig.h \
@@ -65,6 +69,8 @@ EXTRA_DIST = \
 	defines-3.4-orig.h \
 	defines-3.6-ethercat.h \
 	defines-3.6-orig.h \
+	defines-3.8-ethercat.h \
+	defines-3.8-orig.h \
 	e1000-2.6.32-ethercat.h \
 	e1000-2.6.32-orig.h \
 	e1000-2.6.33-ethercat.h \
@@ -81,6 +87,8 @@ EXTRA_DIST = \
 	e1000-3.4-orig.h \
 	e1000-3.6-ethercat.h \
 	e1000-3.6-orig.h \
+	e1000-3.8-ethercat.h \
+	e1000-3.8-orig.h \
 	es2lan-2.6.32-ethercat.c \
 	es2lan-2.6.32-orig.c \
 	es2lan-2.6.33-ethercat.c \
@@ -109,6 +117,8 @@ EXTRA_DIST = \
 	ethtool-3.4-orig.c \
 	ethtool-3.6-ethercat.c \
 	ethtool-3.6-orig.c \
+	ethtool-3.8-ethercat.c \
+	ethtool-3.8-orig.c \
 	hw-2.6.32-ethercat.h \
 	hw-2.6.32-orig.h \
 	hw-2.6.33-ethercat.h \
@@ -125,6 +135,8 @@ EXTRA_DIST = \
 	hw-3.4-orig.h \
 	hw-3.6-ethercat.h \
 	hw-3.6-orig.h \
+	hw-3.8-ethercat.h \
+	hw-3.8-orig.h \
 	ich8lan-2.6.32-ethercat.c \
 	ich8lan-2.6.32-orig.c \
 	ich8lan-2.6.33-ethercat.c \
@@ -141,6 +153,8 @@ EXTRA_DIST = \
 	ich8lan-3.4-orig.c \
 	ich8lan-3.6-ethercat.c \
 	ich8lan-3.6-orig.c \
+	ich8lan-3.8-ethercat.c \
+	ich8lan-3.8-orig.c \
 	lib-2.6.32-ethercat.c \
 	lib-2.6.32-orig.c \
 	lib-2.6.33-ethercat.c \
@@ -157,10 +171,14 @@ EXTRA_DIST = \
 	mac-3.4-orig.c \
 	mac-3.6-ethercat.c \
 	mac-3.6-orig.c \
+	mac-3.8-ethercat.c \
+	mac-3.8-orig.c \
 	manage-3.4-ethercat.c \
 	manage-3.4-orig.c \
 	manage-3.6-ethercat.c \
 	manage-3.6-orig.c \
+	manage-3.8-ethercat.c \
+	manage-3.8-orig.c \
 	netdev-2.6.32-ethercat.c \
 	netdev-2.6.32-orig.c \
 	netdev-2.6.33-ethercat.c \
@@ -177,10 +195,14 @@ EXTRA_DIST = \
 	netdev-3.4-orig.c \
 	netdev-3.6-ethercat.c \
 	netdev-3.6-orig.c \
+	netdev-3.8-ethercat.c \
+	netdev-3.8-orig.c \
 	nvm-3.4-ethercat.c \
 	nvm-3.4-orig.c \
 	nvm-3.6-ethercat.c \
 	nvm-3.6-orig.c \
+	nvm-3.8-ethercat.c \
+	nvm-3.8-orig.c \ \
 	param-2.6.32-ethercat.c \
 	param-2.6.32-orig.c \
 	param-2.6.33-ethercat.c \
@@ -197,6 +219,8 @@ EXTRA_DIST = \
 	param-3.4-orig.c \
 	param-3.6-ethercat.c \
 	param-3.6-orig.c \
+	param-3.8-ethercat.c \
+	param-3.8-orig.c \
 	phy-2.6.32-ethercat.c \
 	phy-2.6.32-orig.c \
 	phy-2.6.33-ethercat.c \
@@ -213,6 +237,8 @@ EXTRA_DIST = \
 	phy-3.4-orig.c
 	phy-3.6-ethercat.c \
 	phy-3.6-orig.c \
+	phy-3.8-ethercat.c \
+	phy-3.8-orig.c \
 	update.sh
 
 BUILT_SOURCES = \

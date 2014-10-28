@@ -64,6 +64,8 @@ EXTRA_DIST = \
 	e1000-3.4-orig.h \
 	e1000-3.6-ethercat.h \
 	e1000-3.6-orig.h \
+	e1000-3.8-ethercat.h \
+	e1000-3.8-orig.h \
 	e1000_ethtool-2.6.13-ethercat.c \
 	e1000_ethtool-2.6.13-orig.c \
 	e1000_ethtool-2.6.18-ethercat.c \
@@ -98,6 +100,8 @@ EXTRA_DIST = \
 	e1000_ethtool-3.4-orig.c \
 	e1000_ethtool-3.6-ethercat.c \
 	e1000_ethtool-3.6-orig.c \
+	e1000_ethtool-3.8-ethercat.c \
+	e1000_ethtool-3.8-orig.c \
 	e1000_hw-2.6.13-ethercat.c \
 	e1000_hw-2.6.13-ethercat.h \
 	e1000_hw-2.6.13-orig.c \
@@ -166,6 +170,10 @@ EXTRA_DIST = \
 	e1000_hw-3.6-ethercat.h \
 	e1000_hw-3.6-orig.c \
 	e1000_hw-3.6-orig.h \
+	e1000_hw-3.8-ethercat.c \
+	e1000_hw-3.8-ethercat.h \
+	e1000_hw-3.8-orig.c \
+	e1000_hw-3.8-orig.h \
 	e1000_main-2.6.13-ethercat.c \
 	e1000_main-2.6.13-orig.c \
 	e1000_main-2.6.18-ethercat.c \
@@ -200,6 +208,8 @@ EXTRA_DIST = \
 	e1000_main-3.4-orig.c \
 	e1000_main-3.6-ethercat.c \
 	e1000_main-3.6-orig.c \
+	e1000_main-3.8-ethercat.c \
+	e1000_main-3.8-orig.c \
 	e1000_osdep-2.6.13-ethercat.h \
 	e1000_osdep-2.6.13-orig.h \
 	e1000_osdep-2.6.18-ethercat.h \
@@ -234,6 +244,8 @@ EXTRA_DIST = \
 	e1000_osdep-3.4-orig.h \
 	e1000_osdep-3.6-ethercat.h \
 	e1000_osdep-3.6-orig.h \
+	e1000_osdep-3.8-ethercat.h \
+	e1000_osdep-3.8-orig.h \
 	e1000_param-2.6.13-ethercat.c \
 	e1000_param-2.6.13-orig.c \
 	e1000_param-2.6.18-ethercat.c \
@@ -267,7 +279,9 @@ EXTRA_DIST = \
 	e1000_param-3.4-ethercat.c \
 	e1000_param-3.4-orig.c \
 	e1000_param-3.6-ethercat.c \
-	e1000_param-3.6-orig.c
+	e1000_param-3.6-orig.c \
+	e1000_param-3.8-ethercat.c \
+	e1000_param-3.8-orig.c
 
 BUILT_SOURCES = \
 	Kbuild
