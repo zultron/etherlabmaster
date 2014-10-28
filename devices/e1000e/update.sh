@@ -2,9 +2,9 @@
 
 set -x
 
-KERNELDIR=/data/kernel/linux-3.8.13
-PREVER=3.6
-KERNELVER=3.8
+KERNELDIR=/data/kernel/linux-3.10.47
+PREVER=3.8
+KERNELVER=3.10
 
 for f in $KERNELDIR/drivers/net/ethernet/intel/e1000e/*.[ch]; do
     echo $f

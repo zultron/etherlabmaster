@@ -48,13 +48,24 @@ ifeq (@ENABLE_E1000E@,1)
 		param-@KERNEL_E1000E@-ethercat.o \
 		phy-@KERNEL_E1000E@-ethercat.o
 
-	ifeq (@E1000E_LAYOUT_3_4@,1)
+	ifeq (@E1000E_LAYOUT@,2)
+		EC_E1000E_OBJ += \
+			80003es2lan-@KERNEL_E1000E@-ethercat.o \
+			mac-@KERNEL_E1000E@-ethercat.o \
+			manage-@KERNEL_E1000E@-ethercat.o \
+			nvm-@KERNEL_E1000E@-ethercat.o \
+			ptp-@KERNEL_E1000E@-ethercat.o
+	endif
+
+	ifeq (@E1000E_LAYOUT@,1)
 		EC_E1000E_OBJ += \
 			80003es2lan-@KERNEL_E1000E@-ethercat.o \
 			mac-@KERNEL_E1000E@-ethercat.o \
 			manage-@KERNEL_E1000E@-ethercat.o \
 			nvm-@KERNEL_E1000E@-ethercat.o
-	else
+	endif
+
+	ifeq (@E1000E_LAYOUT@,0)
 		EC_E1000E_OBJ += \
 			es2lan-@KERNEL_E1000E@-ethercat.o \
 			lib-@KERNEL_E1000E@-ethercat.o
