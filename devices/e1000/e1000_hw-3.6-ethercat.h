@@ -33,7 +33,7 @@
 #ifndef _E1000_HW_H_
 #define _E1000_HW_H_
 
-#include "e1000_osdep-3.4-ethercat.h"
+#include "e1000_osdep-3.6-ethercat.h"
 
 
 /* Forward declarations of structures used by the shared code */

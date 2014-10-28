@@ -28,7 +28,7 @@
 
 *******************************************************************************/
 
-#include "e1000-3.4-ethercat.h"
+#include "e1000-3.6-ethercat.h"
 #include <net/ip6_checksum.h>
 #include <linux/io.h>
 #include <linux/prefetch.h>

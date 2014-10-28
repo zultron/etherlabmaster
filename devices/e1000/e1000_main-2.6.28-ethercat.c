@@ -28,7 +28,7 @@
 
 *******************************************************************************/
 
-#include "e1000-2.6.27-ethercat.h"
+#include "e1000-2.6.28-ethercat.h"
 #include <net/ip6_checksum.h>
 
 char e1000_driver_name[] = "ec_e1000";
