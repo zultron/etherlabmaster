@@ -30,7 +30,7 @@
  * Shared functions for accessing and configuring the MAC
  */
 
-#include "e1000-3.4-ethercat.h"
+#include "e1000-3.6-ethercat.h"
 
 static s32 e1000_check_downshift(struct e1000_hw *hw);
 static s32 e1000_check_polarity(struct e1000_hw *hw,

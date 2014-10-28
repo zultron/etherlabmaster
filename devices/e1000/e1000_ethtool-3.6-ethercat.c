@@ -28,7 +28,7 @@
 
 /* ethtool support for e1000 */
 
-#include "e1000-3.4-ethercat.h"
+#include "e1000-3.6-ethercat.h"
 #include <asm/uaccess.h>
 
 enum {NETDEV_STATS, E1000_STATS};

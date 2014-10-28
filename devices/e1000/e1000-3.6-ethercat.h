@@ -81,7 +81,7 @@
 
 struct e1000_adapter;
 
-#include "e1000_hw-3.4-ethercat.h"
+#include "e1000_hw-3.6-ethercat.h"
 
 #define E1000_MAX_INTR 10
 
