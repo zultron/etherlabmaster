@@ -392,7 +392,7 @@ AC_ARG_WITH([e1000e-kernel],
     ]
 )
 
-e1000elayout34=0
+e1000elayout=0
 
 if test "x${enablee1000e}" = "x1"; then
     AC_MSG_CHECKING([for kernel for e1000e driver])
@@ -410,14 +410,18 @@ if test "x${enablee1000e}" = "x1"; then
 
     AC_MSG_RESULT([$kernele1000e])
 
-    # check for e1000e file layout (changed in kernel 3.4)
+    # check for e1000e file layout (changed in kernel 3.4 and 3.10)
     AC_MSG_CHECKING([for e1000e source layout])
 
     file34="${srcdir}/devices/e1000e/80003es2lan-$kernele1000e-ethercat.c"
+    file310="${srcdir}/devices/e1000e/ptp-$kernele1000e-ethercat.c"
 
-    if test -r "$file34"; then
+    if test -r "$file310"; then
+        AC_MSG_RESULT([>= 3.10])
+        e1000elayout=2
+    elif test -r "$file34"; then
         AC_MSG_RESULT([>= 3.4])
-        e1000elayout34=1
+        e1000elayout=1
     else
         AC_MSG_RESULT([before 3.4])
     fi
@@ -425,7 +429,7 @@ if test "x${enablee1000e}" = "x1"; then
 fi
 
 AC_SUBST(KERNEL_E1000E,[$kernele1000e])
-AC_SUBST(E1000E_LAYOUT_3_4, [$e1000elayout34])
+AC_SUBST(E1000E_LAYOUT, [$e1000elayout])
 
 #------------------------------------------------------------------------------
 # r8169 driver
