@@ -39,10 +39,6 @@
 
 /*****************************************************************************/
 
-/** Mailbox type for SoE.
- */
-#define EC_MBOX_TYPE_SOE 0x05
-
 /** SoE operations
  */
 enum ec_soe_opcodes {
