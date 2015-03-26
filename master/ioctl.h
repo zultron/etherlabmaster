@@ -165,6 +165,7 @@
 #define EC_IOCTL_SII_CACHING           EC_IOW(0x67, uint32_t)
 #define EC_IOCTL_MBOX_GATEWAY         EC_IOWR(0x68, ec_ioctl_mbox_gateway_t)
 #define EC_IOCTL_PCAP_DATA            EC_IOWR(0x69, ec_ioctl_pcap_data_t)
+#define EC_IOCTL_SC_OVERLAPPING_IO     EC_IOW(0x6a, ec_ioctl_config_t)
 
 /****************************************************************************/
 
@@ -520,6 +521,7 @@ typedef struct {
     int32_t slave_position;
     uint16_t dc_assign_activate;
     ec_sync_signal_t dc_sync[EC_SYNC_SIGNAL_COUNT];
+    uint8_t allow_overlapping_pdos;
 } ec_ioctl_config_t;
 
 /****************************************************************************/
