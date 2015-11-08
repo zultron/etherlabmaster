@@ -166,6 +166,8 @@
 #define EC_IOCTL_MBOX_GATEWAY         EC_IOWR(0x68, ec_ioctl_mbox_gateway_t)
 #define EC_IOCTL_PCAP_DATA            EC_IOWR(0x69, ec_ioctl_pcap_data_t)
 #define EC_IOCTL_SC_OVERLAPPING_IO     EC_IOW(0x6a, ec_ioctl_config_t)
+#define EC_IOCTL_SETUP_DOMAIN_MEMORY   EC_IOR(0x6b, ec_ioctl_master_activate_t)
+#define EC_IOCTL_DEACTIVATE_SLAVES      EC_IO(0x6c)
 
 /****************************************************************************/
 
