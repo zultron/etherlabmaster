@@ -151,6 +151,8 @@
 #define EC_IOCTL_SC_OVERLAPPING_IO     EC_IOW(0x5d, ec_ioctl_config_t)
 #define EC_IOCTL_SETUP_DOMAIN_MEMORY   EC_IOR(0x5e, ec_ioctl_master_activate_t)
 #define EC_IOCTL_DEACTIVATE_SLAVES      EC_IO(0x5f)
+#define EC_IOCTL_64_REF_CLK_TIME_QUEUE  EC_IO(0x60)
+#define EC_IOCTL_64_REF_CLK_TIME       EC_IOR(0x61, uint64_t)
 
 /*****************************************************************************/
 
