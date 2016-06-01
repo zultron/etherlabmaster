@@ -279,6 +279,7 @@ static ATTRIBUTES int ec_ioctl_slave(
     ec_ioctl_strcpy(data.image, slave->sii.image);
     ec_ioctl_strcpy(data.order, slave->sii.order);
     ec_ioctl_strcpy(data.name, slave->sii.name);
+    data.ready = ec_fsm_slave_is_ready(slave->fsm);
 
     ec_lock_up(&master->master_sem);
 
