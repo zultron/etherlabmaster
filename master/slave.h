@@ -222,9 +222,10 @@ struct ec_slave
     uint16_t station_address; /**< Configured station address. */
     uint16_t effective_alias; /**< Effective alias address. */
     // identification
-#if EC_REUSE_SII_IMAGE
+#ifdef EC_SII_CACHE
     uint32_t effective_vendor_id; /**< Effective vendor ID. */
     uint32_t effective_product_code; /**< Effective product code. */
+    uint32_t effective_revision_number; /**< Effective revision number. */
     uint32_t effective_serial_number; /**< Effective serial number. */
 #endif
     ec_slave_port_t ports[EC_MAX_PORTS]; /**< Ports. */
@@ -235,6 +236,7 @@ struct ec_slave
     ec_slave_state_t current_state; /**< Current application state. */
     unsigned int error_flag; /**< Stop processing after an error. */
     unsigned int force_config; /**< Force (re-)configuration. */
+    unsigned int reboot; /**< Request reboot */
     uint16_t configured_rx_mailbox_offset; /**< Configured receive mailbox
                                              offset. */
     uint16_t configured_rx_mailbox_size; /**< Configured receive mailbox size.
@@ -304,6 +306,7 @@ void ec_slave_clear_sync_managers(ec_slave_t *);
 void ec_slave_request_state(ec_slave_t *, ec_slave_state_t);
 void ec_slave_set_dl_status(ec_slave_t *, uint16_t);
 void ec_slave_set_al_status(ec_slave_t *, ec_slave_state_t);
+void ec_slave_request_reboot(ec_slave_t *);
 
 // SII categories
 int ec_slave_fetch_sii_strings(ec_slave_t *, const uint8_t *, size_t);

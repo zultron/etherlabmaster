@@ -154,6 +154,7 @@
 #define EC_IOCTL_64_REF_CLK_TIME_QUEUE  EC_IO(0x60)
 #define EC_IOCTL_64_REF_CLK_TIME       EC_IOR(0x61, uint64_t)
 #define EC_IOCTL_SLAVE_DICT_UPLOAD     EC_IOW(0x62, ec_ioctl_slave_dict_upload_t)
+#define EC_IOCTL_SLAVE_REBOOT          EC_IOW(0x63, ec_ioctl_slave_reboot_t)
 
 /*****************************************************************************/
 
@@ -427,6 +428,14 @@ typedef struct {
     size_t size;
     uint8_t *data;
 } ec_ioctl_slave_reg_t;
+
+/*****************************************************************************/
+
+typedef struct {
+    // inputs
+    uint16_t slave_position;
+    uint8_t broadcast;
+} ec_ioctl_slave_reboot_t;
 
 /*****************************************************************************/
 
