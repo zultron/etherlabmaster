@@ -75,9 +75,10 @@ void ec_slave_init(
     slave->ring_position = ring_position;
     slave->station_address = station_address;
     slave->effective_alias = 0x0000;
-#if EC_REUSE_SII_IMAGE
+#ifdef EC_SII_CACHE
     slave->effective_vendor_id = 0x00000000;
     slave->effective_product_code = 0x00000000;
+    slave->effective_revision_number = 0x00000000;
     slave->effective_serial_number = 0x00000000;
 #endif
     slave->config = NULL;
@@ -85,6 +86,7 @@ void ec_slave_init(
     slave->current_state = EC_SLAVE_STATE_UNKNOWN;
     slave->error_flag = 0;
     slave->force_config = 0;
+    slave->reboot = 0;
     slave->configured_rx_mailbox_offset = 0x0000;
     slave->configured_rx_mailbox_size = 0x0000;
     slave->configured_tx_mailbox_offset = 0x0000;
@@ -416,6 +418,18 @@ void ec_slave_request_state(ec_slave_t *slave, /**< EtherCAT slave */
 {
     slave->requested_state = state;
     slave->error_flag = 0;
+}
+
+/*****************************************************************************/
+
+/**
+ * Request a slave reboot (some slaves will ignore this).
+ */
+
+void ec_slave_request_reboot(ec_slave_t *slave /**< EtherCAT slave */
+                            )
+{
+    slave->reboot = 1;
 }
 
 /*****************************************************************************/

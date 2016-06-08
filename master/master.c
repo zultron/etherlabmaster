@@ -183,6 +183,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     master->config_changed = 0;
     master->injection_seq_fsm = 0;
     master->injection_seq_rt = 0;
+    master->reboot = 0;
 
     master->slaves = NULL;
     master->slave_count = 0;
@@ -538,7 +539,7 @@ void ec_master_clear_sii_images(
     ec_sii_image_t *sii_image, *next;
 
     list_for_each_entry_safe(sii_image, next, &master->sii_images, list) {
-#if EC_REUSE_SII_IMAGE
+#ifdef EC_SII_CACHE
         if ((master->phase != EC_OPERATION) ||
            ((sii_image->sii.serial_number == 0) && (sii_image->sii.alias == 0)))
 #endif
@@ -992,6 +993,17 @@ void ec_master_set_send_interval(
     master->max_queue_size =
         (send_interval * 1000) / EC_BYTE_TRANSMISSION_TIME_NS;
     master->max_queue_size -= master->max_queue_size / 10;
+}
+
+/*****************************************************************************/
+
+/** Requests that all slaves on this master be rebooted (if supported).
+ */
+void ec_master_reboot_slaves(
+        ec_master_t *master /**< EtherCAT master */
+        )
+{
+    master->reboot = 1;
 }
 
 /*****************************************************************************/
