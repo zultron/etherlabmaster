@@ -336,6 +336,7 @@ typedef struct  {
                                  bit! */
     unsigned int error_flag : 1; /**< The slave has an unrecoverable error. */
     unsigned int ready : 1; /**< The slave is ready for external requests. */
+    uint16_t position; /**< Offset of the slave in the ring. */
 } ec_slave_config_state_t;
 
 /*****************************************************************************/
@@ -442,6 +443,7 @@ typedef enum {
     EC_DIR_INVALID, /**< Invalid direction. Do not use this value. */
     EC_DIR_OUTPUT, /**< Values written by the master. */
     EC_DIR_INPUT, /**< Values read by the master. */
+    EC_DIR_BOTH, /**< Values read and written by the master. */
     EC_DIR_COUNT /**< Number of directions. For internal use only. */
 } ec_direction_t;
 
@@ -2439,6 +2441,20 @@ void ecrt_write_lreal(void *data, double value);
 #define EC_WRITE_LREAL(DATA, VAL) ecrt_write_lreal(DATA, VAL)
 
 #endif // ifndef __KERNEL__
+
+/** Schedule a register read-write operation.
+ *
+ * \attention This method may not be called while ecrt_reg_request_state()
+ * returns EC_REQUEST_BUSY.
+ *
+ * \attention The \a size parameter is truncated to the size given at request
+ * creation.
+ */
+void ecrt_reg_request_readwrite(
+        ec_reg_request_t *req, /**< Register request. */
+        uint16_t address, /**< Register address. */
+        size_t size /**< Size to read-write. */
+        );
 
 /*****************************************************************************/
 
