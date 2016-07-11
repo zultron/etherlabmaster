@@ -155,6 +155,8 @@
 #define EC_IOCTL_64_REF_CLK_TIME       EC_IOR(0x61, uint64_t)
 #define EC_IOCTL_SLAVE_DICT_UPLOAD     EC_IOW(0x62, ec_ioctl_slave_dict_upload_t)
 #define EC_IOCTL_SLAVE_REBOOT          EC_IOW(0x63, ec_ioctl_slave_reboot_t)
+#define EC_IOCTL_SLAVE_REG_READWRITE  EC_IOWR(0x64, ec_ioctl_slave_reg_t)
+#define EC_IOCTL_REG_REQUEST_READWRITE EC_IOWR(0x65, ec_ioctl_reg_request_t)
 
 /*****************************************************************************/
 
