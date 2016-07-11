@@ -147,6 +147,7 @@ class MasterDevice
         void writeSii(ec_ioctl_slave_sii_t *);
         void readReg(ec_ioctl_slave_reg_t *);
         void writeReg(ec_ioctl_slave_reg_t *);
+        void readWriteReg(ec_ioctl_slave_reg_t *);
         void setDebug(unsigned int);
         void rescan();
         void setSiiCaching(unsigned int);

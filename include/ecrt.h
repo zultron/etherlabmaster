@@ -395,6 +395,7 @@ typedef struct  {
 
                                  Note that each state is coded in a different
                                  bit! */
+    uint16_t position; /**< Offset of the slave in the ring. */
 } ec_slave_config_state_t;
 
 /****************************************************************************/
@@ -515,6 +516,7 @@ typedef enum {
     EC_DIR_INVALID, /**< Invalid direction. Do not use this value. */
     EC_DIR_OUTPUT, /**< Values written by the master. */
     EC_DIR_INPUT, /**< Values read by the master. */
+    EC_DIR_BOTH, /**< Values read and written by the master. */
     EC_DIR_COUNT /**< Number of directions. For internal use only. */
 } ec_direction_t;
 
@@ -2942,6 +2944,29 @@ EC_PUBLIC_API int ecrt_reg_request_read(
         ec_reg_request_t *req, /**< Register request. */
         uint16_t address, /**< Register address. */
         size_t size /**< Size to write. */
+        );
+
+/** Schedule a register read-write operation.
+ *
+ * \attention This method may not be called while ecrt_reg_request_state()
+ * returns EC_REQUEST_BUSY.
+ *
+ * \attention The \a size parameter is truncated to the size given at request
+ * creation.
+ *
+ * This method is meant to be called in realtime context (after master
+ * activation).
+ *
+ * \apiusage{master_op,rt_safe}
+ *
+ * \return 0 on success, otherwise negative error code.
+ * \retval -ENOBUFS Reserved memory in ecrt_slave_config_create_reg_request
+ *              too small.
+ */
+EC_PUBLIC_API int ecrt_reg_request_readwrite(
+        ec_reg_request_t *req, /**< Register request. */
+        uint16_t address, /**< Register address. */
+        size_t size /**< Size to read-write. */
         );
 
 /*****************************************************************************

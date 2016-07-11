@@ -168,6 +168,8 @@
 #define EC_IOCTL_SC_OVERLAPPING_IO     EC_IOW(0x6a, ec_ioctl_config_t)
 #define EC_IOCTL_SETUP_DOMAIN_MEMORY   EC_IOR(0x6b, ec_ioctl_master_activate_t)
 #define EC_IOCTL_DEACTIVATE_SLAVES      EC_IO(0x6c)
+#define EC_IOCTL_SLAVE_REG_READWRITE  EC_IOWR(0x6d, ec_ioctl_slave_reg_t)
+#define EC_IOCTL_REG_REQUEST_READWRITE EC_IOWR(0x6e, ec_ioctl_reg_request_t)
 
 /****************************************************************************/
 

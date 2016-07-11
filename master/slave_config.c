@@ -1430,9 +1430,11 @@ int ecrt_slave_config_state(const ec_slave_config_t *sc,
         state->operational =
             slave->current_state == EC_SLAVE_STATE_OP && !slave->force_config;
         state->al_state = slave->current_state;
+        state->position = sc->slave->ring_position;
     } else {
         state->operational = 0;
         state->al_state = EC_SLAVE_STATE_UNKNOWN;
+        state->position = (uint16_t) -1;
     }
     return 0;
 }
