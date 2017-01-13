@@ -232,8 +232,9 @@ int ecrt_slave_config_pdos(ec_slave_config_t *sc,
         if (ret)
             return ret;
 
+        ecrt_slave_config_pdo_assign_clear(sc, sync_info->index);
+
         if (sync_info->n_pdos && sync_info->pdos) {
-            ecrt_slave_config_pdo_assign_clear(sc, sync_info->index);
 
             for (j = 0; j < sync_info->n_pdos; j++) {
                 pdo_info = &sync_info->pdos[j];
@@ -243,9 +244,9 @@ int ecrt_slave_config_pdos(ec_slave_config_t *sc,
                 if (ret)
                     return ret;
 
-                if (pdo_info->n_entries && pdo_info->entries) {
-                    ecrt_slave_config_pdo_mapping_clear(sc, pdo_info->index);
+                ecrt_slave_config_pdo_mapping_clear(sc, pdo_info->index);
 
+                if (pdo_info->n_entries && pdo_info->entries) {
                     for (k = 0; k < pdo_info->n_entries; k++) {
                         entry_info = &pdo_info->entries[k];
 
