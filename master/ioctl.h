@@ -164,6 +164,8 @@
 #define EC_IOCTL_FOE_REQUEST_READ     EC_IOWR(0x6a, ec_ioctl_foe_request_t)
 #define EC_IOCTL_FOE_REQUEST_WRITE    EC_IOWR(0x6b, ec_ioctl_foe_request_t)
 #define EC_IOCTL_FOE_REQUEST_DATA     EC_IOWR(0x6c, ec_ioctl_foe_request_t)
+#define EC_IOCTL_RT_SLAVE_REQUESTS     EC_IOW(0x6d, uint32_t)
+#define EC_IOCTL_EXEC_SLAVE_REQUESTS    EC_IO(0x6e)
 
 /*****************************************************************************/
 
