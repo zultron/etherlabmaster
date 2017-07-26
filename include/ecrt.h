@@ -149,7 +149,7 @@
 
 /** EtherCAT realtime interface patchlevel number.
  */
-#define ECRT_VER_PATCH 0
+#define ECRT_VER_PATCH 10
 
 /** EtherCAT realtime interface version word generator.
  */
