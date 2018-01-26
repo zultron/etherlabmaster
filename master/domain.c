@@ -99,6 +99,7 @@ void ec_domain_clear(ec_domain_t *domain /**< EtherCAT domain */)
 {
     ec_datagram_pair_t *datagram_pair, *next_pair;
 
+    // lockdep_assert_held(&domain->master->domains_lock);
     ec_lock_down(&domain->datagram_pairs_lock);
     // dequeue and free datagrams
     list_for_each_entry_safe(datagram_pair, next_pair,
@@ -119,6 +120,7 @@ void ec_domain_clear_data(
         ec_domain_t *domain /**< EtherCAT domain. */
         )
 {
+    // lockdep_assert_held(&domain->master->domains_lock);
     if (domain->data_origin == EC_ORIG_INTERNAL && domain->data) {
         kfree(domain->data);
     }
@@ -519,14 +521,11 @@ void ecrt_domain_external_memory(ec_domain_t *domain, uint8_t *mem)
     EC_MASTER_DBG(domain->master, 1, "ecrt_domain_external_memory("
             "domain = 0x%p, mem = 0x%p)\n", domain, mem);
 
-    ec_lock_down(&domain->master->master_sem);
-
+    // lockdep_assert_held(&domain->master->domains_lock);
     ec_domain_clear_data(domain);
 
     domain->data = mem;
     domain->data_origin = EC_ORIG_EXTERNAL;
-
-    ec_lock_up(&domain->master->master_sem);
 }
 
 /*****************************************************************************/

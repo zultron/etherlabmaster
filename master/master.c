@@ -186,6 +186,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 
     INIT_LIST_HEAD(&master->configs);
     INIT_LIST_HEAD(&master->domains);
+	ec_lock_init(&master->domains_lock);
 
     master->app_time = 0ULL;
     master->dc_ref_time = 0ULL;
@@ -534,11 +535,13 @@ void ec_master_clear_domains(ec_master_t *master)
 {
     ec_domain_t *domain, *next;
 
+    ec_lock_down(&master->domains_lock);
     list_for_each_entry_safe(domain, next, &master->domains, list) {
         list_del(&domain->list);
         ec_domain_clear(domain);
         kfree(domain);
     }
+    ec_lock_up(&master->domains_lock);
 }
 
 /*****************************************************************************/
@@ -2089,9 +2092,11 @@ unsigned int ec_master_domain_count(
     const ec_domain_t *domain;
     unsigned int count = 0;
 
+    ec_lock_down(&master->domains_lock);
     list_for_each_entry(domain, &master->domains, list) {
         count++;
     }
+    ec_lock_up(&master->domains_lock);
 
     return count;
 }
@@ -2437,7 +2442,7 @@ ec_domain_t *ecrt_master_create_domain_err(
         return ERR_PTR(-ENOMEM);
     }
 
-    ec_lock_down(&master->master_sem);
+    ec_lock_down(&master->domains_lock);
 
     if (list_empty(&master->domains)) {
         index = 0;
@@ -2449,7 +2454,7 @@ ec_domain_t *ecrt_master_create_domain_err(
     ec_domain_init(domain, master, index);
     list_add_tail(&domain->list, &master->domains);
 
-    ec_lock_up(&master->master_sem);
+    ec_lock_up(&master->domains_lock);
 
     EC_MASTER_DBG(master, 1, "Created domain %u.\n", domain->index);
 
@@ -2492,21 +2497,21 @@ int ecrt_master_activate(ec_master_t *master)
         return 0;
     }
 
-    ec_lock_down(&master->master_sem);
+    ec_lock_down(&master->domains_lock);
 
     // finish all domains
     domain_offset = 0;
     list_for_each_entry(domain, &master->domains, list) {
         ret = ec_domain_finish(domain, domain_offset);
         if (ret < 0) {
-            ec_lock_up(&master->master_sem);
+            ec_lock_up(&master->domains_lock);
             EC_MASTER_ERR(master, "Failed to finish domain 0x%p!\n", domain);
             return ret;
         }
         domain_offset += domain->data_size;
     }
 
-    ec_lock_up(&master->master_sem);
+    ec_lock_up(&master->domains_lock);
 
     // restart EoE process and master thread with new locking
 

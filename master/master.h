@@ -229,6 +229,7 @@ struct ec_master {
     /* Configuration applied by the application. */
     struct list_head configs; /**< List of slave configurations. */
     struct list_head domains; /**< List of domains. */
+    ec_lock_t domains_lock; /**< Lock for access to domains list. */
 
     u64 app_time; /**< Time of the last ecrt_master_sync() call. */
     u64 dc_ref_time; /**< Common reference timestamp for DC start times. */
