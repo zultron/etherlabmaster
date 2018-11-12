@@ -269,12 +269,6 @@ int ec_domain_finish(
         // Correct logical FMMU address
         fmmu->logical_start_address += base_address;
 
-        // Increment Input/Output counter to determine datagram types
-        // and calculate expected working counters
-        if (shall_count(fmmu, datagram_first_fmmu)) {
-            datagram_used[fmmu->dir]++;
-        }
-
         // If the current FMMU's data do not fit in the current datagram,
         // allocate a new one.
         if (datagram_size + fmmu->data_size > EC_MAX_DATA_SIZE) {
@@ -291,6 +285,12 @@ int ec_domain_finish(
             datagram_used[EC_DIR_OUTPUT] = 0;
             datagram_used[EC_DIR_INPUT] = 0;
             datagram_first_fmmu = fmmu;
+        }
+
+        // Increment Input/Output counter to determine datagram types
+        // and calculate expected working counters
+        if (shall_count(fmmu, datagram_first_fmmu)) {
+            datagram_used[fmmu->dir]++;
         }
 
         datagram_size += fmmu->data_size;
