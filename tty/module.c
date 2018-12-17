@@ -107,6 +107,9 @@ struct ec_tty {
     unsigned int tx_read_idx;
     unsigned int tx_write_idx;
     unsigned int wakeup;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0))
+    struct tty_port port;
+#endif
 
     uint8_t rx_buffer[EC_TTY_RX_BUFFER_SIZE];
     unsigned int rx_read_idx;
@@ -228,6 +231,11 @@ int ec_tty_init(ec_tty_t *t, int minor,
     sema_init(&t->sem, 1);
     t->ops = *ops;
     t->cb_data = cb_data;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0))
+    tty_port_init(&t->port);
+    tty_port_link_device(&t->port, tty_driver, t->minor);
+#endif
 
     t->dev = tty_register_device(tty_driver, t->minor, NULL);
     if (IS_ERR(t->dev)) {
@@ -399,7 +407,7 @@ void ec_tty_wakeup(unsigned long data)
             unsigned int i;
 
 #if EC_TTY_DEBUG >= 1
-            printk(KERN_INFO PFX "Pushing %u bytes to TTY core.\n", to_recv);
+            printk(KERN_INFO PFX "Pushing %zu bytes to TTY core.\n", to_recv);
 #endif
 
             for (i = 0; i < to_recv; i++) {
@@ -846,7 +854,7 @@ void ectty_rx_data(ec_tty_t *tty, const uint8_t *buffer, size_t size)
         unsigned int i;
 
 #if EC_TTY_DEBUG >= 1
-        printk(KERN_INFO PFX "Received %u bytes.\n", size);
+        printk(KERN_INFO PFX "Received %zu bytes.\n", size);
 #endif
 
         to_recv = min(ec_tty_rx_space(tty), (unsigned int) size);
