@@ -83,8 +83,8 @@
 #define EC_IOCTL_CONFIG_FLAG          EC_IOWR(0x1d, ec_ioctl_config_flag_t)
 #ifdef EC_EOE
 #define EC_IOCTL_EOE_HANDLER          EC_IOWR(0x1e, ec_ioctl_eoe_handler_t)
-#endif
 #define EC_IOCTL_SLAVE_EOE_IP_PARAM    EC_IOW(0x1f, ec_ioctl_slave_eoe_ip_t)
+#endif
 
 // Application interface
 #define EC_IOCTL_REQUEST                EC_IO(0x20)
@@ -615,6 +615,7 @@ typedef struct {
 #endif
 #endif
 
+#ifdef EC_EOE
 typedef struct {
     // input
     uint16_t slave_position;
@@ -637,6 +638,7 @@ typedef struct {
 	uint16_t result;
 } ec_ioctl_slave_eoe_ip_t;
 
+#endif
 /*****************************************************************************/
 
 typedef struct {
