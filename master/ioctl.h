@@ -164,6 +164,7 @@
 #define EC_IOCTL_SET_SEND_INTERVAL     EC_IOW(0x66, size_t)
 #define EC_IOCTL_SII_CACHING           EC_IOW(0x67, uint32_t)
 #define EC_IOCTL_MBOX_GATEWAY         EC_IOWR(0x68, ec_ioctl_mbox_gateway_t)
+#define EC_IOCTL_PCAP_DATA            EC_IOWR(0x69, ec_ioctl_pcap_data_t)
 
 /****************************************************************************/
 
@@ -215,6 +216,7 @@ typedef struct {
     uint64_t dc_ref_time;
     uint16_t ref_clock;
     uint32_t sii_caching;
+    uint32_t pcap_size;
 } ec_ioctl_master_t;
 
 /****************************************************************************/
@@ -352,6 +354,15 @@ typedef struct {
 } ec_ioctl_domain_data_t;
 
 /****************************************************************************/
+
+typedef struct {
+    // inputs
+    uint32_t data_size;
+    uint8_t reset_data;
+    uint8_t *target;
+} ec_ioctl_pcap_data_t;
+
+/*****************************************************************************/
 
 typedef struct {
     // inputs
