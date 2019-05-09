@@ -284,6 +284,8 @@ struct ec_master {
 
     unsigned int debug_level; /**< Master debug level. */
     ec_stats_t stats; /**< Cyclic statistics. */
+    void *pcap_data; /**< pcap debug output memory pointer */
+    void *pcap_curr_data; /**< pcap debug output current memory pointer */
 
     struct task_struct *thread; /**< Master thread. */
 

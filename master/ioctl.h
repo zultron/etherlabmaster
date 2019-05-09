@@ -158,6 +158,8 @@
 #define EC_IOCTL_SLAVE_REG_READWRITE  EC_IOWR(0x63, ec_ioctl_slave_reg_t)
 #define EC_IOCTL_REG_REQUEST_READWRITE EC_IOWR(0x64, ec_ioctl_reg_request_t)
 
+#define EC_IOCTL_PCAP_DATA          EC_IOWR(0x72, ec_ioctl_pcap_data_t)
+
 /*****************************************************************************/
 
 #define EC_IOCTL_STRING_SIZE 64
@@ -208,6 +210,7 @@ typedef struct {
     uint64_t app_time;
     uint64_t dc_ref_time;
     uint16_t ref_clock;
+    uint32_t pcap_size;
 } ec_ioctl_master_t;
 
 /*****************************************************************************/
@@ -344,6 +347,15 @@ typedef struct {
     uint32_t data_size;
     uint8_t *target;
 } ec_ioctl_domain_data_t;
+
+/*****************************************************************************/
+
+typedef struct {
+    // inputs
+    uint32_t data_size;
+    uint8_t reset_data;
+    uint8_t *target;
+} ec_ioctl_pcap_data_t;
 
 /*****************************************************************************/
 
