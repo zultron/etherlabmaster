@@ -1,8 +1,6 @@
 /*****************************************************************************
  *
- *  $Id$
- *
- *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2019  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT master userspace library.
  *
@@ -64,6 +62,7 @@ void ec_master_clear_config(ec_master_t *master)
     while (d) {
         next_d = d->next;
         ec_domain_clear(d);
+        free(d);
         d = next_d;
     }
     master->first_domain = NULL;
@@ -72,19 +71,22 @@ void ec_master_clear_config(ec_master_t *master)
     while (c) {
         next_c = c->next;
         ec_slave_config_clear(c);
+        free(c);
         c = next_c;
     }
     master->first_config = NULL;
+
+    if (master->process_data)  {
+        munmap(master->process_data, master->process_data_size);
+        master->process_data = NULL;
+        master->process_data_size = 0;
+    }
 }
 
 /****************************************************************************/
 
 void ec_master_clear(ec_master_t *master)
 {
-    if (master->process_data)  {
-        munmap(master->process_data, master->process_data_size);
-    }
-
     ec_master_clear_config(master);
 
     if (master->fd != -1) {
@@ -93,6 +95,7 @@ void ec_master_clear(ec_master_t *master)
 #else
         close(master->fd);
 #endif
+        master->fd = -1;
     }
 }
 
@@ -408,7 +411,7 @@ int ecrt_master_sdo_download(ec_master_t *master, uint16_t slave_position,
             *abort_code = download.abort_code;
         }
         fprintf(stderr, "Failed to execute SDO download: %s\n",
-            strerror(EC_IOCTL_ERRNO(ret)));
+                strerror(EC_IOCTL_ERRNO(ret)));
         return -EC_IOCTL_ERRNO(ret);
     }
 
@@ -437,7 +440,7 @@ int ecrt_master_sdo_download_complete(ec_master_t *master,
             *abort_code = download.abort_code;
         }
         fprintf(stderr, "Failed to execute SDO download: %s\n",
-            strerror(EC_IOCTL_ERRNO(ret)));
+                strerror(EC_IOCTL_ERRNO(ret)));
         return -EC_IOCTL_ERRNO(ret);
     }
 
