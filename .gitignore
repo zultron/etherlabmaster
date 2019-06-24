@@ -45,6 +45,7 @@ script/ethercatctl
 script/init.d/ethercat
 stamp-h1
 tool/ethercat
+mailbox_gateway/ethercat_mbg
 device_drivers.md
 generated_table.md
 doxygen-output/

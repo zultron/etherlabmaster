@@ -372,6 +372,9 @@ uint16_t ec_master_eoe_handler_count(const ec_master_t *);
 const ec_eoe_t *ec_master_get_eoe_handler_const(const ec_master_t *, uint16_t);
 #endif
 
+int ec_master_mbox_gateway(ec_master_t *master, uint8_t *data, 
+        size_t *data_size, size_t buff_size);
+
 int ec_master_debug_level(ec_master_t *, unsigned int);
 
 ec_domain_t *ecrt_master_create_domain_err(ec_master_t *);

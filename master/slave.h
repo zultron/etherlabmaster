@@ -226,6 +226,7 @@ struct ec_slave
     struct list_head foe_requests; /**< FoE requests. */
     struct list_head soe_requests; /**< SoE requests. */
     struct list_head eoe_requests; /**< EoE set IP parameter requests. */
+    struct list_head mbg_requests; /**< EoE set IP parameter requests. */
 
     ec_fsm_slave_t fsm; /**< Slave state machine. */
 
@@ -239,6 +240,7 @@ struct ec_slave
     ec_mbox_data_t mbox_foe_data; /**< Received mailbox data for FoE. */
     ec_mbox_data_t mbox_soe_data; /**< Received mailbox data for SoE. */
     ec_mbox_data_t mbox_voe_data; /**< Received mailbox data for VoE. */
+    ec_mbox_data_t mbox_mbg_data; /**< Received mailbox data for MBox Gateway. */
 
     uint8_t valid_mbox_data; /**< Received mailbox data is valid. */
 };

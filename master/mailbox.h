@@ -42,6 +42,7 @@
  * These are used in the 'Type' field of the mailbox header.
  */
 enum {
+    EC_MBOX_TYPE_AOE = 0x01,
     EC_MBOX_TYPE_EOE = 0x02,
     EC_MBOX_TYPE_COE = 0x03,
     EC_MBOX_TYPE_FOE = 0x04,
@@ -50,6 +51,14 @@ enum {
 };
 
 /****************************************************************************/
+
+/**
+   Mailbox error codes.
+*/
+
+extern const ec_code_msg_t mbox_error_messages[];
+  
+/*****************************************************************************/
 
 uint8_t *ec_slave_mbox_prepare_send(const ec_slave_t *, ec_datagram_t *,
                                     uint8_t, size_t);

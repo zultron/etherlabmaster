@@ -36,12 +36,14 @@
 #ifdef EC_EOE
 #include "eoe_request.h"
 #endif
+#include "mbox_gateway_request.h"
 #include "fsm_coe.h"
 #include "fsm_foe.h"
 #include "fsm_soe.h"
 #ifdef EC_EOE
 #include "fsm_eoe.h"
 #endif
+#include "fsm_mbox_gateway.h"
 
 /****************************************************************************/
 
@@ -63,6 +65,7 @@ struct ec_fsm_slave {
 #ifdef EC_EOE
     ec_eoe_request_t *eoe_request; /**< SoE request to process. */
 #endif
+    ec_mbg_request_t *mbg_request; /**< MBox Gateway request to process. */
 
     ec_fsm_coe_t fsm_coe; /**< CoE state machine. */
     ec_fsm_foe_t fsm_foe; /**< FoE state machine. */
@@ -70,6 +73,7 @@ struct ec_fsm_slave {
 #ifdef EC_EOE
     ec_fsm_eoe_t fsm_eoe; /**< EoE state machine. */
 #endif
+    ec_fsm_mbg_t fsm_mbg; /**< MBox Gateway state machine. */
 };
 
 /****************************************************************************/

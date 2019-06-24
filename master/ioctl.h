@@ -163,6 +163,7 @@
 #define EC_IOCTL_VOE_DATA             EC_IOWR(0x65, ec_ioctl_voe_t)
 #define EC_IOCTL_SET_SEND_INTERVAL     EC_IOW(0x66, size_t)
 #define EC_IOCTL_SII_CACHING           EC_IOW(0x67, uint32_t)
+#define EC_IOCTL_MBOX_GATEWAY         EC_IOWR(0x68, ec_ioctl_mbox_gateway_t)
 
 /****************************************************************************/
 
@@ -844,6 +845,15 @@ typedef struct {
     // outputs
     ec_master_link_state_t *state;
 } ec_ioctl_link_state_t;
+
+/****************************************************************************/
+
+typedef struct {
+    // input / output
+    size_t data_size;
+    size_t buff_size;
+    uint8_t *data;
+} ec_ioctl_mbox_gateway_t;
 
 /****************************************************************************/
 

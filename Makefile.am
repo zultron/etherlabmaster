@@ -40,6 +40,10 @@ if BUILD_TOOL
 SUBDIRS += tool
 endif
 
+if BUILD_MBG
+SUBDIRS += mailbox_gateway
+endif
+
 if ENABLE_USERLIB
 # userspace examples depend on lib/
 SUBDIRS += \
