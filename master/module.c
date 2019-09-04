@@ -65,6 +65,7 @@ bool eoe_autocreate = 1;  /**< Auto-create EOE interfaces. */
 #endif
 static unsigned int debug_level;  /**< Debug level parameter. */
 static unsigned int run_on_cpu = 0xffffffff; /**< Bind created kernel threads to a cpu. Default do not bind*/
+unsigned long pcap_size;  /**< Pcap buffer size in bytes. */
 
 static ec_master_t *masters; /**< Array of masters. */
 static ec_lock_t master_sem; /**< Master semaphore. */
@@ -99,6 +100,8 @@ module_param_named(debug_level, debug_level, uint, S_IRUGO);
 MODULE_PARM_DESC(debug_level, "Debug level");
 module_param_named(run_on_cpu, run_on_cpu, uint, S_IRUGO);
 MODULE_PARM_DESC(run_on_cpu, "Bind kthreads to a specific cpu");
+module_param_named(pcap_size, pcap_size, ulong, S_IRUGO);
+MODULE_PARM_DESC(pcap_size, "Pcap buffer size");
 
 /** \endcond */
 
