@@ -59,6 +59,7 @@ static unsigned int master_count; /**< Number of masters. */
 static char *backup_devices[MAX_MASTERS]; /**< Backup devices parameter. */
 static unsigned int backup_count; /**< Number of backup devices. */
 static unsigned int debug_level;  /**< Debug level parameter. */
+unsigned long pcap_size;  /**< Pcap buffer size in bytes. */
 
 static ec_master_t *masters; /**< Array of masters. */
 static ec_lock_t master_sem; /**< Master semaphore. */
@@ -85,6 +86,8 @@ module_param_array(backup_devices, charp, &backup_count, S_IRUGO);
 MODULE_PARM_DESC(backup_devices, "MAC addresses of backup devices");
 module_param_named(debug_level, debug_level, uint, S_IRUGO);
 MODULE_PARM_DESC(debug_level, "Debug level");
+module_param_named(pcap_size, pcap_size, ulong, S_IRUGO);
+MODULE_PARM_DESC(pcap_size, "Pcap buffer size");
 
 /** \endcond */
 

@@ -284,6 +284,7 @@ struct ec_master {
 
     unsigned int debug_level; /**< Master debug level. */
     ec_stats_t stats; /**< Cyclic statistics. */
+
     void *pcap_data; /**< pcap debug output memory pointer */
     void *pcap_curr_data; /**< pcap debug output current memory pointer */
 
@@ -389,6 +390,8 @@ void ec_master_internal_receive_cb(void *);
 int ec_master_dict_upload(ec_master_t *, uint16_t);
 
 extern const unsigned int rate_intervals[EC_RATE_COUNT]; // see master.c
+
+extern unsigned long pcap_size;  // see module.c
 
 /*****************************************************************************/
 

@@ -119,9 +119,16 @@ start)
         MASTER_INDEX=$((${MASTER_INDEX} + 1))
     done
 
+    # build pcap command
+    PCAP_SIZE_CMD=""
+    if [ -n "${PCAP_SIZE_MB}" ]; then
+        PCAP_SIZE_CMD="pcap_size=$(expr ${PCAP_SIZE_MB} '*' 1048576)"
+    fi
+
     # load master module
     if ! ${MODPROBE} ${MODPROBE_FLAGS} ec_master \
-            main_devices="${DEVICES}" backup_devices="${BACKUPS}"; then
+            main_devices="${DEVICES}" backup_devices="${BACKUPS}" \
+            ${PCAP_SIZE_CMD}; then
         exit 1
     fi
 
