@@ -126,6 +126,10 @@ start)
         backup_devices="${BACKUPS}"
     )
 
+    if [ -n "${PCAP_SIZE_MB}" ]; then
+        MODULE_PARAMS+=(pcap_size=$(expr ${PCAP_SIZE_MB} '*' 1048576))
+    fi
+
     if [ -n "$SII_CACHING" ]; then
         MODULE_PARAMS+=(sii_caching="$SII_CACHING")
     fi

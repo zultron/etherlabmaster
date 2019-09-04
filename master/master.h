@@ -116,10 +116,6 @@
  */
 #define EC_MAX_MASTERS 32
 
-/** Set pcap debugging cache size. (30mb)
- */
-#define PCAP_SIZE 30000000
-
 /****************************************************************************/
 
 /** EtherCAT master phase.
@@ -282,6 +278,7 @@ struct ec_master {
     unsigned int run_on_cpu;  /**< Bind kernel threads to this cpu. */
     unsigned int sii_caching;  /**< SII caching mode. */
     ec_stats_t stats; /**< Cyclic statistics. */
+
     void *pcap_data; /**< pcap debug output memory pointer */
     void *pcap_curr_data; /**< pcap debug output current memory pointer */
 
@@ -398,6 +395,8 @@ void ec_master_internal_send_cb(void *);
 void ec_master_internal_receive_cb(void *);
 
 extern const unsigned int rate_intervals[EC_RATE_COUNT]; // see master.c
+
+extern unsigned long pcap_size;  // see module.c
 
 /****************************************************************************/
 

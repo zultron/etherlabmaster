@@ -57,6 +57,7 @@ static unsigned int run_on_cpu = 0xffffffff; /**< Bind created kernel threads
                                                to a cpu. Default do not bind.
                                               */
 static unsigned int sii_caching; /**< SII Caching mode. */
+unsigned long pcap_size;  /**< Pcap buffer size in bytes. */
 
 static ec_master_t *masters; /**< Array of masters. */
 static struct semaphore master_sem; /**< Master semaphore. */
@@ -87,6 +88,8 @@ module_param(run_on_cpu, uint, S_IRUGO);
 MODULE_PARM_DESC(run_on_cpu, "Bind kthreads to a specific cpu");
 module_param(sii_caching, uint, S_IRUGO);
 MODULE_PARM_DESC(sii_caching, "SII caching mode (default=0=off)");
+module_param_named(pcap_size, pcap_size, ulong, S_IRUGO);
+MODULE_PARM_DESC(pcap_size, "Pcap buffer size");
 
 /** \endcond */
 
