@@ -131,10 +131,6 @@
 
 #define EOE_STH_PENDING 2
 
-/** Set pcap debugging cache size. (30mb)
- */
-#define PCAP_SIZE 30000000
-
 /*****************************************************************************/
 
 /** EtherCAT master phase.
@@ -314,6 +310,7 @@ struct ec_master {
     unsigned int debug_level; /**< Master debug level. */
     unsigned int run_on_cpu;  /**< bind kernel threads to this cpu */
     ec_stats_t stats; /**< Cyclic statistics. */
+
     void *pcap_data; /**< pcap debug output memory pointer */
     void *pcap_curr_data; /**< pcap debug output current memory pointer */
 
@@ -439,6 +436,7 @@ extern char *eoe_interfaces[MAX_EOE]; // see module.c
 extern unsigned int eoe_count; // see module.c
 extern bool eoe_autocreate; // see module.c
 #endif
+extern unsigned long pcap_size;  // see module.c
 
 /*****************************************************************************/
 
