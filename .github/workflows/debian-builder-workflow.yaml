@@ -1,0 +1,14 @@
+name: Build and publish packages
+
+on:
+  push:
+    branches:
+      - '*'
+    tags-ignore:
+      - 'v*'
+
+  pull_request:
+    branches:
+      - '*'
+
+                                        
