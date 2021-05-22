@@ -45,8 +45,4 @@ EXTRA_DIST = \
 	ethercat.service.in \
 	ifup-eoe.sh
 
-BUILT_SOURCES = \
-	ethercatctl \
-	ethercat.service
-
 #------------------------------------------------------------------------------
