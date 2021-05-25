@@ -45,6 +45,8 @@ AM_INIT_AUTOMAKE([-Wall -Werror dist-bzip2 subdir-objects])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_MACRO_DIR([m4])
+PKG_PROG_PKG_CONFIG
+PKG_INSTALLDIR()
 
 #------------------------------------------------------------------------------
 # Global
@@ -1078,6 +1080,35 @@ else
 fi
 
 #------------------------------------------------------------------------------
+# systemd service support
+#------------------------------------------------------------------------------
+
+AC_ARG_WITH([systemdsystemunitdir],
+    AS_HELP_STRING([--with-systemdsystemunitdir=DIR],
+                   [Directory for systemd service files]),
+    ,
+    [with_systemdsystemunitdir=auto]
+)
+
+case "${with_systemdsystemunitdir}" in
+    yes)
+        with_systemdsystemunitdir=$($PKG_CONFIG --variable=systemdsystemunitdir systemd)
+        if test "x$with_systemdsystemunitdir" = "x"; then
+            AC_MSG_ERROR([systemd support requested but pkg-config unable to query systemd package])
+        fi
+        ;;
+    no)
+        with_systemdsystemunitdir=
+        ;;
+    auto)
+        with_systemdsystemunitdir=$($PKG_CONFIG --variable=systemdsystemunitdir systemd)
+        ;;
+esac
+
+AM_CONDITIONAL(HAVE_SYSTEMD, test "x$with_systemdsystemunitdir" != "x")
+AC_SUBST(systemdsystemunitdir,[$with_systemdsystemunitdir])
+
+#------------------------------------------------------------------------------
 
 AC_CONFIG_FILES([
         Doxyfile
@@ -1112,6 +1143,7 @@ AC_CONFIG_FILES([
         examples/xenomai_posix/Makefile
         include/Makefile
         lib/Makefile
+        lib/libethercat.pc
         m4/Makefile
         master/Kbuild
         master/Makefile

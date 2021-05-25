@@ -307,7 +307,7 @@ EtherCAT functionality (see \autoref{chap:api}).
 
   \item Accessing IDNs via the command-line tool.
 
-  \item Accessing IDNs at runtime via the the user-space library.
+  \item Accessing IDNs at runtime via the user-space library.
 
   \end{itemize}
 
@@ -2903,7 +2903,7 @@ are rare, there are a few aspects that can (and should be) dealt with.
 
 %------------------------------------------------------------------------------
 
-\subsection{Application Interface Profiling}
+\section{Application Interface Profiling}
 \label{sec:timing-profile}
 \index{Profiling}
 % FIXME
@@ -2985,7 +2985,7 @@ in \autoref{sec:timing-bus}.
 
 %------------------------------------------------------------------------------
 
-\subsection{Bus Cycle Measuring}
+\section{Bus Cycle Measuring}
 \label{sec:timing-bus}
 \index{Bus cycle}
 
@@ -3164,6 +3164,10 @@ interface) & \\
 
 \lstinline+--with-devices+ & Number of Ethernet devices for redundant
 operation ($>1$ switches redundancy on) & 1\\
+
+\lstinline+--with-systemdsystemunitdir+ & Systemd unit directory ("no"
+disables service file installation)
+& auto \\
 
 \lstinline+--enable-debug-if+ & Create a debug interface for each master & no\\
 
