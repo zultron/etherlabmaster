@@ -29,6 +29,9 @@
 
 ACLOCAL_AMFLAGS = -I m4
 
+AM_DISTCHECK_CONFIGURE_FLAGS = \
+  --with-systemdsystemunitdir=$$dc_install_base/$(systemdsystemunitdir)
+
 SUBDIRS = \
 	include \
 	script
@@ -68,16 +71,8 @@ noinst_HEADERS = \
 	globals.h
 
 EXTRA_DIST = \
-	Doxyfile.in \
 	FEATURES \
-	Kbuild.in \
 	README.EoE \
-	ethercat.spec \
-	ethercat.spec.in
-
-BUILT_SOURCES = \
-	Doxyfile \
-	Kbuild \
 	ethercat.spec
 
 modules:

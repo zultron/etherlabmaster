@@ -35,9 +35,6 @@ SUBDIRS = init.d sysconfig
 
 sbin_SCRIPTS = ethercatctl
 
-systemddir = $(libdir)/systemd/system
-systemd_DATA = ethercat.service
-
 dist_sysconf_DATA = ethercat.conf
 
 EXTRA_DIST = \
@@ -45,8 +42,8 @@ EXTRA_DIST = \
 	ethercat.service.in \
 	ifup-eoe.sh
 
-BUILT_SOURCES = \
-	ethercatctl \
-	ethercat.service
+if HAVE_SYSTEMD
+systemdsystemunit_DATA = ethercat.service
+endif
 
 #------------------------------------------------------------------------------
