@@ -104,7 +104,7 @@
 #define EC_IOCTL_RECEIVE                EC_IO(0x26)
 #define EC_IOCTL_MASTER_STATE          EC_IOR(0x27, ec_master_state_t)
 #define EC_IOCTL_MASTER_LINK_STATE    EC_IOWR(0x28, ec_ioctl_link_state_t)
-#define EC_IOCTL_APP_TIME              EC_IOW(0x29, ec_ioctl_app_time_t)
+#define EC_IOCTL_APP_TIME              EC_IOW(0x29, uint64_t)
 #define EC_IOCTL_SYNC_REF               EC_IO(0x2a)
 #define EC_IOCTL_SYNC_REF_TO           EC_IOW(0x2b, uint64_t)
 #define EC_IOCTL_SYNC_SLAVES            EC_IO(0x2c)
