@@ -8473,14 +8473,7 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 		rx_buffer = igb_get_rx_buffer(rx_ring, size);
 
 		/* retrieve a buffer from the ring */
-		if (adapter->ecdev) {
-			unsigned char *va = page_address(rx_buffer->page) + rx_buffer->page_offset;
-			unsigned int size = le16_to_cpu(rx_desc->wb.upper.length);
-			ecdev_receive(adapter->ecdev, va, size);
-			adapter->ec_watchdog_jiffies = jiffies;
-
-		}
-		else if (skb)
+		if (skb)
 			igb_add_rx_frag(rx_ring, rx_buffer, skb, size);
 		else if (ring_uses_build_skb(rx_ring))
 			skb = igb_build_skb(rx_ring, rx_buffer, rx_desc, size);
@@ -8489,7 +8482,7 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 						rx_desc, size);
 
 		/* exit if we failed to retrieve a buffer */
-		if (!adapter->ecdev && !skb) {
+		if (!skb) {
 			rx_ring->rx_stats.alloc_failed++;
 			rx_buffer->pagecnt_bias++;
 			break;
@@ -8503,23 +8496,25 @@ static int igb_clean_rx_irq(struct igb_q_vector *q_vector, const int budget)
 			continue;
 
 		if (adapter->ecdev) {
-			total_packets++;
-			continue;
+			ecdev_receive(adapter->ecdev, skb->data, size);
+			adapter->ec_watchdog_jiffies = jiffies;
+			total_bytes += skb->len;
+			dev_kfree_skb_any(skb);
+		} else {
+			/* verify the packet layout is correct */
+			if (igb_cleanup_headers(rx_ring, rx_desc, skb)) {
+				skb = NULL;
+				continue;
+			}
+
+			/* probably a little skewed due to removing CRC */
+			total_bytes += skb->len;
+
+			/* populate checksum, timestamp, VLAN, and protocol */
+			igb_process_skb_fields(rx_ring, rx_desc, skb);
+
+			napi_gro_receive(&q_vector->napi, skb);
 		}
-
-		/* verify the packet layout is correct */
-		if (igb_cleanup_headers(rx_ring, rx_desc, skb)) {
-			skb = NULL;
-			continue;
-		}
-
-		/* probably a little skewed due to removing CRC */
-		total_bytes += skb->len;
-
-		/* populate checksum, timestamp, VLAN, and protocol */
-		igb_process_skb_fields(rx_ring, rx_desc, skb);
-
-		napi_gro_receive(&q_vector->napi, skb);
 
 		/* reset skb pointer */
 		skb = NULL;
