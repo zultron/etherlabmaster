@@ -52,3 +52,4 @@ debian/etherlabmaster-dev
 debian/etherlabmaster
 debian/files
 debian/tmp
+INSTALL
