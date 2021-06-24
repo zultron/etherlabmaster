@@ -2112,7 +2112,7 @@ static ATTRIBUTES int ec_ioctl_send(
 
     /* Locking added as send is likely to be used by more than
         one application tasks */
-    if (ec_ioctl_lock_down_interruptible(&master->master_sem))
+    if (ec_ioctl_lock_down_interruptible(&master->io_sem))
         return -EINTR;
 
     if (master->send_cb != NULL) {
@@ -2121,7 +2121,7 @@ static ATTRIBUTES int ec_ioctl_send(
     } else
         sent_bytes = ecrt_master_send(master);
 
-    ec_ioctl_lock_up(&master->master_sem);
+    ec_ioctl_lock_up(&master->io_sem);
 
     if (copy_to_user((void __user *) arg, &sent_bytes, sizeof(sent_bytes))) {
         return -EFAULT;
@@ -2148,7 +2148,7 @@ static ATTRIBUTES int ec_ioctl_receive(
 
     /* Locking added as receive is likely to be used by more than
        one application tasks */
-    if (ec_ioctl_lock_down_interruptible(&master->master_sem))
+    if (ec_ioctl_lock_down_interruptible(&master->io_sem))
         return -EINTR;
 
     if (master->receive_cb != NULL)
@@ -2156,7 +2156,8 @@ static ATTRIBUTES int ec_ioctl_receive(
     else
         ecrt_master_receive(master);
 
-    ec_ioctl_lock_up(&master->master_sem);
+    ec_ioctl_lock_up(&master->io_sem);
+
     return 0;
 }
 
@@ -2255,7 +2256,10 @@ static ATTRIBUTES int ec_ioctl_sync_ref(
         return -EPERM;
     }
 
+    if (ec_ioctl_lock_down_interruptible(&master->io_sem))
+        return -EINTR;
     ecrt_master_sync_reference_clock(master);
+    ec_ioctl_lock_up(&master->io_sem);
     return 0;
 }
 
@@ -2280,7 +2284,10 @@ static ATTRIBUTES int ec_ioctl_sync_ref_to(
         return -EFAULT;
     }
 
+    if (ec_ioctl_lock_down_interruptible(&master->io_sem))
+        return -EINTR;
     ecrt_master_sync_reference_clock_to(master, time);
+    ec_ioctl_lock_up(&master->io_sem);
     return 0;
 }
 
@@ -2300,7 +2307,10 @@ static ATTRIBUTES int ec_ioctl_sync_slaves(
         return -EPERM;
     }
 
+    if (ec_ioctl_lock_down_interruptible(&master->io_sem))
+        return -EINTR;
     ecrt_master_sync_slave_clocks(master);
+    ec_ioctl_lock_up(&master->io_sem);
     return 0;
 }
 
@@ -2351,7 +2361,10 @@ static ATTRIBUTES int ec_ioctl_64bit_ref_clock_time_queue(
         return -EPERM;
     }
 
+    if (ec_ioctl_lock_down_interruptible(&master->io_sem))
+        return -EINTR;
     ecrt_master_64bit_reference_clock_time_queue(master);
+    ec_ioctl_lock_up(&master->io_sem);
     return 0;
 }
 
@@ -2402,7 +2415,10 @@ static ATTRIBUTES int ec_ioctl_sync_mon_queue(
         return -EPERM;
     }
 
+    if (ec_ioctl_lock_down_interruptible(&master->io_sem))
+        return -EINTR;
     ecrt_master_sync_monitor_queue(master);
+    ec_ioctl_lock_up(&master->io_sem);
     return 0;
 }
 
@@ -3515,9 +3531,12 @@ static ATTRIBUTES int ec_ioctl_domain_queue(
         return -ENOENT;
     }
 
-    ecrt_domain_queue(domain);
-
     ec_ioctl_lock_up(&master->master_sem);
+
+    if (ec_ioctl_lock_down_interruptible(&master->io_sem))
+        return -EINTR;
+    ecrt_domain_queue(domain);
+    ec_ioctl_lock_up(&master->io_sem);
 
     return 0;
 }
@@ -4236,7 +4255,10 @@ static ATTRIBUTES int ec_ioctl_voe_exec(
         return -ENOENT;
     }
 
+    if (ec_ioctl_lock_down_interruptible(&master->io_sem))
+        return -EINTR;
     data.state = ecrt_voe_handler_execute(voe);
+    ec_ioctl_lock_up(&master->io_sem);
     if (data.state == EC_REQUEST_SUCCESS && voe->dir == EC_DIR_INPUT)
         data.size = ecrt_voe_handler_data_size(voe);
     else

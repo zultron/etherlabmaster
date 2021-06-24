@@ -564,9 +564,7 @@ void ec_master_internal_send_cb(
         )
 {
     ec_master_t *master = (ec_master_t *) cb_data;
-    ec_lock_down(&master->io_sem);
     ecrt_master_send_ext(master);
-    ec_lock_up(&master->io_sem);
 }
 
 /*****************************************************************************/
@@ -578,9 +576,7 @@ void ec_master_internal_receive_cb(
         )
 {
     ec_master_t *master = (ec_master_t *) cb_data;
-    ec_lock_down(&master->io_sem);
     ecrt_master_receive(master);
-    ec_lock_up(&master->io_sem);
 }
 
 /*****************************************************************************/
@@ -1889,7 +1885,9 @@ static int ec_master_eoe_thread(void *priv_data)
         }
 
         // receive datagrams
+	ec_lock_down(&master->io_sem);
         master->receive_cb(master->cb_data);
+	ec_lock_up(&master->io_sem);
 
         // actual EoE processing
         sth_to_send = 0;
@@ -1904,9 +1902,11 @@ static int ec_master_eoe_thread(void *priv_data)
         }
 
         if (sth_to_send) {
+	    ec_lock_down(&master->io_sem);
             list_for_each_entry(eoe, &master->eoe_handlers, list) {
                 ec_eoe_queue(eoe);
             }
+	    ec_lock_up(&master->io_sem);
             // (try to) send datagrams
             ec_lock_down(&master->ext_queue_sem);
             master->send_cb(master->cb_data);
