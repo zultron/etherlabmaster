@@ -260,6 +260,7 @@ struct ec_master {
 
     struct list_head datagram_queue; /**< Datagram queue. */
     uint8_t datagram_index; /**< Current datagram index. */
+    ec_lock_t io_sem; /**< Semaphore protecting the datagram_queue. */
 
     struct list_head ext_datagram_queue; /**< Queue for non-application
                                            datagrams. */
@@ -289,8 +290,6 @@ struct ec_master {
     struct task_struct *eoe_thread; /**< EoE thread. */
     struct list_head eoe_handlers; /**< Ethernet over EtherCAT handlers. */
 #endif
-
-    ec_lock_t io_sem; /**< Semaphore used in \a IDLE phase. */
 
     void (*send_cb)(void *); /**< Current send datagrams callback. */
     void (*receive_cb)(void *); /**< Current receive datagrams callback. */
