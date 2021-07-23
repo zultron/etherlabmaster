@@ -579,14 +579,15 @@ ec_voe_handler_t *ec_slave_config_find_voe_handler(
  */
 ec_flag_t *ec_slave_config_find_flag(
         ec_slave_config_t *sc, /**< Slave configuration. */
-        const uint8_t *key /**< Flag key. */
+        const char *key /**< Flag key. */
         )
 {
-    ec_flag_t *flag;
-
-    list_for_each_entry(flag, &sc->flags, list) {
-        if (!strcmp(flag->key, key)) {
-            return flag;
+    if (sc) {
+        ec_flag_t *flag;
+        list_for_each_entry(flag, &sc->flags, list) {
+            if (!strcmp(flag->key, key)) {
+                return flag;
+            }
         }
     }
 
