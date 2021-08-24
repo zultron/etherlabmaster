@@ -4,9 +4,7 @@
 #
 #  Start script for EtherCAT to use with systemd
 #
-#  $Id$
-#
-#  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
+#  Copyright (C) 2006-2021  Florian Pose, Ingenieurgemeinschaft IgH
 #
 #  This file is part of the IgH EtherCAT Master.
 #
@@ -37,6 +35,7 @@ LSMOD=/sbin/lsmod
 MODPROBE=/sbin/modprobe
 RMMOD=/sbin/rmmod
 MODINFO=/sbin/modinfo
+IP=/bin/ip
 
 ETHERCAT=@bindir@/ethercat
 
@@ -55,13 +54,22 @@ fi
 #------------------------------------------------------------------------------
 
 parse_mac_address() {
+    local DEVICENAMETOMAC
     if [ -z "${1}" ]; then
         MAC=""
-    elif echo "${1}" | grep -qE '^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$'; then
+    elif echo ${1} | grep -qE '^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$'; then
         MAC=${1}
     else
-        echo Invalid MAC address \""${1}"\" in ${ETHERCAT_CONFIG}
-        exit 1
+        DEVICENAMETOMAC=$("${IP}" address show dev "${1}" |
+            awk '/link\/ether/ { print $2; }')
+        if echo "${DEVICENAMETOMAC}" |
+            grep -qE '^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$'; then
+            MAC=${DEVICENAMETOMAC}
+        else
+            echo Invalid MAC address or interface name \""${1}"\" \
+                in ${ETHERCAT_CONFIG}
+            exit 1
+        fi
     fi
 }
 
