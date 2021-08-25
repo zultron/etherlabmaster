@@ -1450,20 +1450,6 @@ void ec_master_nanosleep(const unsigned long nsecs)
 
 /*****************************************************************************/
 
-/* compatibility for priority changes */
-static inline void set_normal_priority(struct task_struct *p, int nice)
-{
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
-    sched_set_normal(p, nice);
-#else
-    struct sched_param param = { .sched_priority = 0 };
-    sched_setscheduler(p, SCHED_NORMAL, &param);
-    set_user_nice(p, nice);
-#endif
-}
-
-/*****************************************************************************/
-
 /** Execute slave FSMs.
  */
 void ec_master_exec_slave_fsms(
@@ -1679,6 +1665,21 @@ static int ec_master_operation_thread(void *priv_data)
 /*****************************************************************************/
 
 #ifdef EC_EOE
+
+/* compatibility for priority changes */
+static inline void set_normal_priority(struct task_struct *p, int nice)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
+    sched_set_normal(p, nice);
+#else
+    struct sched_param param = { .sched_priority = 0 };
+    sched_setscheduler(p, SCHED_NORMAL, &param);
+    set_user_nice(p, nice);
+#endif
+}
+
+/*****************************************************************************/
+
 /** Starts Ethernet over EtherCAT processing on demand.
  */
 void ec_master_eoe_start(ec_master_t *master /**< EtherCAT master */)
@@ -1788,6 +1789,7 @@ schedule:
     EC_MASTER_DBG(master, 1, "EoE thread exiting...\n");
     return 0;
 }
+
 #endif
 
 /*****************************************************************************/
