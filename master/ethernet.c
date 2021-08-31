@@ -285,23 +285,24 @@ int ec_eoe_send(ec_eoe_t *eoe /**< EoE handler */)
     }
 
 #if EOE_DEBUG_LEVEL >= 2
-    EC_SLAVE_DBG(slave, 0, "EoE %s TX sending fragment %u%s"
-            " with %u octets (%u). %u frames queued.\n",
+    EC_SLAVE_DBG(eoe->slave, 0, "EoE %s TX sending fragment %u%s"
+            " with %zu octets (%zu). %u frames queued.\n",
             eoe->dev->name, eoe->tx_fragment_number,
             last_fragment ? "" : "+", current_size, complete_offset,
             eoe->tx_queued_frames);
 #endif
 
 #if EOE_DEBUG_LEVEL >= 3
-    EC_SLAVE_DBG(master, 0, "");
+    EC_SLAVE_DBG(eoe->slave, 0, "");
     for (i = 0; i < current_size; i++) {
-        printk("%02X ", eoe->tx_frame->skb->data[eoe->tx_offset + i]);
+        printk(KERN_CONT "%02X ",
+                eoe->tx_frame->skb->data[eoe->tx_offset + i]);
         if ((i + 1) % 16 == 0) {
-            printk("\n");
-            EC_SLAVE_DBG(master, 0, "");
+            printk(KERN_CONT "\n");
+            EC_SLAVE_DBG(eoe->slave, 0, "");
         }
     }
-    printk("\n");
+    printk(KERN_CONT "\n");
 #endif
 
     data = ec_slave_mbox_prepare_send(eoe->slave, &eoe->datagram,
@@ -527,13 +528,13 @@ void ec_eoe_state_rx_fetch(ec_eoe_t *eoe /**< EoE handler */)
 #if EOE_DEBUG_LEVEL >= 3
     EC_SLAVE_DBG(eoe->slave, 0, "");
     for (i = 0; i < rec_size - 4; i++) {
-        printk("%02X ", data[i + 4]);
+        printk(KERN_CONT "%02X ", data[i + 4]);
         if ((i + 1) % 16 == 0) {
-            printk("\n");
+            printk(KERN_CONT "\n");
             EC_SLAVE_DBG(eoe->slave, 0, "");
         }
     }
-    printk("\n");
+    printk(KERN_CONT "\n");
 #endif
 
     data_size = time_appended ? rec_size - 8 : rec_size - 4;
