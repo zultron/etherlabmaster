@@ -42,7 +42,7 @@ ETHERCAT=@prefix@/bin/ethercat
 
 #------------------------------------------------------------------------------
 
-ETHERCAT_CONFIG=/etc/ethercat.conf
+ETHERCAT_CONFIG=/etc/default/ethercat
 
 if [ ! -r ${ETHERCAT_CONFIG} ]; then
     echo ${ETHERCAT_CONFIG} not existing;
