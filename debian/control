@@ -1,17 +1,36 @@
 Source: etherlabmaster
 Section: misc
-Priority: extra
-Maintainer: Sascha Ittner <sascha.ittner@modusoft.de>
-Build-Depends: debhelper (>> 4.0.0), dkms, gettext, autoconf, automake, libtool, quilt, linux-headers-amd64 | linux-headers-rt-amd64
+Priority: optional
+Maintainer: Jakub Fišer <jakub.fiser@eryaf.com>
+Build-Depends: debhelper (>= 12),
+               debhelper-compat (=12),
+               dkms,
+               gettext,
+               autoconf,
+               automake,
+               libtool,
+               quilt,
+               linux-headers-amd64 | linux-headers-rt-amd64
 Standards-Version: 2.1.0
 
-Package: etherlabmaster
+Package: libethercat
+Architecture: any
+Multi-Arch: same
+Depends: ${shlibs:Depends}
+Description: IgH EtherCAT master for Linux shared libraries
+
+Package: etherlabmaster-dkms
 Replaces: ethercat, etherlabmaster
 Conflicts: ethercat, etherlabmaster
 Provides: ethercat, etherlabmaster
 Architecture: any
 Depends: ${shlibs:Depends}, dkms, procps, ifupdown, linux-headers-amd64 | linux-headers-rt-amd64
 Description: IgH EtherCAT master for Linux
+
+Package: etherlabmaster-tools
+Architecture: any
+Depends: ${shlibs:Depends}, libethercat
+Description: IgH EtherCAT master for Linux utilitie
 
 Package: etherlabmaster-dev
 Replaces: ethercat-dev, etherlabmaster-dev
