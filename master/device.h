@@ -55,7 +55,7 @@ typedef enum {
 
 typedef struct {
     ec_debug_frame_dir_t dir;
-    struct timeval t;
+    struct timespec64 ts;
     uint8_t data[EC_MAX_DATA_SIZE];
     unsigned int data_size;
 } ec_debug_frame_t;
@@ -84,7 +84,7 @@ struct ec_device
     cycles_t cycles_poll; /**< cycles of last poll */
 #endif
 #ifdef EC_DEBUG_RING
-    struct timeval timeval_poll;
+    struct timespec64 timespec64_poll;
 #endif
     unsigned long jiffies_poll; /**< jiffies of last poll */
 
@@ -144,8 +144,8 @@ typedef struct {
 */
 
 typedef struct {
-    u32 ts_sec;         /* timestamp seconds */
-    u32 ts_usec;        /* timestamp microseconds */
+    u64 ts_sec;         /* timestamp seconds */
+    u64 ts_nsec;        /* timestamp nanoseconds */
     u32 incl_len;       /* number of octets of packet saved in file */
     u32 orig_len;       /* actual length of packet */
 } pcaprec_hdr_t;

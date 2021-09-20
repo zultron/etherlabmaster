@@ -39,10 +39,10 @@
 #define timersub(a, b, result) \
     do { \
         (result)->tv_sec = (a)->tv_sec - (b)->tv_sec; \
-        (result)->tv_usec = (a)->tv_usec - (b)->tv_usec; \
-        if ((result)->tv_usec < 0) { \
+        (result)->tv_nsec = (a)->tv_nsec - (b)->tv_nsec; \
+        if ((result)->tv_nsec < 0) { \
             --(result)->tv_sec; \
-            (result)->tv_usec += 1000000; \
+            (result)->tv_nsec += 1000000000; \
         } \
     } while (0)
 #endif
@@ -85,8 +85,8 @@ int ec_device_init(
     device->cycles_poll = 0;
 #endif
 #ifdef EC_DEBUG_RING
-    device->timeval_poll.tv_sec = 0;
-    device->timeval_poll.tv_usec = 0;
+    device->timespec64_poll.tv_sec = 0;
+    device->timespec64_poll.tv_nsec = 0;
 #endif
     device->jiffies_poll = 0;
 
@@ -97,7 +97,7 @@ int ec_device_init(
         ec_debug_frame_t *df = &device->debug_frames[i];
         df->dir = TX;
         df->t.tv_sec = 0;
-        df->t.tv_usec = 0;
+        df->t.tv_nsec = 0;
         memset(df->data, 0, EC_MAX_DATA_SIZE);
         df->data_size = 0;
     }
@@ -312,16 +312,16 @@ static void pcap_record(
         long reqd = size + sizeof(pcaprec_hdr_t);
         if (unlikely(reqd <= available)) {
             pcaprec_hdr_t *pcaphdr;
-            struct timeval t;
+            struct timespec64 ts;
           
             // update curr data pointer
             device->master->pcap_curr_data = curr_data + reqd;
             
             // fill in pcap frame header info
             pcaphdr = curr_data;
-            jiffies_to_timeval(device->jiffies_poll, &t);
-            pcaphdr->ts_sec   = t.tv_sec;
-            pcaphdr->ts_usec  = t.tv_usec;
+            jiffies_to_timespec64(device->jiffies_poll, &ts);
+            pcaphdr->ts_sec   = ts.tv_sec;
+            pcaphdr->ts_nsec  = ts.tv_nsec;
             pcaphdr->incl_len = size;
             pcaphdr->orig_len = size;
             curr_data += sizeof(pcaprec_hdr_t);
@@ -438,10 +438,10 @@ void ec_device_debug_ring_append(
 
     df->dir = dir;
     if (dir == TX) {
-        do_gettimeofday(&df->t);
+        ktime_get_ts64(&df->ts);
     }
     else {
-        df->t = device->timeval_poll;
+        df->ts = device->timespec64_poll;
     }
     memcpy(df->data, data, size);
     df->data_size = size;
@@ -463,12 +463,12 @@ void ec_device_debug_ring_print(
     int i;
     unsigned int ring_index;
     const ec_debug_frame_t *df;
-    struct timeval t0, diff;
+    struct timespec64 ts0, diff;
 
     // calculate index of the newest frame in the ring to get its time
     ring_index = (device->debug_frame_index + EC_DEBUG_RING_SIZE - 1)
         % EC_DEBUG_RING_SIZE;
-    t0 = device->debug_frames[ring_index].t;
+    ts0 = device->debug_frames[ring_index].ts;
 
     EC_MASTER_DBG(device->master, 1, "Debug ring %u:\n", ring_index);
 
@@ -478,12 +478,12 @@ void ec_device_debug_ring_print(
 
     for (i = 0; i < device->debug_frame_count; i++) {
         df = &device->debug_frames[ring_index];
-        timersub(&t0, &df->t, &diff);
+        timersub(&ts0, &df->ts, &diff);
 
-        EC_MASTER_DBG(device->master, 1, "Frame %u, dt=%u.%06u s, %s:\n",
+        EC_MASTER_DBG(device->master, 1, "Frame %u, dt=%u.%09u s, %s:\n",
                 i + 1 - device->debug_frame_count,
                 (unsigned int) diff.tv_sec,
-                (unsigned int) diff.tv_usec,
+                (unsigned int) diff.tv_nsec,
                 (df->dir == TX) ? "TX" : "RX");
         ec_print_data(df->data, df->data_size);
 
@@ -510,7 +510,7 @@ void ec_device_poll(
 #endif
     device->jiffies_poll = jiffies;
 #ifdef EC_DEBUG_RING
-    do_gettimeofday(&device->timeval_poll);
+    ktime_get_ts64(&device->timespec64_poll);
 #endif
     device->poll(device->dev);
 }
