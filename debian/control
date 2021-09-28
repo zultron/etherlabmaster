@@ -37,6 +37,6 @@ Replaces: ethercat-dev, etherlabmaster-dev
 Conflicts: ethercat-dev, etherlabmaster-dev
 Provides: ethercat-dev, etherlabmaster-dev
 Architecture: any
-Depends: etherlabmaster
+Depends: etherlabmaster-dkms
 Description: IgH EtherCAT master for Linux (development files)
 
