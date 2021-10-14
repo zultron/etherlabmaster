@@ -1899,7 +1899,9 @@ static ATTRIBUTES int ec_ioctl_send(
         return -EPERM;
     }
 
+    down( & master->io_sem );
     ecrt_master_send(master);
+    up( & master->io_sem );
     return 0;
 }
 
@@ -1919,7 +1921,9 @@ static ATTRIBUTES int ec_ioctl_receive(
         return -EPERM;
     }
 
+    down( & master->io_sem );
     ecrt_master_receive(master);
+    up( & master->io_sem );
     return 0;
 }
 
