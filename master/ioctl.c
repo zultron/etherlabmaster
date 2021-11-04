@@ -2022,7 +2022,9 @@ static ATTRIBUTES int ec_ioctl_sync_ref(
         return -EPERM;
     }
 
+    down( & master->io_sem );
     ecrt_master_sync_reference_clock(master);
+    up( & master->io_sem );
     return 0;
 }
 
@@ -2047,7 +2049,9 @@ static ATTRIBUTES int ec_ioctl_sync_ref_to(
         return -EFAULT;
     }
 
+    down( & master->io_sem );
     ecrt_master_sync_reference_clock_to(master, time);
+    up( & master->io_sem );
     return 0;
 }
 
@@ -2067,7 +2071,9 @@ static ATTRIBUTES int ec_ioctl_sync_slaves(
         return -EPERM;
     }
 
+    down( & master->io_sem );
     ecrt_master_sync_slave_clocks(master);
+    up( & master->io_sem );
     return 0;
 }
 
@@ -2118,7 +2124,9 @@ static ATTRIBUTES int ec_ioctl_sync_mon_queue(
         return -EPERM;
     }
 
+    down( & master->io_sem );
     ecrt_master_sync_monitor_queue(master);
+    up( & master->io_sem );
     return 0;
 }
 
@@ -3181,7 +3189,9 @@ static ATTRIBUTES int ec_ioctl_domain_queue(
         return -ENOENT;
     }
 
+    down( & master->io_sem );
     ecrt_domain_queue(domain);
+    up( & master->io_sem );
     return 0;
 }
 
@@ -3899,7 +3909,9 @@ static ATTRIBUTES int ec_ioctl_voe_exec(
         return -ENOENT;
     }
 
+    down( & master->io_sem );
     data.state = ecrt_voe_handler_execute(voe);
+    up( & master->io_sem );
     if (data.state == EC_REQUEST_SUCCESS && voe->dir == EC_DIR_INPUT)
         data.size = ecrt_voe_handler_data_size(voe);
     else
