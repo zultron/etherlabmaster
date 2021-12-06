@@ -50,7 +50,7 @@ static inline int dma_set_mask_and_coherent(struct device *dev, u64 mask)
  * configure the drivers capabilities here
  */
 static const struct ccat_driver *const drivers[] = {
-#ifdef CONFIG_PCI
+#ifdef CONFIG_GENERIC_ISA_DMA
 	&eth_dma_driver,	/* load Ethernet MAC/EtherCAT Master driver with DMA support from netdev.c */
 #endif
 	&eth_eim_driver,	/* load Ethernet MAC/EtherCAT Master driver without DMA support from */
@@ -257,7 +257,7 @@ static void ccat_functions_remove(struct ccat_device *const dev)
 	}
 }
 
-#ifdef CONFIG_PCI
+#ifdef CONFIG_GENERIC_ISA_DMA
 static int ccat_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct ccat_device *ccatdev;
@@ -362,7 +362,7 @@ static struct pci_driver ccat_pci_driver = {
 
 module_pci_driver(ccat_pci_driver);
 
-#else /* #ifdef CONFIG_PCI */
+#else /* #ifdef CONFIG_GENERIC_ISA_DMA */
 
 static int ccat_eim_probe(struct platform_device *pdev)
 {
@@ -424,4 +424,4 @@ static struct platform_driver ccat_eim_driver = {
 };
 
 module_platform_driver(ccat_eim_driver);
-#endif /* #ifdef CONFIG_PCI */
+#endif /* #ifdef CONFIG_GENERIC_ISA_DMA */

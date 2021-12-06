@@ -24,7 +24,7 @@
 #include <linux/netdevice.h>
 #include <linux/version.h>
 
-#ifdef CONFIG_PCI
+#ifdef CONFIG_GENERIC_ISA_DMA
 #include <asm/dma.h>
 #else
 #define free_dma(X)
