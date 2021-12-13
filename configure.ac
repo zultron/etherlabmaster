@@ -47,6 +47,7 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_MACRO_DIR([m4])
 AC_PROG_SED
+AC_PROG_MKDIR_P
 m4_ifndef([PKG_INSTALLDIR], [m4_fatal([pkgconf or pkg-config not found or too old (`pkg-config --version` must be >= 0.27)])])
 PKG_PROG_PKG_CONFIG(0.27)
 PKG_INSTALLDIR
@@ -1141,6 +1142,16 @@ else
 fi
 
 #------------------------------------------------------------------------------
+# init.d support
+#------------------------------------------------------------------------------
+
+AC_ARG_ENABLE([initd],
+    AS_HELP_STRING([--disable-initd],
+                   [Disable /etc/init.d script support (default: enabled)])
+)
+AM_CONDITIONAL(HAVE_INITD, test "x$enable_initd" != "xno")
+
+#------------------------------------------------------------------------------
 # systemd service support
 #------------------------------------------------------------------------------
 
@@ -1208,9 +1219,6 @@ AC_CONFIG_FILES([
         master/Kbuild
         master/Makefile
         script/Makefile
-        script/init.d/Makefile
-        script/init.d/ethercat
-        script/sysconfig/Makefile
         tool/Makefile
         tty/Kbuild
         tty/Makefile

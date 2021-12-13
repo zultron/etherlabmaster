@@ -31,15 +31,14 @@
 #
 #------------------------------------------------------------------------------
 
-SUBDIRS = init.d sysconfig
-
 sbin_SCRIPTS = ethercatctl
 
 dist_sysconf_DATA = ethercat.conf
 
 script_templates = \
 	ethercatctl.in \
-	ethercat.service.in
+	ethercat.service.in \
+	init.d/ethercat.in
 
 EXTRA_DIST = \
 	$(script_templates) \
@@ -47,10 +46,19 @@ EXTRA_DIST = \
 
 CLEANFILES = \
 	ethercatctl \
-	ethercat.service
+	ethercat.service \
+	init.d/ethercat \
+	ethercat
 
 if HAVE_SYSTEMD
 systemdsystemunit_DATA = ethercat.service
+endif
+
+if HAVE_INITD
+initdir = $(sysconfdir)/init.d
+init_SCRIPTS = init.d/ethercat
+sysdir = $(sysconfdir)/sysconfig
+sys_DATA = ethercat
 endif
 
 
@@ -66,5 +74,12 @@ ethercatctl: $(srcdir)/ethercatctl.in Makefile
 
 ethercat.service: $(srcdir)/ethercat.service.in Makefile
 	$(expand_script) < $< > $@
+
+init.d/ethercat: $(srcdir)/init.d/ethercat.in Makefile
+	$(MKDIR_P) init.d && \
+	$(expand_script) < $< > $@
+
+ethercat: $(srcdir)/ethercat.conf Makefile
+	$(SED) -e 's,for use with ethercatctl,for use with init.d,g' < $< > $@
 
 #------------------------------------------------------------------------------

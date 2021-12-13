@@ -41,7 +41,15 @@ ETHERCAT=@bindir@/ethercat
 
 #------------------------------------------------------------------------------
 
-ETHERCAT_CONFIG=@sysconfdir@/ethercat.conf
+if [ "$1" = "-c" ]; then
+    ETHERCAT_CONFIG="$2"
+    COMMAND="$3"
+else
+    ETHERCAT_CONFIG=@sysconfdir@/ethercat.conf
+    COMMAND="$1"
+fi
+
+#------------------------------------------------------------------------------
 
 if [ ! -r ${ETHERCAT_CONFIG} ]; then
     echo ${ETHERCAT_CONFIG} not existing;
@@ -79,7 +87,7 @@ parse_mac_address() {
 
 #------------------------------------------------------------------------------
 
-case "${1}" in
+case "$COMMAND" in
 
 start)
     # bring up all updown interfaces before anything else
@@ -227,7 +235,7 @@ status)
 #------------------------------------------------------------------------------
 
 *)
-    echo "USAGE: $0 {start|stop|restart|status}"
+    echo "USAGE: $0 [-c path/to/ethercat.conf] {start|stop|restart|status}"
     exit 1
     ;;
 esac
