@@ -53,18 +53,22 @@ fi
 
 #------------------------------------------------------------------------------
 
+is_mac_address() {
+    local x='[0-9a-fA-F]'
+    echo "$1" | grep -qE "^($x$x:){5}$x$x\$" -
+}
+
+#------------------------------------------------------------------------------
+
 parse_mac_address() {
     local DEVICENAMETOMAC
-    if [ -z "${1}" ]; then
-        MAC=""
-    elif echo ${1} | grep -qE '^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$'; then
-        MAC=${1}
+    if [ -z "${1}" ] || is_mac_address "${1}"; then
+        MAC="${1}"
     else
         DEVICENAMETOMAC=$("${IP}" address show dev "${1}" |
             awk '/link\/ether/ { print $2; }')
-        if echo "${DEVICENAMETOMAC}" |
-            grep -qE '^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$'; then
-            MAC=${DEVICENAMETOMAC}
+        if is_mac_address "${DEVICENAMETOMAC}"; then
+            MAC="${DEVICENAMETOMAC}"
         else
             echo Invalid MAC address or interface name \""${1}"\" \
                 in ${ETHERCAT_CONFIG}
@@ -78,6 +82,11 @@ parse_mac_address() {
 case "${1}" in
 
 start)
+    # bring up all updown interfaces before anything else
+    for interface in $UPDOWN_INTERFACES; do
+        $IP link set dev $interface up
+    done
+
     # construct DEVICES and BACKUPS from configuration variables
     DEVICES=""
     BACKUPS=""
@@ -163,6 +172,11 @@ stop)
             continue
         fi
         ${MODPROBE} ${MODPROBE_FLAGS} "${MODULE}"
+    done
+
+    # bring down all updown interfaces
+    for interface in $UPDOWN_INTERFACES; do
+        $IP link set dev $interface down
     done
 
     exit 0
