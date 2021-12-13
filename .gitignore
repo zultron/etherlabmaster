@@ -37,6 +37,7 @@ lib/libethercat.la
 lib/libethercat.pc
 libtool
 master/*.o.d
+script/ethercat
 script/ethercat.service
 script/ethercatctl
 script/init.d/ethercat
