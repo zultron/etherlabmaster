@@ -10,6 +10,19 @@ build:
         - make -j8 all modules
         - make DISTCHECK_CONFIGURE_FLAGS="--with-linux-dir=/usr/src/linux-obj/$(uname -i)/default" distcheck
 
+test cmake:
+    stage: test
+
+    script:
+        - ./bootstrap
+        - ./configure --prefix=/tmp/ethercat_test_dir --disable-kernel
+        - make -j8 install
+        - cd examples/user
+        - mkdir build && cd build
+        - cmake -DCMAKE_PREFIX_PATH=/tmp/ethercat_test_dir -DCMAKE_BUILD_TYPE=Release ..
+        - make
+        - ldd userexample
+
 pages:
     stage: deploy
     rules:

@@ -75,11 +75,11 @@ libethercat_la_LDFLAGS = -version-info 2:0:1
 
 pkgconfig_DATA = libethercat.pc
 
-cmakedir = $(libdir)/cmake
+cmakedir = $(libdir)/cmake/ethercat
 
-cmake_DATA = EtherCATConfig.cmake
+cmake_DATA = ethercat-config.cmake
 
-EXTRA_DIST = EtherCATConfig.cmake.in
+EXTRA_DIST = ethercat-config.cmake.in
 
 CLEANFILES = $(cmake_DATA)
 
@@ -110,5 +110,5 @@ endif
 
 # we need to replace the variables manually, because autotools does not expand them.
 
-EtherCATConfig.cmake: $(srcdir)/EtherCATConfig.cmake.in Makefile
+ethercat-config.cmake: $(srcdir)/ethercat-config.cmake.in Makefile
 	$(SED) -e 's,%libdir%,$(libdir),' -e 's,%includedir%,$(includedir),' $< > $@
