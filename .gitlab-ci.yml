@@ -10,6 +10,51 @@ build:
         - make -j8 all modules
         - make DISTCHECK_CONFIGURE_FLAGS="--with-linux-dir=/usr/src/linux-obj/$(uname -i)/default" distcheck
 
+test cmake:
+    stage: test
+
+    script:
+        - ./bootstrap
+        - ./configure --prefix=/tmp/ethercat_test_dir --disable-kernel
+        - make -j8 install
+        - cd examples/user
+        - mkdir build && cd build
+        - cmake -DCMAKE_PREFIX_PATH=/tmp/ethercat_test_dir -DCMAKE_BUILD_TYPE=Release ..
+        - make
+        - ldd userexample
+
+pages:
+    stage: deploy
+    rules:
+        - if: $CI_COMMIT_BRANCH == "stable-1.5"
+    script:
+        - ./bootstrap
+        - ./configure --with-linux-dir=/usr/src/linux-obj/$(uname -i)/default --disable-8139too --enable-tty --with-devices=2 --enable-ccat
+        - doxygen
+        - mkdir public
+        - echo "/ethercat /ethercat/v1 301" > public/_redirects
+        - mv doxygen-output/html/ public/v1/
+    artifacts:
+        paths:
+            - public/
+
+documentation:
+    stage: deploy
+    rules:
+        - if: $CI_COMMIT_BRANCH == "stable-1.5"
+    script:
+        - ./bootstrap
+        - ./configure --disable-kernel --disable-userlib
+        - make -j8 all
+        - cd documentation
+        - mkdir external
+        - make
+        - make index
+        - make
+    artifacts:
+        paths:
+            - documentation/*.pdf
+
 # from 'Workflows/MergeRequest-Pipelines.gitlab-ci.yml', but on all branches
 workflow:
     rules:
