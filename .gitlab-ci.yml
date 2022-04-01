@@ -10,6 +10,7 @@ build:
         - make -j8 all modules
         - make DISTCHECK_CONFIGURE_FLAGS="--with-linux-dir=/usr/src/linux-obj/$(uname -i)/default" distcheck
 
+# Build ethercat tool subcommand help output for documentation
 commands:
     stage: build
     rules:
@@ -57,7 +58,7 @@ documentation:
     stage: deploy
     rules:
         - if: $CI_COMMIT_BRANCH == "stable-1.5"
-          #    image: texlive/texlive
+    image: texlive/texlive
     script:
         - find documentation
         - cd documentation
