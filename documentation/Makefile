@@ -13,6 +13,7 @@ LATEX_OPTIONS := -file-line-error-style
 COMMANDS := \
 	alias \
 	config \
+	crc \
 	cstruct \
 	data \
 	debug \
@@ -26,6 +27,7 @@ COMMANDS := \
 	pdos \
 	reg_read \
 	reg_write \
+	rescan \
 	sdos \
 	sii_read \
 	sii_write \
