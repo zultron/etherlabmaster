@@ -38,7 +38,7 @@ pages:
         paths:
             - public/
 
-documentation:
+commands:
     stage: deploy
     rules:
         - if: $CI_COMMIT_BRANCH == "stable-1.5"
@@ -46,8 +46,22 @@ documentation:
         - ./bootstrap
         - ./configure --disable-kernel --disable-userlib
         - make -j8 all
+        - mkdir documentation/external
+        - make -C documentation ext
+    artifacts:
+        paths:
+            - tool/ethercat
+            - documentation/external/
+
+documentation:
+    stage: deploy
+    rules:
+        - if: $CI_COMMIT_BRANCH == "stable-1.5"
+    image: texlive/texlive
+    dependencies:
+        - commands
+    script:
         - cd documentation
-        - mkdir external
         - make
         - make index
         - make
