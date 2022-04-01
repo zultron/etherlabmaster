@@ -58,9 +58,8 @@ documentation:
     stage: deploy
     rules:
         - if: $CI_COMMIT_BRANCH == "stable-1.5"
-    image: texlive/texlive
+    image: registry.gitlab.com/etherlab.org/build-container-factory/leap-15.2:texlive
     script:
-        - find documentation
         - cd documentation
         - make
         - make index
