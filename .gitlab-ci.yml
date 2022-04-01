@@ -1,3 +1,7 @@
+stages:
+  - build
+  - documentation
+
 image:
     registry.gitlab.com/etherlab.org/build-container-factory/leap-15.2:linux-syms
 
@@ -9,6 +13,23 @@ build:
         - ./configure --with-linux-dir=/usr/src/linux-obj/$(uname -i)/default --disable-8139too --enable-tty --with-devices=2 --enable-ccat
         - make -j8 all modules
         - make DISTCHECK_CONFIGURE_FLAGS="--with-linux-dir=/usr/src/linux-obj/$(uname -i)/default" distcheck
+
+documentation:
+    stage: documentation
+
+    artifacts:
+      untracked: true
+      expire_in: 1 week
+
+    script:
+        - ./bootstrap
+        - ./configure --disable-kernel --disable-userlib
+        - make -j8 all
+        - cd documentation
+        - mkdir external
+        - make
+        - make index
+        - make
 
 include:
     - template: 'Workflows/MergeRequest-Pipelines.gitlab-ci.yml'
