@@ -53,7 +53,9 @@ $(EXT_FILES): $(ETHERCAT_CMD)
 	@echo Creating $@...
 	$(shell $(subst $(EXT_PREFIX),$(ETHERCAT_HELP) ,$@) > $@)
 
-pdf: $(EXT_FILES)
+ext: $(EXT_FILES)
+
+pdf: ext
 	$(MAKE) -C images
 	$(MAKE) -C graphs
 
