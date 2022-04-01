@@ -10,6 +10,21 @@ build:
         - make -j8 all modules
         - make DISTCHECK_CONFIGURE_FLAGS="--with-linux-dir=/usr/src/linux-obj/$(uname -i)/default" distcheck
 
+commands:
+    stage: build
+    rules:
+        - if: $CI_COMMIT_BRANCH == "stable-1.5"
+    script:
+        - ./bootstrap
+        - ./configure --disable-kernel --disable-userlib
+        - make -j8 all
+        - mkdir documentation/external
+        - make -C documentation ext
+    artifacts:
+        paths:
+            - tool/ethercat
+            - documentation/external/
+
 test cmake:
     stage: test
 
@@ -38,28 +53,11 @@ pages:
         paths:
             - public/
 
-commands:
-    stage: deploy
-    rules:
-        - if: $CI_COMMIT_BRANCH == "stable-1.5"
-    script:
-        - ./bootstrap
-        - ./configure --disable-kernel --disable-userlib
-        - make -j8 all
-        - mkdir documentation/external
-        - make -C documentation ext
-    artifacts:
-        paths:
-            - tool/ethercat
-            - documentation/external/
-
 documentation:
     stage: deploy
     rules:
         - if: $CI_COMMIT_BRANCH == "stable-1.5"
           #    image: texlive/texlive
-    dependencies:
-        - commands
     script:
         - find documentation
         - cd documentation
