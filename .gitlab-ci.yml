@@ -1,5 +1,5 @@
 image:
-    registry.gitlab.com/etherlab.org/build-container-factory/leap-15.2:linux-syms
+    registry.gitlab.com/etherlab.org/build-container-factory/leap-15.3:linux-syms
 
 build:
     stage: build
@@ -58,7 +58,7 @@ documentation:
     stage: deploy
     rules:
         - if: $CI_COMMIT_BRANCH == "stable-1.5"
-    image: registry.gitlab.com/etherlab.org/build-container-factory/leap-15.2:texlive
+    image: registry.gitlab.com/etherlab.org/build-container-factory/leap-15.3:texlive
     script:
         - cd documentation
         - make
