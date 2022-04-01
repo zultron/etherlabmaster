@@ -37,7 +37,24 @@ pages:
     artifacts:
         paths:
             - public/
- 
+
+documentation:
+    stage: deploy
+    rules:
+        - if: $CI_COMMIT_BRANCH == "stable-1.5"
+    script:
+        - ./bootstrap
+        - ./configure --disable-kernel --disable-userlib
+        - make -j8 all
+        - cd documentation
+        - mkdir external
+        - make
+        - make index
+        - make
+    artifacts:
+        paths:
+            - documentation/*.pdf
+
 # from 'Workflows/MergeRequest-Pipelines.gitlab-ci.yml', but on all branches
 workflow:
     rules:
