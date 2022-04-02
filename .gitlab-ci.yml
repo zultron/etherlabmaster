@@ -24,6 +24,7 @@ commands:
     artifacts:
         paths:
             - script/init.d/ethercat
+            - script/ethercat.service
             - tool/ethercat
             - documentation/external/
 
