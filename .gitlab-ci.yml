@@ -23,6 +23,7 @@ commands:
         - make -C documentation ext
     artifacts:
         paths:
+            - script/init.d/ethercat
             - tool/ethercat
             - documentation/external/
 
