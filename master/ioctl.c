@@ -4100,12 +4100,13 @@ static ATTRIBUTES int ec_ioctl_slave_foe_read(
     }
 
     ec_foe_request_init(&request, io.file_name);
-    ret = ec_foe_request_alloc(&request, 10000); // FIXME
+    ret = ec_foe_request_alloc(&request, io.buffer_size); // FIXME
     if (ret) {
         ec_foe_request_clear(&request);
         return ret;
     }
 
+    request.password = io.password;
     ec_foe_request_read(&request);
 
     if (down_interruptible(&master->master_sem)) {
@@ -4210,6 +4211,7 @@ static ATTRIBUTES int ec_ioctl_slave_foe_write(
     }
 
     request.data_size = io.buffer_size;
+    request.password = io.password;
     ec_foe_request_write(&request);
 
     if (down_interruptible(&master->master_sem)) {
