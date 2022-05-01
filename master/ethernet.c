@@ -113,7 +113,11 @@ ec_eoedev_set_mac(struct net_device *netdev, void *p)
       return -EADDRNOTAVAIL;
    }
 
-   memcpy(netdev->dev_addr, addr->sa_data, netdev->addr_len);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+    eth_hw_addr_set(netdev, addr->sa_data);
+#else
+    memcpy(netdev->dev_addr, addr->sa_data, netdev->addr_len);
+#endif
 
    return 0;
 }
@@ -134,6 +138,7 @@ int ec_eoe_init(
     ec_eoe_t **priv;
     int ret = 0;
     char name[EC_DATAGRAM_NAME_SIZE];
+    u8 mac_addr[ETH_ALEN];
 
     struct net_device *dev;
     unsigned char lo_mac[ETH_ALEN] = {0};
@@ -233,9 +238,9 @@ int ec_eoe_init(
                 EC_SLAVE_INFO(slave, "%s MAC address derived from"
                         " NIC part of %s MAC address",
                     eoe->dev->name, dev->name);
-                eoe->dev->dev_addr[1] = dev->dev_addr[3];
-                eoe->dev->dev_addr[2] = dev->dev_addr[4];
-                eoe->dev->dev_addr[3] = dev->dev_addr[5];
+                mac_addr[1] = dev->dev_addr[3];
+                mac_addr[2] = dev->dev_addr[4];
+                mac_addr[3] = dev->dev_addr[5];
             }
             else {
                 use_master_mac = 1;
@@ -248,16 +253,23 @@ int ec_eoe_init(
                     " from NIC part of %s MAC address",
                 eoe->dev->name,
                 slave->master->devices[EC_DEVICE_MAIN].dev->name);
-            eoe->dev->dev_addr[1] =
+            mac_addr[1] =
                 slave->master->devices[EC_DEVICE_MAIN].dev->dev_addr[3];
-            eoe->dev->dev_addr[2] =
+            mac_addr[2] =
                 slave->master->devices[EC_DEVICE_MAIN].dev->dev_addr[4];
-            eoe->dev->dev_addr[3] =
+            mac_addr[3] =
                 slave->master->devices[EC_DEVICE_MAIN].dev->dev_addr[5];
         }
-        eoe->dev->dev_addr[0] = 0x02;
-        eoe->dev->dev_addr[4] = (uint8_t)(slave->ring_position >> 8);
-        eoe->dev->dev_addr[5] = (uint8_t)(slave->ring_position);
+        //eoe->dev->dev_addr[0] = 0x02;
+        mac_addr[0] = 0x02;
+        mac_addr[4] = (uint8_t)(slave->ring_position >> 8);
+        mac_addr[5] = (uint8_t)(slave->ring_position);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+        eth_hw_addr_set(eoe->dev, mac_addr);
+#else
+        memcpy(eoe->dev->dev_addr, mac_addr, sizeof(mac_addr));
+#endif
     }
 
     // initialize private data

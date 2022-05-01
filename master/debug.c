@@ -134,7 +134,11 @@ void ec_debug_register(
     ec_debug_unregister(dbg);
 
     // use the Ethernet address of the physical device for the debug device
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+    eth_hw_addr_set(dbg->dev, net_dev->dev_addr);
+#else
     memcpy(dbg->dev->dev_addr, net_dev->dev_addr, ETH_ALEN);
+#endif
 
     // connect the net_device to the kernel
     if ((result = register_netdev(dbg->dev))) {
