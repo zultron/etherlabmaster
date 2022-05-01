@@ -107,8 +107,9 @@ int ec_eoe_init(
         )
 {
     ec_eoe_t **priv;
-    int i, ret = 0;
+    int ret = 0;
     char name[EC_DATAGRAM_NAME_SIZE];
+    u8 mac_addr[ETH_ALEN] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
 
     eoe->slave = slave;
 
@@ -171,8 +172,11 @@ int ec_eoe_init(
     eoe->dev->get_stats = ec_eoedev_stats;
 #endif
 
-    for (i = 0; i < ETH_ALEN; i++)
-        eoe->dev->dev_addr[i] = i | (i << 4);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+    eth_hw_addr_set(eoe->dev, mac_addr);
+#else
+    memcpy(eoe->dev->dev_addr, mac_addr, sizeof(mac_addr));
+#endif
 
     // initialize private data
     priv = netdev_priv(eoe->dev);
@@ -195,7 +199,13 @@ int ec_eoe_init(
     }
 
     // make the last address octet unique
-    eoe->dev->dev_addr[ETH_ALEN - 1] = (uint8_t) eoe->dev->ifindex;
+    mac_addr[ETH_ALEN - 1] = (uint8_t) eoe->dev->ifindex;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+    eth_hw_addr_set(eoe->dev, mac_addr);
+#else
+    memcpy(eoe->dev->dev_addr, mac_addr, sizeof(mac_addr));
+#endif
+
     return 0;
 
  out_free:

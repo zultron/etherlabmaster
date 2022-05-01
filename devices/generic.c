@@ -255,7 +255,11 @@ int ec_gen_device_offer(
     int ret = 0;
 
     dev->used_netdev = desc->netdev;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
+    eth_hw_addr_set(dev->netdev, desc->dev_addr);
+#else
     memcpy(dev->netdev->dev_addr, desc->dev_addr, ETH_ALEN);
+#endif
 
     dev->ecdev = ecdev_offer(dev->netdev, ec_gen_poll, THIS_MODULE);
     if (dev->ecdev) {
