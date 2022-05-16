@@ -426,6 +426,7 @@ typedef struct {
 
 typedef struct {
     // inputs
+    uint32_t password;
     uint16_t slave_position;
     uint16_t offset;
     size_t buffer_size;
