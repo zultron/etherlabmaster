@@ -4,9 +4,7 @@
 #
 #  IgH EtherCAT master
 #
-#  $Id$
-#
-#  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+#  Copyright (C) 2006-2022  Florian Pose, Ingenieurgemeinschaft IgH
 #
 #  This file is part of the IgH EtherCAT Master.
 #
@@ -53,6 +51,12 @@ if HAVE_SYSTEMD
 systemdsystemunit_DATA = ethercat.service
 endif
 
+completionsdir = $(datadir)/bash-completion/completions
+completions_DATA = ethercat.bash_completion
+
+install-data-hook:
+	cd $(DESTDIR)$(completionsdir); \
+    mv ethercat.bash_completion ethercat
 
 # Any precious variable used inside script_templates should appear here
 expand_script = $(SED) \
