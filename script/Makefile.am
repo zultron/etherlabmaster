@@ -41,6 +41,7 @@ script_templates = \
 
 EXTRA_DIST = \
 	$(script_templates) \
+	ethercat.bash_completion \
 	ifup-eoe.sh
 
 CLEANFILES = \
@@ -57,6 +58,10 @@ completions_DATA = ethercat.bash_completion
 install-data-hook:
 	cd $(DESTDIR)$(completionsdir); \
     mv ethercat.bash_completion ethercat
+
+uninstall-hook:
+	cd $(DESTDIR)$(completionsdir); \
+    rm ethercat
 
 # Any precious variable used inside script_templates should appear here
 expand_script = $(SED) \
