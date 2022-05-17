@@ -28,8 +28,8 @@
  *****************************************************************************/
 
 /**
-   \file
-   Ethernet over EtherCAT (EoE).
+  \file
+  Ethernet over EtherCAT (EoE).
 */
 
 /*****************************************************************************/
@@ -368,10 +368,10 @@ void ec_eoe_run(ec_eoe_t *eoe /**< EoE handler */)
  */
 void ec_eoe_queue(ec_eoe_t *eoe /**< EoE handler */)
 {
-   if (eoe->queue_datagram) {
-       ec_master_queue_datagram_ext(eoe->slave->master, &eoe->datagram);
-       eoe->queue_datagram = 0;
-   }
+    if (eoe->queue_datagram) {
+        ec_master_queue_datagram_ext(eoe->slave->master, &eoe->datagram);
+        eoe->queue_datagram = 0;
+    }
 }
 
 /*****************************************************************************/
