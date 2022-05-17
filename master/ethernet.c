@@ -28,8 +28,8 @@
  *****************************************************************************/
 
 /**
-   \file
-   Ethernet over EtherCAT (EoE).
+  \file
+  Ethernet over EtherCAT (EoE).
 */
 
 /*****************************************************************************/
@@ -107,11 +107,11 @@ static const struct net_device_ops ec_eoedev_ops = {
 static int
 ec_eoedev_set_mac(struct net_device *netdev, void *p)
 {
-   struct sockaddr *addr = p;
+    struct sockaddr *addr = p;
 
-   if (!is_valid_ether_addr(addr->sa_data)) {
-      return -EADDRNOTAVAIL;
-   }
+    if (!is_valid_ether_addr(addr->sa_data)) {
+        return -EADDRNOTAVAIL;
+    }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
     eth_hw_addr_set(netdev, addr->sa_data);
@@ -119,7 +119,7 @@ ec_eoedev_set_mac(struct net_device *netdev, void *p)
     memcpy(netdev->dev_addr, addr->sa_data, netdev->addr_len);
 #endif
 
-   return 0;
+    return 0;
 }
 
 /*****************************************************************************/
@@ -458,10 +458,10 @@ void ec_eoe_run(ec_eoe_t *eoe /**< EoE handler */)
  */
 void ec_eoe_queue(ec_eoe_t *eoe /**< EoE handler */)
 {
-   if (eoe->queue_datagram) {
-       ec_master_queue_datagram_ext(eoe->slave->master, &eoe->datagram);
-       eoe->queue_datagram = 0;
-   }
+    if (eoe->queue_datagram) {
+        ec_master_queue_datagram_ext(eoe->slave->master, &eoe->datagram);
+        eoe->queue_datagram = 0;
+    }
 }
 
 /*****************************************************************************/
