@@ -1,7 +1,3 @@
-stages:
-  - build
-  - documentation
-
 image:
     registry.gitlab.com/etherlab.org/build-container-factory/leap-15.3:linux-syms
 
