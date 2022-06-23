@@ -6,6 +6,10 @@ vim: spelllang=en spell tw=78
 
 -------------------------------------------------------------------------------
 
+Changes in 1.6.0-rc1:
+
+* Support for multiple mailbox protocols at the same time
+
 Changes since 1.5.2:
 
 * Fixed FoE timeout calculation bug.
