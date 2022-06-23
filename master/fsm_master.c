@@ -48,7 +48,7 @@
 
 /** Time difference [ns] to tolerate without setting a new system time offset.
  */
-#define EC_SYSTEM_TIME_TOLERANCE_NS 1000000
+#define EC_SYSTEM_TIME_TOLERANCE_NS 1000
 
 /*****************************************************************************/
 
@@ -69,6 +69,8 @@ void ec_fsm_master_state_dc_measure_delays(ec_fsm_master_t *);
 void ec_fsm_master_state_scan_slave(ec_fsm_master_t *);
 void ec_fsm_master_state_dc_read_offset(ec_fsm_master_t *);
 void ec_fsm_master_state_dc_write_offset(ec_fsm_master_t *);
+void ec_fsm_master_state_dc_reset_filter(ec_fsm_master_t *);
+
 void ec_fsm_master_state_assign_sii(ec_fsm_master_t *);
 void ec_fsm_master_state_write_sii(ec_fsm_master_t *);
 void ec_fsm_master_state_sdo_dictionary(ec_fsm_master_t *);
@@ -332,15 +334,15 @@ void ec_fsm_master_state_broadcast(
     }
 
     if (fsm->rescan_required) {
-        down(&master->scan_sem);
+        ec_lock_down(&master->scan_sem);
         if (!master->allow_scan) {
-            up(&master->scan_sem);
+            ec_lock_up(&master->scan_sem);
         } else {
             unsigned int count = 0, next_dev_slave, ring_position;
             ec_device_index_t dev_idx;
 
             master->scan_busy = 1;
-            up(&master->scan_sem);
+            ec_lock_up(&master->scan_sem);
 
             // clear all slaves and scan the bus
             fsm->rescan_required = 0;
@@ -417,6 +419,7 @@ void ec_fsm_master_state_broadcast(
         // application applied configurations
         if (master->config_changed) {
             master->config_changed = 0;
+            master->dc_offset_valid = 0;
 
             EC_MASTER_DBG(master, 1, "Configuration changed.\n");
 
@@ -524,7 +527,7 @@ int ec_fsm_master_action_process_sdo(
         }
 
         if (!ec_fsm_slave_is_ready(&slave->fsm)) {
-            EC_SLAVE_DBG(slave, 1, "Busy - processing external request!\n");
+            EC_SLAVE_DBG(slave, 2, "Busy - processing external request!\n");
             continue;
         }
 
@@ -805,6 +808,7 @@ void ec_fsm_master_action_configure(
 
     if (master->config_changed) {
         master->config_changed = 0;
+        master->dc_offset_valid = 0;
 
         // abort iterating through slaves,
         // first compensate DC system time offsets,
@@ -822,9 +826,9 @@ void ec_fsm_master_action_configure(
                 || slave->force_config) && !slave->error_flag) {
 
         // Start slave configuration
-        down(&master->config_sem);
+        ec_lock_down(&master->config_sem);
         master->config_busy = 1;
-        up(&master->config_sem);
+        ec_lock_up(&master->config_sem);
 
         if (master->debug_level) {
             char old_state[EC_STATE_STRING_SIZE],
@@ -1163,10 +1167,13 @@ void ec_fsm_master_state_scan_slave(
     master->scan_busy = 0;
     wake_up_interruptible(&master->scan_queue);
 
-    ec_master_calc_dc(master);
-
     // Attach slave configurations
     ec_master_attach_slave_configs(master);
+
+    // Set DC ref slave and calc topology and transmission delays
+    // Note: must come after attach_slave_configs for application
+    //       selected dc_ref_config to return its slave
+    ec_master_calc_dc(master);
 
 #ifdef EC_EOE
     // check if EoE processing has to be started
@@ -1175,6 +1182,7 @@ void ec_fsm_master_state_scan_slave(
 
     if (master->slave_count) {
         master->config_changed = 0;
+        master->dc_offset_valid = 0;
 
         fsm->slave = master->slaves; // begin with first slave
         ec_fsm_master_enter_write_system_times(fsm);
@@ -1230,7 +1238,7 @@ void ec_fsm_master_enter_write_system_times(
 {
     ec_master_t *master = fsm->master;
 
-    if (master->dc_ref_time) {
+    if (master->active) {
 
         while (fsm->slave < master->slaves + master->slave_count) {
             if (!fsm->slave->base_dc_supported
@@ -1244,21 +1252,19 @@ void ec_fsm_master_enter_write_system_times(
             // read DC system time (0x0910, 64 bit)
             //                         gap (64 bit)
             //     and time offset (0x0920, 64 bit)
+            //   and receive delay (0x0928, 32 bit)
             ec_datagram_fprd(fsm->datagram, fsm->slave->station_address,
-                    0x0910, 24);
+                    0x0910, 28);
+            ec_datagram_zero(fsm->datagram);
             fsm->datagram->device_index = fsm->slave->device_index;
             fsm->retries = EC_FSM_RETRIES;
             fsm->state = ec_fsm_master_state_dc_read_offset;
             return;
         }
+        master->dc_offset_valid = 1;
 
     } else {
-        if (master->active) {
-            EC_MASTER_WARN(master, "No application time received up to now,"
-                    " but master already active.\n");
-        } else {
-            EC_MASTER_DBG(master, 1, "No app_time received up to now.\n");
-        }
+        EC_MASTER_DBG(master, 1, "No app_time received up to now.\n");
     }
 
     // scanning and setting system times complete
@@ -1276,26 +1282,21 @@ u64 ec_fsm_master_dc_offset32(
         ec_fsm_master_t *fsm, /**< Master state machine. */
         u64 system_time, /**< System time register. */
         u64 old_offset, /**< Time offset register. */
-        unsigned long jiffies_since_read /**< Jiffies for correction. */
+        u64 app_time_sent /**< Master app time by reading. */
         )
 {
     ec_slave_t *slave = fsm->slave;
-    u32 correction, system_time32, old_offset32, new_offset;
+    u32 system_time32, old_offset32, new_offset;
     s32 time_diff;
 
     system_time32 = (u32) system_time;
     old_offset32 = (u32) old_offset;
 
-    // correct read system time by elapsed time since read operation
-    correction = jiffies_since_read * 1000 / HZ * 1000000;
-    system_time32 += correction;
-    time_diff = (u32) slave->master->app_time - system_time32;
+    time_diff = (u32) app_time_sent - system_time32;
 
     EC_SLAVE_DBG(slave, 1, "DC 32 bit system time offset calculation:"
-            " system_time=%u (corrected with %u),"
-            " app_time=%llu, diff=%i\n",
-            system_time32, correction,
-            slave->master->app_time, time_diff);
+            " system_time=%u, app_time=%llu, diff=%i\n",
+            system_time32, app_time_sent, time_diff);
 
     if (EC_ABS(time_diff) > EC_SYSTEM_TIME_TOLERANCE_NS) {
         new_offset = time_diff + old_offset32;
@@ -1318,23 +1319,18 @@ u64 ec_fsm_master_dc_offset64(
         ec_fsm_master_t *fsm, /**< Master state machine. */
         u64 system_time, /**< System time register. */
         u64 old_offset, /**< Time offset register. */
-        unsigned long jiffies_since_read /**< Jiffies for correction. */
+        u64 app_time_sent /**< Master app time by reading. */
         )
 {
     ec_slave_t *slave = fsm->slave;
-    u64 new_offset, correction;
+    u64 new_offset;
     s64 time_diff;
 
-    // correct read system time by elapsed time since read operation
-    correction = (u64) (jiffies_since_read * 1000 / HZ) * 1000000;
-    system_time += correction;
-    time_diff = fsm->slave->master->app_time - system_time;
+    time_diff = app_time_sent - system_time;
 
     EC_SLAVE_DBG(slave, 1, "DC 64 bit system time offset calculation:"
-            " system_time=%llu (corrected with %llu),"
-            " app_time=%llu, diff=%lli\n",
-            system_time, correction,
-            slave->master->app_time, time_diff);
+            " system_time=%llu, app_time=%llu, diff=%lli\n",
+            system_time, app_time_sent, time_diff);
 
     if (EC_ABS(time_diff) > EC_SYSTEM_TIME_TOLERANCE_NS) {
         new_offset = time_diff + old_offset;
@@ -1358,8 +1354,9 @@ void ec_fsm_master_state_dc_read_offset(
 {
     ec_datagram_t *datagram = fsm->datagram;
     ec_slave_t *slave = fsm->slave;
+    ec_master_t *master = fsm->master;
     u64 system_time, old_offset, new_offset;
-    unsigned long jiffies_since_read;
+    u32 old_delay;
 
     if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--)
         return;
@@ -1380,16 +1377,42 @@ void ec_fsm_master_state_dc_read_offset(
         return;
     }
 
+    if (unlikely(!master->dc_ref_time)) {
+        EC_MASTER_WARN(master, "No app_time received up to now,"
+                    " abort DC time offset calculation.\n");
+        // scanning and setting system times complete
+        ec_master_request_op(master);
+        ec_fsm_master_restart(fsm);
+        return;
+    }
+
     system_time = EC_READ_U64(datagram->data);     // 0x0910
     old_offset = EC_READ_U64(datagram->data + 16); // 0x0920
-    jiffies_since_read = jiffies - datagram->jiffies_sent;
+    old_delay = EC_READ_U32(datagram->data + 24);  // 0x0928
 
     if (slave->base_dc_range == EC_DC_32) {
         new_offset = ec_fsm_master_dc_offset32(fsm,
-                system_time, old_offset, jiffies_since_read);
+                system_time, old_offset, datagram->app_time_sent);
     } else {
         new_offset = ec_fsm_master_dc_offset64(fsm,
-                system_time, old_offset, jiffies_since_read);
+                system_time, old_offset, datagram->app_time_sent);
+    }
+
+    if (new_offset != old_offset
+            && slave->current_state >= EC_SLAVE_STATE_SAFEOP) {
+        // Slave is already active; changing the system time offset could
+        // cause problems.  Leave the offset alone in this case and just
+        // let the normal cyclic sync process gradually adjust it to the
+        // correct time.
+        EC_SLAVE_DBG(slave, 1, "Slave is running; ignoring DC offset change.\n");
+        new_offset = old_offset;
+    }
+
+    if (new_offset == old_offset && slave->transmission_delay == old_delay) {
+        // offsets have not changed; skip write to avoid possible trouble
+        fsm->slave++;
+        ec_fsm_master_enter_write_system_times(fsm);
+        return;
     }
 
     // set DC system time offset and transmission delay
@@ -1426,6 +1449,51 @@ void ec_fsm_master_state_dc_write_offset(
 
     if (datagram->working_counter != 1) {
         EC_SLAVE_ERR(slave, "Failed to set DC system time offset: ");
+        ec_datagram_print_wc_error(datagram);
+        fsm->slave++;
+        ec_fsm_master_enter_write_system_times(fsm);
+        return;
+    }
+
+    // reset DC filter after changing offsets
+    if (slave->current_state >= EC_SLAVE_STATE_SAFEOP) {
+        EC_SLAVE_DBG(slave, 1, "Slave is running; not resetting DC filter.\n");
+        fsm->slave++;
+        ec_fsm_master_enter_write_system_times(fsm);
+    } else {
+        ec_datagram_fpwr(datagram, slave->station_address, 0x0930, 2);
+        EC_WRITE_U16(datagram->data, 0x1000);
+        fsm->datagram->device_index = slave->device_index;
+        fsm->retries = EC_FSM_RETRIES;
+        fsm->state = ec_fsm_master_state_dc_reset_filter;
+    }
+}
+
+/*****************************************************************************/
+
+/** Master state: DC RESET FILTER.
+ */
+void ec_fsm_master_state_dc_reset_filter(
+        ec_fsm_master_t *fsm /**< Master state machine. */
+        )
+{
+    ec_datagram_t *datagram = fsm->datagram;
+    ec_slave_t *slave = fsm->slave;
+
+    if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--)
+        return;
+
+    if (datagram->state != EC_DATAGRAM_RECEIVED) {
+        EC_SLAVE_ERR(slave,
+                "Failed to receive DC reset filter datagram: ");
+        ec_datagram_print_state(datagram);
+        fsm->slave++;
+        ec_fsm_master_enter_write_system_times(fsm);
+        return;
+    }
+
+    if (datagram->working_counter != 1) {
+        EC_SLAVE_ERR(slave, "Failed to reset DC filter: ");
         ec_datagram_print_wc_error(datagram);
         fsm->slave++;
         ec_fsm_master_enter_write_system_times(fsm);

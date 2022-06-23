@@ -57,6 +57,7 @@ noinst_HEADERS = \
 	fsm_soe.c fsm_soe.h \
 	globals.h \
 	ioctl.c ioctl.h \
+	locks.h \
 	mailbox.c mailbox.h \
 	master.c master.h \
 	module.c \

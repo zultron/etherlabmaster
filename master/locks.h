@@ -29,44 +29,52 @@
 
 /**
    \file
-   Mailbox functionality.
+   Abstract locks
 */
 
 /*****************************************************************************/
 
-#ifndef __EC_MAILBOX_H__
-#define __EC_MAILBOX_H__
+#ifndef __EC_LOCKS_H__
+#define __EC_LOCKS_H__
 
-#include "slave.h"
+#include "globals.h"
 
-/*****************************************************************************/
-
-/** Size of the mailbox header.
- */
-#define EC_MBOX_HEADER_SIZE 6
-
-/** Mailbox types.
- *
- * These are used in the 'Type' field of the mailbox header.
- */
-enum {
-    EC_MBOX_TYPE_EOE = 0x02,
-    EC_MBOX_TYPE_COE = 0x03,
-    EC_MBOX_TYPE_FOE = 0x04,
-    EC_MBOX_TYPE_SOE = 0x05,
-    EC_MBOX_TYPE_VOE = 0x0f,
-};
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27)
+#include <linux/semaphore.h>
+#else
+#include <asm/semaphore.h>
+#endif
 
 /*****************************************************************************/
 
-uint8_t *ec_slave_mbox_prepare_send(const ec_slave_t *, ec_datagram_t *,
-                                    uint8_t, size_t);
-int      ec_slave_mbox_prepare_check(const ec_slave_t *, ec_datagram_t *);
-int      ec_slave_mbox_check(const ec_datagram_t *);
-int      ec_slave_mbox_prepare_fetch(const ec_slave_t *, ec_datagram_t *);
-uint8_t *ec_slave_mbox_fetch(const ec_slave_t *, ec_mbox_data_t *,
-                             uint8_t *, size_t *);
+#ifdef EC_USE_RTMUTEX
+
+#include <linux/rtmutex.h>
+
+typedef struct rt_mutex ec_lock_t;
+
+static inline void ec_lock_init(ec_lock_t *sem) { rt_mutex_init(sem); }
+static inline void ec_lock_down(ec_lock_t *sem) { rt_mutex_lock(sem); }
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 34)
+static inline int ec_lock_down_interruptible(ec_lock_t *sem) { return rt_mutex_lock_interruptible(sem); }
+#else
+static inline int ec_lock_down_interruptible(ec_lock_t *sem) { return rt_mutex_lock_interruptible(sem, 1); }
+#endif
+static inline void ec_lock_up(ec_lock_t *sem) { rt_mutex_unlock(sem); }
+
+#else
+
+typedef struct semaphore ec_lock_t;
+
+static inline void ec_lock_init(ec_lock_t *sem) { sema_init(sem, 1); }
+static inline void ec_lock_down(ec_lock_t *sem) { down(sem); }
+static inline int ec_lock_down_interruptible(ec_lock_t *sem) { return down_interruptible(sem); }
+static inline void ec_lock_up(ec_lock_t *sem) { up(sem); }
+
+#endif
 
 /*****************************************************************************/
 
 #endif
+
+/*****************************************************************************/

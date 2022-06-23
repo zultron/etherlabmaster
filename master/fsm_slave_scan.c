@@ -957,6 +957,7 @@ void ec_fsm_slave_scan_enter_preop(
          * sizes. */
         ec_datagram_fprd(fsm->datagram, slave->station_address, 0x0800,
                 EC_SYNC_PAGE_SIZE * 2);
+        ec_datagram_zero(fsm->datagram);
         fsm->retries = EC_FSM_RETRIES;
         fsm->state = ec_fsm_slave_scan_state_sync;
     }
@@ -1045,6 +1046,9 @@ void ec_fsm_slave_scan_state_sync(
     EC_SLAVE_DBG(slave, 1, " TX offset=0x%04x size=%u\n",
             slave->configured_tx_mailbox_offset,
             slave->configured_tx_mailbox_size);
+
+    // allocate memory for mailbox response data for supported mailbox protocols
+    ec_mbox_prot_data_prealloc(slave, slave->sii.mailbox_protocols, slave->configured_tx_mailbox_size);
 
     ec_fsm_slave_scan_enter_pdos(fsm);
 }

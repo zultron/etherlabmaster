@@ -39,6 +39,9 @@ struct ec_master {
 
     ec_domain_t *first_domain;
     ec_slave_config_t *first_config;
+
+    int last_err_64bit_ref_clk_queue;
+    int last_err_64bit_ref_clk;
 };
 
 /*****************************************************************************/

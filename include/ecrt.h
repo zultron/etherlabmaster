@@ -675,6 +675,20 @@ ec_domain_t *ecrt_master_create_domain(
         ec_master_t *master /**< EtherCAT master. */
         );
 
+/** setup the domain's process data memory.
+ *
+ * Call this after all PDO entries have been registered and before activating
+ * the master.
+ *
+ * Call this if you need to access the domain memory before activating the
+ * master
+ *
+ * \return 0 on success, else non-zero.
+ */
+int ecrt_master_setup_domain_memory(
+        ec_master_t *master /**< EtherCAT master. */
+        );
+
 /** Obtains a slave configuration.
  *
  * Creates a slave configuration object for the given \a alias and \a position
@@ -933,6 +947,19 @@ int ecrt_master_activate(
         ec_master_t *master /**< EtherCAT master. */
         );
 
+/** Deactivates the slaves distributed clocks and sends the slaves into PREOP.
+ *
+ * This can be called prior to ecrt_master_deactivate to avoid the slaves
+ * getting sync errors.
+ *
+ * This method should be called in realtime context.
+ *
+ * Note: EoE slaves will not be changed to PREOP.
+ */
+void ecrt_master_deactivate_slaves(
+        ec_master_t *master /**< EtherCAT master. */
+        );
+
 /** Deactivates the master.
  *
  * Removes the bus configuration. All objects created by
@@ -1096,6 +1123,34 @@ void ecrt_master_sync_slave_clocks(
 int ecrt_master_reference_clock_time(
         ec_master_t *master, /**< EtherCAT master. */
         uint32_t *time /**< Pointer to store the queried system time. */
+        );
+
+/** Queues the 64 bit DC reference slave clock time value datagram for
+ * sending.
+ *
+ * The datagram read the 64 bit DC timestamp of the DC reference slave.
+ * (register \a 0x0910:0x0917). The result can be checked with the
+ * ecrt_master_64bit_reference_clock_time() method.
+ */
+void ecrt_master_64bit_reference_clock_time_queue(
+        ec_master_t *master /**< EtherCAT master. */
+        );
+
+/** Get the 64 bit DC reference slave clock time.
+ *
+ * ecrt_master_64bit_reference_clock_time_queue() must be called in the cycle
+ * prior to calling this method
+ *
+ * \attention The returned time is the system time of the reference clock
+ * minus the transmission delay of the reference clock.
+ *
+ * \retval 0 success, system time was written into \a time.
+ * \retval -ENXIO No reference clock found.
+ * \retval -EIO Slave synchronization datagram was not received.
+ */
+int ecrt_master_64bit_reference_clock_time(
+        ec_master_t *master, /**< EtherCAT master. */
+        uint64_t *time /**< Pointer to store the queried time. */
         );
 
 /** Queues the DC synchrony monitoring datagram for sending.

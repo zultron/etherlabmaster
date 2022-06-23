@@ -77,7 +77,7 @@
 
 /** Resulting maximum data size of a single datagram in a frame. */
 #ifdef DEBUG_DATAGRAM_OVERFLOW
-// Define a runt datagram which can be easily overflowed on 
+// Define a runt datagram which can be easily overflowed on
 // available hardware for use when testing ec_domain_finish()
 #define EC_MAX_DATA_SIZE (128)
 #else
@@ -266,7 +266,7 @@ unsigned int ec_master_count(void);
 void ec_print_data(const uint8_t *, size_t);
 void ec_print_data_diff(const uint8_t *, const uint8_t *, size_t);
 size_t ec_state_string(uint8_t, char *, uint8_t);
-ssize_t ec_mac_print(const uint8_t *, char *);
+size_t ec_mac_print(const uint8_t *, char *);
 int ec_mac_is_zero(const uint8_t *);
 
 ec_master_t *ecrt_request_master_err(unsigned int);

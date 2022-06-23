@@ -74,7 +74,9 @@
 #define EC_IOCTL_SLAVE_FOE_WRITE       EC_IOW(0x15, ec_ioctl_slave_foe_t)
 #define EC_IOCTL_SLAVE_SOE_READ       EC_IOWR(0x16, ec_ioctl_slave_soe_read_t)
 #define EC_IOCTL_SLAVE_SOE_WRITE      EC_IOWR(0x17, ec_ioctl_slave_soe_write_t)
+#ifdef EC_EOE
 #define EC_IOCTL_SLAVE_EOE_IP_PARAM    EC_IOW(0x18, ec_ioctl_slave_eoe_ip_t)
+#endif
 #define EC_IOCTL_CONFIG               EC_IOWR(0x19, ec_ioctl_config_t)
 #define EC_IOCTL_CONFIG_PDO           EC_IOWR(0x1a, ec_ioctl_config_pdo_t)
 #define EC_IOCTL_CONFIG_PDO_ENTRY     EC_IOWR(0x1b, ec_ioctl_config_pdo_entry_t)
@@ -148,6 +150,10 @@
 #define EC_IOCTL_VOE_DATA             EC_IOWR(0x5b, ec_ioctl_voe_t)
 #define EC_IOCTL_SET_SEND_INTERVAL     EC_IOW(0x5c, size_t)
 #define EC_IOCTL_SC_OVERLAPPING_IO     EC_IOW(0x5d, ec_ioctl_config_t)
+#define EC_IOCTL_SETUP_DOMAIN_MEMORY   EC_IOR(0x5e, ec_ioctl_master_activate_t)
+#define EC_IOCTL_DEACTIVATE_SLAVES      EC_IO(0x5f)
+#define EC_IOCTL_64_REF_CLK_TIME_QUEUE  EC_IO(0x60)
+#define EC_IOCTL_64_REF_CLK_TIME       EC_IOR(0x61, uint64_t)
 
 /*****************************************************************************/
 
@@ -613,6 +619,7 @@ typedef struct {
 #endif
 #endif
 
+#ifdef EC_EOE
 typedef struct {
     // input
     uint16_t slave_position;
@@ -635,6 +642,7 @@ typedef struct {
 	uint16_t result;
 } ec_ioctl_slave_eoe_ip_t;
 
+#endif
 /*****************************************************************************/
 
 typedef struct {

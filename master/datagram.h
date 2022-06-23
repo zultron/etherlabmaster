@@ -77,7 +77,8 @@ typedef enum {
     EC_DATAGRAM_SENT,      /**< Sent (still in the queue). */
     EC_DATAGRAM_RECEIVED,  /**< Received (dequeued). */
     EC_DATAGRAM_TIMED_OUT, /**< Timed out (dequeued). */
-    EC_DATAGRAM_ERROR      /**< Error while sending/receiving (dequeued). */
+    EC_DATAGRAM_ERROR,     /**< Error while sending/receiving (dequeued). */
+    EC_DATAGRAM_INVALID    /**< Unused and should not be queued (dequeued). */
 } ec_datagram_state_t;
 
 /*****************************************************************************/
@@ -102,6 +103,7 @@ typedef struct {
     cycles_t cycles_sent; /**< Time, when the datagram was sent. */
 #endif
     unsigned long jiffies_sent; /**< Jiffies, when the datagram was sent. */
+    uint64_t app_time_sent; /**< App time, when the datagram was sent. */
 #ifdef EC_HAVE_CYCLES
     cycles_t cycles_received; /**< Time, when the datagram was received. */
 #endif
@@ -111,6 +113,17 @@ typedef struct {
     unsigned long stats_output_jiffies; /**< Last statistics output. */
     char name[EC_DATAGRAM_NAME_SIZE]; /**< Description of the datagram. */
 } ec_datagram_t;
+
+
+/*****************************************************************************/
+
+/** EtherCAT mailbox response data.
+ */
+typedef struct {
+    uint8_t *data;       /**< Mailbox response data. */
+    size_t data_size;    /**< Size of the mailbox response data buffer. */
+    size_t payload_size; /**< Size of the mailbox response payload data. */
+} ec_mbox_data_t;
 
 /*****************************************************************************/
 
@@ -142,6 +155,10 @@ void ec_datagram_print_state(const ec_datagram_t *);
 void ec_datagram_print_wc_error(const ec_datagram_t *);
 void ec_datagram_output_stats(ec_datagram_t *);
 const char *ec_datagram_type_string(const ec_datagram_t *);
+
+void ec_mbox_data_init(ec_mbox_data_t *);
+void ec_mbox_data_clear(ec_mbox_data_t *);
+void ec_mbox_prot_data_prealloc(ec_slave_t *, uint16_t, size_t);
 
 /*****************************************************************************/
 

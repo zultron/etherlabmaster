@@ -272,6 +272,10 @@ void ec_fsm_slave_config_state_init(
     ec_datagram_zero(datagram);
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_slave_config_state_clear_fmmus;
+
+    EC_SLAVE_DBG(slave, 1, "Clearing mailbox check flag...\n");
+
+    ec_read_mbox_lock_clear(slave);
 }
 
 /*****************************************************************************/
@@ -541,6 +545,9 @@ void ec_fsm_slave_config_enter_mbox_sync(
         slave->configured_tx_mailbox_size =
             slave->sii.std_tx_mailbox_size;
     }
+
+    // allocate memory for mailbox response data for supported mailbox protocols
+    ec_mbox_prot_data_prealloc(slave, slave->sii.mailbox_protocols, slave->configured_tx_mailbox_size);
 
     fsm->take_time = 1;
 
@@ -1372,6 +1379,7 @@ void ec_fsm_slave_config_state_dc_cycle(
 
     fsm->jiffies_start = jiffies;
     ec_datagram_fprd(datagram, slave->station_address, 0x092c, 4);
+    ec_datagram_zero(datagram);
     fsm->retries = EC_FSM_RETRIES;
     fsm->state = ec_fsm_slave_config_state_dc_sync_check;
 }
@@ -1388,6 +1396,7 @@ void ec_fsm_slave_config_state_dc_sync_check(
     ec_slave_t *slave = fsm->slave;
     ec_master_t *master = slave->master;
     ec_slave_config_t *config = slave->config;
+    bool negative;
     uint32_t abs_sync_diff;
     unsigned long diff_ms;
     ec_sync_signal_t *sync0 = &config->dc_sync[0];
@@ -1418,6 +1427,7 @@ void ec_fsm_slave_config_state_dc_sync_check(
     }
 
     abs_sync_diff = EC_READ_U32(datagram->data) & 0x7fffffff;
+    negative = (EC_READ_U32(datagram->data) & 0x80000000) != 0;
     diff_ms = (datagram->jiffies_received - fsm->jiffies_start) * 1000 / HZ;
 
     if (abs_sync_diff > EC_DC_MAX_SYNC_DIFF_NS) {
@@ -1429,18 +1439,19 @@ void ec_fsm_slave_config_state_dc_sync_check(
             static unsigned long last_diff_ms = 0;
             if ((diff_ms < last_diff_ms) || (diff_ms >= (last_diff_ms + 100))) {
                 last_diff_ms = diff_ms;
-                EC_SLAVE_DBG(slave, 1, "Sync after %4lu ms: %10u ns\n",
-                        diff_ms, abs_sync_diff);
+                EC_SLAVE_DBG(slave, 1, "Sync after %4lu ms: %10d ns\n",
+                        diff_ms, negative ? -abs_sync_diff: abs_sync_diff);
             }
 
             // check synchrony again
             ec_datagram_fprd(datagram, slave->station_address, 0x092c, 4);
+            ec_datagram_zero(datagram);
             fsm->retries = EC_FSM_RETRIES;
             return;
         }
     } else {
-        EC_SLAVE_DBG(slave, 1, "%u ns difference after %lu ms.\n",
-                abs_sync_diff, diff_ms);
+        EC_SLAVE_DBG(slave, 1, "%d ns difference after %lu ms.\n",
+                negative ? -abs_sync_diff: abs_sync_diff, diff_ms);
     }
 
     // set DC start time (roughly in the future, not in-phase)
