@@ -85,6 +85,8 @@ ec_master_t *ecrt_open_master(unsigned int master_index)
     master->process_data_size = 0;
     master->first_domain = NULL;
     master->first_config = NULL;
+    master->last_err_64bit_ref_clk_queue = 0;
+    master->last_err_64bit_ref_clk = 0;
 
     snprintf(path, MAX_PATH_LEN - 1,
 #ifdef USE_RTDM

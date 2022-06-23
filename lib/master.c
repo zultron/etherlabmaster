@@ -813,6 +813,46 @@ int ecrt_master_reference_clock_time(ec_master_t *master, uint32_t *time)
 
 /****************************************************************************/
 
+void ecrt_master_64bit_reference_clock_time_queue(ec_master_t *master)
+{
+    int ret;
+
+    ret = ioctl(master->fd, EC_IOCTL_64_REF_CLK_TIME_QUEUE, NULL);
+    // we only report the first error of its kind, otherwise the errors
+    // will flood the logs
+    if ((ret != master->last_err_64bit_ref_clk_queue)
+            && EC_IOCTL_IS_ERROR(ret)) {
+        EC_PRINT_ERR("Failed to queue 64-bit ref clock time datagram: %s\n",
+                strerror(EC_IOCTL_ERRNO(ret)));
+    }
+    master->last_err_64bit_ref_clk_queue = ret;
+}
+
+/****************************************************************************/
+
+int ecrt_master_64bit_reference_clock_time(ec_master_t *master,
+        uint64_t *time)
+{
+    int ret;
+
+    ret = ioctl(master->fd, EC_IOCTL_64_REF_CLK_TIME, time);
+
+    // we use EAGAIN to inform the user that the ref clock is not ready yet.
+    // also we only report the first error of its kind, otherwise the errors
+    // will flood the logs
+    if (ret != master->last_err_64bit_ref_clk &&
+            EC_IOCTL_IS_ERROR(ret) &&
+            EC_IOCTL_ERRNO(ret) != EAGAIN) {
+        EC_PRINT_ERR("Failed to get 64-bit reference clock time: %s\n",
+                strerror(EC_IOCTL_ERRNO(ret)));
+    }
+    master->last_err_64bit_ref_clk = ret;
+
+    return ret;
+}
+
+/****************************************************************************/
+
 void ecrt_master_sync_monitor_queue(ec_master_t *master)
 {
     int ret;
