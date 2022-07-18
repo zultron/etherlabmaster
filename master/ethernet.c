@@ -741,7 +741,11 @@ void ec_eoe_state_rx_fetch_data(ec_eoe_t *eoe /**< EoE handler */)
         eoe->rx_skb->dev = eoe->dev;
         eoe->rx_skb->protocol = eth_type_trans(eoe->rx_skb, eoe->dev);
         eoe->rx_skb->ip_summed = CHECKSUM_UNNECESSARY;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
+        if (netif_rx(eoe->rx_skb)) {
+#else
         if (netif_rx_ni(eoe->rx_skb)) {
+#endif
             EC_SLAVE_WARN(eoe->slave, "EoE RX netif_rx failed.\n");
         }
         eoe->rx_skb = NULL;
