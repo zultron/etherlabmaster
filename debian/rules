@@ -26,7 +26,9 @@ default:
 
 override_dh_autoreconf:
 	touch ChangeLog
-	dh_autoreconf
+	mkdir -p m4
+        # Remove `autoreconf -f` arg so `INSTALL` file isn't clobbered
+	dh_autoreconf autoreconf -- -i
 
 override_dh_clean:
 	rm -f ChangeLog
@@ -40,7 +42,7 @@ override_dh_missing:
 	dh_missing --fail-missing
 
 override_dh_installsystemd:
-	mv debian/tmp/usr/lib/${DEB_HOST_GNU_TYPE}/systemd/system/ethercat.service debian/etherlabmaster-dkms.ethercat.service
+	mv debian/tmp/lib/systemd/system/ethercat.service debian/etherlabmaster-dkms.ethercat.service
 	dh_installsystemd --name=ethercat
 
 override_dh_install:
