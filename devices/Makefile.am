@@ -207,6 +207,8 @@ noinst_HEADERS = \
 	r8169-4.4-orig.c \
 	r8169-4.9-ethercat.c \
 	r8169-4.9-orig.c \
+        r8169-4.11-ethercat.c \
+        r8169-4.11-orig.c \
 	r8169-4.14-ethercat.c \
 	r8169-4.14-orig.c
 
