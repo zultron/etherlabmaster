@@ -69,6 +69,25 @@ m4_ifdef([LT_INIT], [LT_INIT], [AC_PROG_LIBTOOL])
 # Kernel modules
 #------------------------------------------------------------------------------
 
+AC_MSG_CHECKING([whether to enable DKMS configuration])
+AC_ARG_ENABLE([dkms],
+    AS_HELP_STRING(
+        [--enable-dkms],
+        [
+            Enable DKMS configuration:  Enable all kernel modules, but
+            disable kernel module build; configure Kbuild to
+            enable/disable individual modules from variables passed
+            from e.g. 'make modules ENABLE_E1000=1' kbuild command
+            line
+        ]
+    ),
+    [],
+    [
+    enable_dkms=no  # default
+    ]
+)
+AC_MSG_RESULT([$enable_dkms])
+
 AC_MSG_CHECKING([whether to build kernel modules])
 
 AC_ARG_ENABLE([kernel],
@@ -87,7 +106,10 @@ AC_ARG_ENABLE([kernel],
     [enablekernel=1]
 )
 
-if test "x$enablekernel" = "x1"; then
+if test $enable_dkms = yes; then
+    enablekernel=0
+    AC_MSG_RESULT([(disabled by --enable-dkms)])
+elif test "x$enablekernel" = "x1"; then
     AC_MSG_RESULT([yes])
 else
     AC_MSG_RESULT([no])
@@ -181,6 +203,8 @@ AC_MSG_RESULT([$INSTALL_MOD_DIR])
 # Generic Ethernet driver
 #------------------------------------------------------------------------------
 
+AC_MSG_CHECKING([whether to build the generic driver])
+
 AC_ARG_ENABLE([generic],
     AS_HELP_STRING([--enable-generic],
                    [Enable generic Ethernet driver]),
@@ -197,12 +221,23 @@ AC_ARG_ENABLE([generic],
     [enablegeneric=$enablekernel]
 )
 
+if test $enable_dkms = yes; then
+    enablegeneric=1
+    AC_MSG_RESULT([(enabling for --enable-dkms)])
+elif test "x${enablegeneric}" = "x1"; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
+
 AM_CONDITIONAL(ENABLE_GENERIC, test "x$enablegeneric" = "x1")
 AC_SUBST(ENABLE_GENERIC,[$enablegeneric])
 
 #------------------------------------------------------------------------------
 # 8139too driver
 #------------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to build the 8139too driver])
 
 AC_ARG_ENABLE([8139too],
     AS_HELP_STRING([--enable-8139too],
@@ -220,6 +255,15 @@ AC_ARG_ENABLE([8139too],
     [enable8139too=$enablekernel]
 )
 
+if test $enable_dkms = yes; then
+    enable8139too='$(ENABLE_8139TOO)'
+    AC_MSG_RESULT([(dynamic configuration for --enable-dkms)])
+elif test "${enable8139too}" = 1; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
+
 AM_CONDITIONAL(ENABLE_8139TOO, test "x$enable8139too" = "x1")
 AC_SUBST(ENABLE_8139TOO,[$enable8139too])
 
@@ -234,8 +278,10 @@ AC_ARG_WITH([8139too-kernel],
     ]
 )
 
-if test "x${enable8139too}" = "x1"; then
-    AC_MSG_CHECKING([for kernel for 8139too driver])
+if test $enable_dkms = yes; then
+    kernel8139too='$(KERNEL_8139TOO)'
+elif test "x${enable8139too}" = "x1"; then
+    AC_MSG_CHECKING([8139too kernel driver source version])
 
     kernels=`ls -1 ${srcdir}/devices/ | grep -oE "^8139too-.*-" | cut -d "-" -f 2 | uniq`
     found=0
@@ -257,6 +303,8 @@ AC_SUBST(KERNEL_8139TOO,[$kernel8139too])
 # e100 driver
 #------------------------------------------------------------------------------
 
+AC_MSG_CHECKING([whether to build the e100 driver])
+
 AC_ARG_ENABLE([e100],
     AS_HELP_STRING([--enable-e100],
                    [Enable e100 driver]),
@@ -273,6 +321,15 @@ AC_ARG_ENABLE([e100],
     [enablee100=0] # disabled by default
 )
 
+if test $enable_dkms = yes; then
+    enablee100='$(ENABLE_E100)'
+    AC_MSG_RESULT([(dynamic configuration for --enable-dkms)])
+elif test "${enablee100}" = 1; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
+
 AM_CONDITIONAL(ENABLE_E100, test "x$enablee100" = "x1")
 AC_SUBST(ENABLE_E100,[$enablee100])
 
@@ -287,8 +344,10 @@ AC_ARG_WITH([e100-kernel],
     ]
 )
 
-if test "x${enablee100}" = "x1"; then
-    AC_MSG_CHECKING([for kernel for e100 driver])
+if test $enable_dkms = yes; then
+    kernele100='$(KERNEL_E100)'
+elif test "x${enablee100}" = "x1"; then
+    AC_MSG_CHECKING([e100 kernel driver version])
 
     kernels=`ls -1 ${srcdir}/devices/ | grep -oE "^e100-.*-" | cut -d "-" -f 2 | uniq`
     found=0
@@ -310,6 +369,8 @@ AC_SUBST(KERNEL_E100,[$kernele100])
 # e1000 driver
 #------------------------------------------------------------------------------
 
+AC_MSG_CHECKING([whether to build the e1000 driver])
+
 AC_ARG_ENABLE([e1000],
     AS_HELP_STRING([--enable-e1000],
                    [Enable e1000 driver]),
@@ -326,6 +387,15 @@ AC_ARG_ENABLE([e1000],
     [enablee1000=0] # disabled by default
 )
 
+if test $enable_dkms = yes; then
+    enablee1000='$(ENABLE_E1000)'
+    AC_MSG_RESULT([(dynamic configuration for --enable-dkms)])
+elif test "${enablee1000}" = 1; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
+
 AM_CONDITIONAL(ENABLE_E1000, test "x$enablee1000" = "x1")
 AC_SUBST(ENABLE_E1000,[$enablee1000])
 
@@ -340,9 +410,10 @@ AC_ARG_WITH([e1000-kernel],
     ]
 )
 
-if test "x${enablee1000}" = "x1"; then
-    AC_MSG_CHECKING([for kernel for e1000 driver])
-
+if test $enable_dkms = yes; then
+    kernele1000='$(KERNEL_E1000)'
+elif test "x${enablee1000}" = "x1"; then
+    AC_MSG_CHECKING([e1000 kernel driver source version])
     kernels=`ls -1 ${srcdir}/devices/e1000/ | grep -oE "^e1000_main-.*" | cut -d "-" -f 2 | uniq`
     found=0
     for k in $kernels; do
@@ -363,6 +434,8 @@ AC_SUBST(KERNEL_E1000,[$kernele1000])
 # e1000e driver
 #------------------------------------------------------------------------------
 
+AC_MSG_CHECKING([whether to build the e1000e driver])
+
 AC_ARG_ENABLE([e1000e],
     AS_HELP_STRING([--enable-e1000e],
                    [Enable e1000e driver]),
@@ -378,6 +451,15 @@ AC_ARG_ENABLE([e1000e],
     ],
     [enablee1000e=0] # disabled by default
 )
+
+if test $enable_dkms = yes; then
+    enablee1000e='$(ENABLE_E1000E)'
+    AC_MSG_RESULT([(dynamic configuration for --enable-dkms)])
+elif test "${enablee1000e}" = 1; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
 
 AM_CONDITIONAL(ENABLE_E1000E, test "x$enablee1000e" = "x1")
 AC_SUBST(ENABLE_E1000E,[$enablee1000e])
@@ -395,8 +477,10 @@ AC_ARG_WITH([e1000e-kernel],
 
 e1000elayout=0
 
-if test "x${enablee1000e}" = "x1"; then
-    AC_MSG_CHECKING([for kernel for e1000e driver])
+if test $enable_dkms = yes; then
+    kernele1000e='$(KERNEL_E1000E)'
+elif test "x${enablee1000e}" = "x1"; then
+    AC_MSG_CHECKING([e1000e kernel driver source version])
 
     kernels=`ls -1 ${srcdir}/devices/e1000e/ | grep -oE "^netdev-.*" | cut -d "-" -f 2 | uniq`
     found=0
@@ -410,23 +494,6 @@ if test "x${enablee1000e}" = "x1"; then
     fi
 
     AC_MSG_RESULT([$kernele1000e])
-
-    # check for e1000e file layout (changed in kernel 3.4 and 3.10)
-    AC_MSG_CHECKING([for e1000e source layout])
-
-    file34="${srcdir}/devices/e1000e/80003es2lan-$kernele1000e-ethercat.c"
-    file310="${srcdir}/devices/e1000e/ptp-$kernele1000e-ethercat.c"
-
-    if test -r "$file310"; then
-        AC_MSG_RESULT([>= 3.10])
-        e1000elayout=2
-    elif test -r "$file34"; then
-        AC_MSG_RESULT([>= 3.4])
-        e1000elayout=1
-    else
-        AC_MSG_RESULT([before 3.4])
-    fi
-
 fi
 
 AC_SUBST(KERNEL_E1000E,[$kernele1000e])
@@ -435,6 +502,8 @@ AC_SUBST(E1000E_LAYOUT, [$e1000elayout])
 #------------------------------------------------------------------------------
 # igb driver
 #------------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to build the igb driver])
 
 AC_ARG_ENABLE([igb],
     AS_HELP_STRING([--enable-igb],
@@ -452,6 +521,15 @@ AC_ARG_ENABLE([igb],
     [enableigb=0] # disabled by default
 )
 
+if test $enable_dkms = yes; then
+    enableigb='$(ENABLE_IGB)'
+    AC_MSG_RESULT([(dynamic configuration for --enable-dkms)])
+elif test "${enableigb}" = 1; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
+
 AM_CONDITIONAL(ENABLE_IGB, test "x$enableigb" = "x1")
 AC_SUBST(ENABLE_IGB,[$enableigb])
 
@@ -467,8 +545,10 @@ AC_ARG_WITH([igb-kernel],
     ]
 )
 
-if test "x${enableigb}" = "x1"; then
-    AC_MSG_CHECKING([for kernel for igb driver])
+if test $enable_dkms = yes; then
+    kerneligb='$(KERNEL_IGB)'
+elif test "x${enableigb}" = "x1"; then
+    AC_MSG_CHECKING([igb kernel driver source version])
 
     if test ! -f "${srcdir}/devices/igb/igb_main-${kerneligb}-orig.c"; then
         AC_MSG_ERROR([kernel $kerneligb not available for igb driver!])
@@ -482,6 +562,8 @@ AC_SUBST(KERNEL_IGB,[$kerneligb])
 #------------------------------------------------------------------------------
 # cx2100 driver
 #------------------------------------------------------------------------------
+
+AC_MSG_CHECKING([whether to build the cx2100 driver])
 
 AC_ARG_ENABLE([cx2100],
     AS_HELP_STRING([--enable-cx2100],
@@ -499,6 +581,15 @@ AC_ARG_ENABLE([cx2100],
     [enablecx2100=0] # disabled by default
 )
 
+if test $enable_dkms = yes; then
+    enablecx2100='$(ENABLE_CX2100)'
+    AC_MSG_RESULT([(dynamic configuration for --enable-dkms)])
+elif test "${enablecx2100}" = 1; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
+
 AM_CONDITIONAL(ENABLE_CX2100, test "x$enablecx2100" = "x1")
 AC_SUBST(ENABLE_CX2100,[$enablecx2100])
 
@@ -515,8 +606,10 @@ AC_ARG_WITH([cx2100-kernel],
     ]
 )
 
-if test "x${enablecx2100}" = "x1"; then
-    AC_MSG_CHECKING([for kernel for cx2100 driver])
+if test $enable_dkms = yes; then
+    kernelcx2100='$(KERNEL_CX2100)'
+elif test "x${enablecx2100}" = "x1"; then
+    AC_MSG_CHECKING([cx2100 kernel driver source version])
 
     kernels=`ls -1 ${srcdir}/devices/cx2100/ | grep -oE "^cx2100-.*" | cut -d "-" -f 2 | uniq`
     found=0
@@ -538,6 +631,8 @@ AC_SUBST(KERNEL_CX2100,[$kernelcx2100])
 # r8169 driver
 #------------------------------------------------------------------------------
 
+AC_MSG_CHECKING([whether to build the r8169 driver])
+
 AC_ARG_ENABLE([r8169],
     AS_HELP_STRING([--enable-r8169],
                    [Enable r8169 driver]),
@@ -554,6 +649,15 @@ AC_ARG_ENABLE([r8169],
     [enable_r8169=0] # disabled by default
 )
 
+if test $enable_dkms = yes; then
+    enable_r8169='$(ENABLE_R8169)'
+    AC_MSG_RESULT([(dynamic configuration for --enable-dkms)])
+elif test "${enable_r8169}" = 1; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
+
 AM_CONDITIONAL(ENABLE_R8169, test "x$enable_r8169" = "x1")
 AC_SUBST(ENABLE_R8169,[$enable_r8169])
 
@@ -568,8 +672,10 @@ AC_ARG_WITH([r8169-kernel],
     ]
 )
 
-if test "x${enable_r8169}" = "x1"; then
-    AC_MSG_CHECKING([for kernel for r8169 driver])
+if test $enable_dkms = yes; then
+    kernel_r8169='$(KERNEL_R8169)'
+elif test "x${enabler8169}" = "x1"; then
+    AC_MSG_CHECKING([r8169 kernel driver source version])
 
     kernels=`ls -1 ${srcdir}/devices/ | grep -oE "^r8169-.*-" | cut -d "-" -f 2 | uniq`
     found=0
@@ -591,6 +697,8 @@ AC_SUBST(KERNEL_R8169,[$kernel_r8169])
 # r8152 driver
 #------------------------------------------------------------------------------
 
+AC_MSG_CHECKING([whether to build the r8152 driver])
+
 AC_ARG_ENABLE([r8152],
     AS_HELP_STRING([--enable-r8152],
                    [Enable r8152 driver]),
@@ -606,6 +714,15 @@ AC_ARG_ENABLE([r8152],
     ],
     [enable_r8152=0] # disabled by default
 )
+
+if test $enable_dkms = yes; then
+    enable_r8152='$(ENABLE_R8152)'
+    AC_MSG_RESULT([(dynamic configuration for --enable-dkms)])
+elif test "${enable_r8152}" = 1; then
+    AC_MSG_RESULT([yes])
+else
+    AC_MSG_RESULT([no])
+fi
 
 AM_CONDITIONAL(ENABLE_R8152, test "x$enable_r8152" = "x1")
 AC_SUBST(ENABLE_R8152,[$enable_r8152])
@@ -623,8 +740,10 @@ AC_ARG_WITH([r8152-kernel],
     ]
 )
 
-if test "x${enable_r8152}" = "x1"; then
-    AC_MSG_CHECKING([for kernel for r8152 driver])
+if test $enable_dkms = yes; then
+    kernel_r8152='$(KERNEL_R8152)'
+elif test "x${enabler8152}" = "x1"; then
+    AC_MSG_CHECKING([r8152 kernel driver source version])
 
     kernels=`ls -1 ${srcdir}/devices/ | grep -oE "^r8152-.*-" | cut -d "-" -f 2 | uniq`
     found=0
@@ -664,7 +783,10 @@ AC_ARG_ENABLE([ccat],
     [enableccat=0] # disabled by default
 )
 
-if test "x${enableccat}" = "x1"; then
+if test $enable_dkms = yes; then
+    enableccat='$(ENABLE_CCAT)'
+    AC_MSG_RESULT([(dynamic configuration for --enable-dkms)])
+elif test "${enableccat}" = 1; then
     AC_MSG_RESULT([yes])
 else
     AC_MSG_RESULT([no])

@@ -7,9 +7,21 @@ KBUILD = $(MAKE) -C "$(LINUX_SOURCE_DIR)" M="$(abs_srcdir)" INSTALL_MOD_DIR="$(I
 
 
 modules:
+	@if test -z "$(LINUX_SOURCE_DIR)"; then \
+	    echo "ERROR:  LINUX_SOURCE_DIR unset" >&2; \
+	    echo "ERROR:  Add configure options to build/install modules?" >&2; \
+	    echo "ERROR:  ./configure --enable-kernel --with-linux-dir=[...]" >&2; \
+	    exit 1; \
+	fi
 	$(KBUILD) modules
 
 modules_install:
+	@if test -z "$(LINUX_SOURCE_DIR)"; then \
+	    echo "ERROR:  LINUX_SOURCE_DIR unset" >&2; \
+	    echo "ERROR:  Add configure options to build/install modules?" >&2; \
+	    echo "ERROR:  ./configure --enable-kernel --with-linux-dir=[...]" >&2; \
+	    exit 1; \
+	fi
 	$(KBUILD) modules_install
 
 
