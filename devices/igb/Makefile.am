@@ -48,6 +48,10 @@ EXTRA_DIST = \
 	e1000_82575-4.9-ethercat.h \
 	e1000_82575-4.9-orig.c \
 	e1000_82575-4.9-orig.h \
+	e1000_82575-4.11-ethercat.c \
+	e1000_82575-4.11-ethercat.h \
+	e1000_82575-4.11-orig.c \
+	e1000_82575-4.11-orig.h \
 	e1000_82575-4.14-ethercat.c \
 	e1000_82575-4.14-ethercat.h \
 	e1000_82575-4.14-orig.c \
@@ -66,6 +70,8 @@ EXTRA_DIST = \
 	e1000_defines-4.4-orig.h \
 	e1000_defines-4.9-ethercat.h \
 	e1000_defines-4.9-orig.h \
+	e1000_defines-4.11-ethercat.h \
+	e1000_defines-4.11-orig.h \
 	e1000_defines-4.14-ethercat.h \
 	e1000_defines-4.14-orig.h \
 	e1000_defines-4.19-ethercat.h \
@@ -80,6 +86,8 @@ EXTRA_DIST = \
 	e1000_hw-4.4-orig.h \
 	e1000_hw-4.9-ethercat.h \
 	e1000_hw-4.9-orig.h \
+	e1000_hw-4.11-ethercat.h \
+	e1000_hw-4.11-orig.h \
 	e1000_hw-4.14-ethercat.h \
 	e1000_hw-4.14-orig.h \
 	e1000_hw-4.19-ethercat.h \
@@ -104,6 +112,10 @@ EXTRA_DIST = \
 	e1000_i210-4.9-ethercat.h \
 	e1000_i210-4.9-orig.c \
 	e1000_i210-4.9-orig.h \
+	e1000_i210-4.11-ethercat.c \
+	e1000_i210-4.11-ethercat.h \
+	e1000_i210-4.11-orig.c \
+	e1000_i210-4.11-orig.h \
 	e1000_i210-4.14-ethercat.c \
 	e1000_i210-4.14-ethercat.h \
 	e1000_i210-4.14-orig.c \
@@ -132,6 +144,10 @@ EXTRA_DIST = \
 	e1000_mac-4.9-ethercat.h \
 	e1000_mac-4.9-orig.c \
 	e1000_mac-4.9-orig.h \
+	e1000_mac-4.11-ethercat.c \
+	e1000_mac-4.11-ethercat.h \
+	e1000_mac-4.11-orig.c \
+	e1000_mac-4.11-orig.h \
 	e1000_mac-4.14-ethercat.c \
 	e1000_mac-4.14-ethercat.h \
 	e1000_mac-4.14-orig.c \
@@ -160,6 +176,10 @@ EXTRA_DIST = \
 	e1000_mbx-4.9-ethercat.h \
 	e1000_mbx-4.9-orig.c \
 	e1000_mbx-4.9-orig.h \
+	e1000_mbx-4.11-ethercat.c \
+	e1000_mbx-4.11-ethercat.h \
+	e1000_mbx-4.11-orig.c \
+	e1000_mbx-4.11-orig.h \
 	e1000_mbx-4.14-ethercat.c \
 	e1000_mbx-4.14-ethercat.h \
 	e1000_mbx-4.14-orig.c \
@@ -188,6 +208,10 @@ EXTRA_DIST = \
 	e1000_nvm-4.9-ethercat.h \
 	e1000_nvm-4.9-orig.c \
 	e1000_nvm-4.9-orig.h \
+	e1000_nvm-4.11-ethercat.c \
+	e1000_nvm-4.11-ethercat.h \
+	e1000_nvm-4.11-orig.c \
+	e1000_nvm-4.11-orig.h \
 	e1000_nvm-4.14-ethercat.c \
 	e1000_nvm-4.14-ethercat.h \
 	e1000_nvm-4.14-orig.c \
@@ -216,6 +240,10 @@ EXTRA_DIST = \
 	e1000_phy-4.9-ethercat.h \
 	e1000_phy-4.9-orig.c \
 	e1000_phy-4.9-orig.h \
+	e1000_phy-4.11-ethercat.c \
+	e1000_phy-4.11-ethercat.h \
+	e1000_phy-4.11-orig.c \
+	e1000_phy-4.11-orig.h \
 	e1000_phy-4.14-ethercat.c \
 	e1000_phy-4.14-ethercat.h \
 	e1000_phy-4.14-orig.c \
@@ -234,6 +262,8 @@ EXTRA_DIST = \
 	e1000_regs-4.4-orig.h \
 	e1000_regs-4.9-ethercat.h \
 	e1000_regs-4.9-orig.h \
+	e1000_regs-4.11-ethercat.h \
+	e1000_regs-4.11-orig.h \
 	e1000_regs-4.14-ethercat.h \
 	e1000_regs-4.14-orig.h \
 	e1000_regs-4.19-ethercat.h \
@@ -248,6 +278,8 @@ EXTRA_DIST = \
 	igb-4.4-orig.h \
 	igb-4.9-ethercat.h \
 	igb-4.9-orig.h \
+	igb-4.11-ethercat.h \
+	igb-4.11-orig.h \
 	igb-4.14-ethercat.h \
 	igb-4.14-orig.h \
 	igb-4.19-ethercat.h \
@@ -264,6 +296,8 @@ EXTRA_DIST = \
 	igb_ethtool-4.4-orig.c \
 	igb_ethtool-4.9-ethercat.c \
 	igb_ethtool-4.9-orig.c \
+	igb_ethtool-4.11-ethercat.c \
+	igb_ethtool-4.11-orig.c \
 	igb_ethtool-4.14-ethercat.c \
 	igb_ethtool-4.14-orig.c \
 	igb_ethtool-4.19-ethercat.c \
@@ -280,6 +314,8 @@ EXTRA_DIST = \
 	igb_hwmon-4.4-orig.c \
 	igb_hwmon-4.9-ethercat.c \
 	igb_hwmon-4.9-orig.c \
+	igb_hwmon-4.11-ethercat.c \
+	igb_hwmon-4.11-orig.c \
 	igb_hwmon-4.14-ethercat.c \
 	igb_hwmon-4.14-orig.c \
 	igb_hwmon-4.19-ethercat.c \
@@ -296,6 +332,8 @@ EXTRA_DIST = \
 	igb_main-4.4-orig.c \
 	igb_main-4.9-ethercat.c \
 	igb_main-4.9-orig.c \
+	igb_main-4.11-ethercat.c \
+	igb_main-4.11-orig.c \
 	igb_main-4.14-ethercat.c \
 	igb_main-4.14-orig.c \
 	igb_main-4.19-ethercat.c \
@@ -312,6 +350,8 @@ EXTRA_DIST = \
 	igb_ptp-4.4-orig.c \
 	igb_ptp-4.9-ethercat.c \
 	igb_ptp-4.9-orig.c \
+	igb_ptp-4.11-ethercat.c \
+	igb_ptp-4.11-orig.c
 	igb_ptp-4.14-ethercat.c \
 	igb_ptp-4.14-orig.c \
 	igb_ptp-4.19-ethercat.c \
