@@ -6,6 +6,9 @@ MODCONF=/etc/modprobe.d/ethercat.conf
 MODLOAD=/etc/modules-load.d/ethercat.conf
 IFACES=/etc/network/interfaces.d/ethercat
 
+# If no systemd-modules-load.service, write to temporary file instead
+test -d $(dirname $MODLOAD) || MODLOAD=/tmp/ethercat.conf
+
 #------------------------------------------------------------------------------
 
 ETHERCAT_CONFIG=/etc/default/ethercat
