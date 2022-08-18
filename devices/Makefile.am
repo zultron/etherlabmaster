@@ -210,6 +210,16 @@ noinst_HEADERS = \
         r8169-4.11-ethercat.c \
         r8169-4.11-orig.c \
 	r8169-4.14-ethercat.c \
-	r8169-4.14-orig.c
+	r8169-4.14-orig.c \
+	r8169-5.10-ethercat.h \
+	r8169-5.10-orig.h \
+	r8169_firmware-5.10-ethercat.c \
+	r8169_firmware-5.10-ethercat.h \
+	r8169_firmware-5.10-orig.c \
+	r8169_firmware-5.10-orig.h \
+	r8169_main-5.10-ethercat.c \
+	r8169_main-5.10-orig.c \
+	r8169_phy_config-5.10-ethercat.c \
+	r8169_phy_config-5.10-orig.c
 
 #------------------------------------------------------------------------------

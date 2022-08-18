@@ -79,10 +79,18 @@ ifeq (@ENABLE_CX2100@,1)
 endif
 
 ifeq (@ENABLE_R8169@,1)
-	EC_R8169_OBJ := r8169-@KERNEL_R8169@-ethercat.o
+	ifeq ($(shell test $(VERSION) -lt 5 && echo y),y)
+	    EC_R8169_OBJ := r8169-@KERNEL_R8169@-ethercat.o
+	    CFLAGS_$(EC_R8169_OBJ) = -DREV=$(REV)
+	else
+	    EC_R8169_OBJ := \
+                r8169_main-@KERNEL_R8169@-ethercat.o \
+                r8169_phy_config-@KERNEL_R8169@-ethercat.o \
+                r8169_firmware-@KERNEL_R8169@-ethercat.o
+            CFLAGS_r8169_main-@KERNEL_R8169@-ethercat.o = -DREV=$(REV)
+        endif
 	obj-m += ec_r8169.o
 	ec_r8169-objs := $(EC_R8169_OBJ)
-	CFLAGS_$(EC_R8169_OBJ) = -DREV=$(REV)
 endif
 
 ifeq (@ENABLE_R8152@,1)
