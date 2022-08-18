@@ -61,7 +61,11 @@ add_module devices/e1000/ec_e1000 devices/e1000/e1000-@KVER@-ethercat.h
 add_module devices/e1000e/ec_e1000e devices/e1000e/e1000-@KVER@-ethercat.h
 add_module devices/igb/ec_igb devices/igb/igb-@KVER@-ethercat.h
 add_module devices/cx2100/ec_cx2100 devices/cx2100/cx2100-@KVER@-ethercat.c
-add_module devices/ec_r8169 devices/r8169-@KVER@-ethercat.c
+if test $KVER1 -lt 5; then
+    add_module devices/ec_r8169 devices/r8169-@KVER@-ethercat.c
+else
+    add_module devices/ec_r8169 devices/r8169-@KVER@-ethercat.h
+fi
 add_module devices/ec_r8152 devices/r8152-@KVER@-ethercat.c
 
 POST_BUILD="postbld \${kernel_source_dir} $dkms_tree/$PACKAGE_NAME/$PACKAGE_VERSION/build"
