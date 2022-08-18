@@ -52,14 +52,12 @@
 #include "datagram.h"
 #include "mailbox.h"
 
-#ifdef EC_EOE
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
 #include <uapi/linux/sched/types.h> // struct sched_param
 #include <linux/sched/types.h> // sched_setscheduler
 #include <linux/sched/signal.h> // signal_pending
 #endif
 #include "ethernet.h"
-#endif
 
 #include "master.h"
 
