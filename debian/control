@@ -2,8 +2,8 @@ Source: etherlabmaster
 Section: misc
 Priority: optional
 Maintainer: Jakub Fišer <jakub.fiser@eryaf.com>
-Build-Depends: debhelper (>= 12),
-               debhelper-compat (=12),
+Build-Depends: debhelper (>= 9),
+               dh-autoreconf,
                dkms,
                gettext,
                autoconf,
