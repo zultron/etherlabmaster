@@ -40,6 +40,21 @@ REV := $(shell if test -s $(TOPDIR)/revision; then \
 	fi)
 
 ifeq (@ENABLE_E1000E@,1)
+        # Check for e1000e file layout (changed in kernel 3.4 and 3.10)
+	ifeq ($(shell test $(VERSION) -gt 3 && echo y),y)
+		E1000E_LAYOUT = 2
+	else # VERSION <= 3
+	  ifeq ($(shell test ( $(VERSION) -eq 3 -a $(PATCHLEVEL) -ge 10 ) && echo y),y)
+		E1000E_LAYOUT = 2
+	  else # VERSION <= 3 or VERSION = 3, PATCHLEVEL < 10
+	    ifeq ($(shell test ( $(VERSION) -eq 3 -a $(PATCHLEVEL) -ge 4 ) && echo y),y)
+		E1000E_LAYOUT = 1
+	    else # VERSION <= 3 or VERSION = 3, PATCHLEVEL < 4
+		E1000E_LAYOUT = 0
+	    endif
+	  endif
+	endif
+
 	EC_E1000E_OBJ := \
 		82571-@KERNEL_E1000E@-ethercat.o \
 		ethtool-@KERNEL_E1000E@-ethercat.o \
@@ -48,7 +63,7 @@ ifeq (@ENABLE_E1000E@,1)
 		param-@KERNEL_E1000E@-ethercat.o \
 		phy-@KERNEL_E1000E@-ethercat.o
 
-	ifeq (@E1000E_LAYOUT@,2)
+	ifeq ($(E1000E_LAYOUT),2)
 		EC_E1000E_OBJ += \
 			80003es2lan-@KERNEL_E1000E@-ethercat.o \
 			mac-@KERNEL_E1000E@-ethercat.o \
@@ -57,7 +72,7 @@ ifeq (@ENABLE_E1000E@,1)
 			ptp-@KERNEL_E1000E@-ethercat.o
 	endif
 
-	ifeq (@E1000E_LAYOUT@,1)
+	ifeq ($(E1000E_LAYOUT),1)
 		EC_E1000E_OBJ += \
 			80003es2lan-@KERNEL_E1000E@-ethercat.o \
 			mac-@KERNEL_E1000E@-ethercat.o \
@@ -65,7 +80,7 @@ ifeq (@ENABLE_E1000E@,1)
 			nvm-@KERNEL_E1000E@-ethercat.o
 	endif
 
-	ifeq (@E1000E_LAYOUT@,0)
+	ifeq ($(E1000E_LAYOUT),0)
 		EC_E1000E_OBJ += \
 			es2lan-@KERNEL_E1000E@-ethercat.o \
 			lib-@KERNEL_E1000E@-ethercat.o
