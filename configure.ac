@@ -48,7 +48,13 @@ AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_MACRO_DIR([m4])
 AC_PROG_SED
 PKG_PROG_PKG_CONFIG
-PKG_INSTALLDIR()
+m4_ifdef([PKG_INSTALLDIR],[
+    PKG_INSTALLDIR()
+],[
+    dnl On Ubuntu Trusty, pkg-config version <27, so PKG_INSTALLDIR
+    dnl macro not available
+    AC_SUBST(pkgconfigdir,[/usr/lib/pkgconfig])
+])
 
 #------------------------------------------------------------------------------
 # Global
