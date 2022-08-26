@@ -1,3 +1,32 @@
+etherlabmaster (1:1.5~git20190614.1+gl20190904.1+mds20210617.4) unstable; urgency=medium
+
+  * Restore support for older Ubuntu Trusty 14.04 distribution:
+  * - Fix build failure related to `#include` in `master.c`
+  * - Fix build on systems with pkg-config < v.27
+  * - Various other packaging tweaks
+  * Add flexible DKMS RT NIC config to packaging, w/support from autoconf
+  * - Add `./configure --enable-dkms` to template configurable `Kbuild` files
+  * - Add dynamic DKMS config to packaging and update rules
+  * Add igb and r8169 drivers for kernel 5.10 and 4.11
+
+ -- John Morris <john@zultron.com>  Fri, 26 Aug 2022 12:22:10 -0500
+
+etherlabmaster (1:1.5~git20190614.1+gl20190904.1+mds20210617.3) unstable; urgency=medium
+
+  * debian/control:  Fix broken etherlabmaster-dev Depends:
+  * debian/rules:  Fix changelog version extraction
+  * Remove package `linux-headers-*` dependencies from `debian/control`
+  * .gitignore `debian/` package build artifacts
+
+ -- John Morris <john@zultron.com>  Wed, Sep 29 13:51:57 2021 -0500
+
+etherlabmaster (1:1.5~git20190614.1+gl20190904.1+mds20210617.2) unstable; urgency=medium
+
+  * Rename & restructure packages to follow Debian packaging guidelines
+  * Update packaging for Debian 11 Bullseye
+
+ -- Jakub Fišer <jakub.fiser@eryaf.com>  Mon, Sep 20 20:59:49 2021 +0200
+
 etherlabmaster (1:1.5~git20190614.1+gl20190904.1+mds20210617.1) buster; urgency=low
 
   * moved to git
