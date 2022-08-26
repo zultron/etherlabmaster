@@ -4716,12 +4716,12 @@ static void ec_poll(struct net_device *dev)
 	status = rtl_get_events(tp);
 	rtl_ack_events(tp, status & ~tp->event_slow);
 
-	if (status & RTL_EVENT_NAPI_RX) {
-            rtl_rx(dev, tp, 100); // FIXME
+	if (status & (RxOK | RxErr)) {
+            rtl_rx(dev, tp, NAPI_POLL_WEIGHT);
         }
 
-	if (status & RTL_EVENT_NAPI_TX) {
-            rtl_tx(dev, tp, 100); // FIXME
+	if (status & (TxOK | TxErr)) {
+            rtl_tx(dev, tp, NAPI_POLL_WEIGHT);
         }
 
 	if (jiffies - tp->ec_watchdog_jiffies >= 2 * HZ) {
