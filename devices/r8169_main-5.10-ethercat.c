@@ -4714,7 +4714,7 @@ static void ec_poll(struct net_device *dev)
 	u16 status;
 
 	status = rtl_get_events(tp);
-	rtl_ack_events(tp, status & ~tp->event_slow);
+	rtl_ack_events(tp, status);
 
 	if (status & (RxOK | RxErr)) {
             rtl_rx(dev, tp, NAPI_POLL_WEIGHT);
