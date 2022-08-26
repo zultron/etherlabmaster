@@ -3047,7 +3047,7 @@ void ec_poll(struct net_device *netdev)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	int i;
-	int budget = 64;
+	int budget = NAPI_POLL_WEIGHT;
 
 	if (jiffies - adapter->ec_watchdog_jiffies >= 2 * HZ) {
 		struct e1000_hw *hw = &adapter->hw;
@@ -8176,13 +8176,13 @@ static bool igb_clean_tx_irq(struct igb_q_vector *q_vector, int napi_budget)
 		total_packets += tx_buffer->gso_segs;
 
 		/* free the skb */
-		if (tx_buffer->type == IGB_TYPE_SKB)
-                    if (!adapter->ecdev) {
+		if (tx_buffer->type == IGB_TYPE_SKB) {
+                    if (!adapter->ecdev)
 			/* free the skb */
 			napi_consume_skb(tx_buffer->skb, napi_budget);
-                    }
-		else
+                } else {
 			xdp_return_frame(tx_buffer->xdpf);
+                }
 
 		/* unmap skb header data */
 		dma_unmap_single(tx_ring->dev,
