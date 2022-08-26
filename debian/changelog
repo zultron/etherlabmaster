@@ -18,14 +18,14 @@ etherlabmaster (1:1.5~git20190614.1+gl20190904.1+mds20210617.3) unstable; urgenc
   * Remove package `linux-headers-*` dependencies from `debian/control`
   * .gitignore `debian/` package build artifacts
 
- -- John Morris <john@zultron.com>  Wed, Sep 29 13:51:57 2021 -0500
+ -- John Morris <john@zultron.com>  Wed, 29 Sep 2021 13:51:57 -0500
 
 etherlabmaster (1:1.5~git20190614.1+gl20190904.1+mds20210617.2) unstable; urgency=medium
 
   * Rename & restructure packages to follow Debian packaging guidelines
   * Update packaging for Debian 11 Bullseye
 
- -- Jakub Fišer <jakub.fiser@eryaf.com>  Mon, Sep 20 20:59:49 2021 +0200
+ -- Jakub Fišer <jakub.fiser@eryaf.com>  Mon, 20 Sep 2021 20:59:49 +0200
 
 etherlabmaster (1:1.5~git20190614.1+gl20190904.1+mds20210617.1) buster; urgency=low
 
