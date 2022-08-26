@@ -4,6 +4,7 @@ Priority: optional
 Maintainer: Jakub Fišer <jakub.fiser@eryaf.com>
 Build-Depends: debhelper (>= 9),
                dh-autoreconf,
+	       dh-systemd (>= 1.5),
                dkms,
                gettext,
                autoconf,
