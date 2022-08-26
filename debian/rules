@@ -19,7 +19,7 @@ default:
 	echo "$(VERSION)"
 
 %:
-	dh $@ --with autoreconf,dkms
+	dh $@ --with autoreconf,dkms,systemd
 
 override_dh_autoreconf:
 	touch ChangeLog
@@ -37,10 +37,6 @@ override_dh_auto_configure:
 
 override_dh_missing:
 	dh_missing --fail-missing
-
-override_dh_installsystemd:
-	mv debian/tmp/lib/systemd/system/ethercat.service debian/etherlabmaster-dkms.ethercat.service
-	dh_installsystemd --name=ethercat
 
 override_dh_install:
 #	Clean up and check for omissions
