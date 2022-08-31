@@ -336,7 +336,7 @@ static void pcap_record(
             ts = device->timespec64_poll;
 #endif
             pcaphdr->ts_sec   = ts.tv_sec;
-            pcaphdr->ts_nsec  = ts.tv_nsec;
+            pcaphdr->ts_usec  = ts.tv_nsec/1000;
             pcaphdr->incl_len = size;
             pcaphdr->orig_len = size;
             curr_data += sizeof(pcaprec_hdr_t);
