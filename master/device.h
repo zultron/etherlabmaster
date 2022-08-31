@@ -152,8 +152,8 @@ typedef struct {
 */
 
 typedef struct {
-    u64 ts_sec;         /* timestamp seconds */
-    u64 ts_nsec;        /* timestamp nanoseconds */
+    u32 ts_sec;         /* timestamp seconds */
+    u32 ts_usec;        /* timestamp microseconds */
     u32 incl_len;       /* number of octets of packet saved in file */
     u32 orig_len;       /* actual length of packet */
 } pcaprec_hdr_t;
