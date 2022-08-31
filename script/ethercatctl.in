@@ -35,7 +35,7 @@ LSMOD=/sbin/lsmod
 MODPROBE=/sbin/modprobe
 RMMOD=/sbin/rmmod
 MODINFO=/sbin/modinfo
-IP=/bin/ip
+IP=/sbin/ip
 
 ETHERCAT=@bindir@/ethercat
 
