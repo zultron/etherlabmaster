@@ -1,8 +1,6 @@
 /*****************************************************************************
  *
- *  $Id$
- *
- *  Copyright (C) 2006-2009  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2022  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -183,8 +181,7 @@ void CommandDownload::execute(const StringVector &args)
             throwCommandException(e.what());
         } catch (ios::failure &e) {
             delete [] data.data;
-            err << "Invalid value argument '" << args[2]
-                << "' for type '" << dataType->name << "'!";
+            err << "Invalid value for type '" << dataType->name << "'!";
             throwInvalidUsageException(err);
         }
 
@@ -205,23 +202,10 @@ void CommandDownload::execute(const StringVector &args)
             throwCommandException(e.what());
         } catch (ios::failure &e) {
             delete [] data.data;
-            err << "Invalid value argument '" << args[2]
+            err << "Invalid value argument '" << args[valueIndex]
                 << "' for type '" << dataType->name << "'!";
             throwInvalidUsageException(err);
         }
-    }
-
-    try {
-        data.data_size = interpretAsType(
-                dataType, args[valueIndex], data.data, data.data_size);
-    } catch (SizeException &e) {
-        delete [] data.data;
-        throwCommandException(e.what());
-    } catch (ios::failure &e) {
-        delete [] data.data;
-        err << "Invalid value argument '" << args[2]
-            << "' for type '" << dataType->name << "'!";
-        throwInvalidUsageException(err);
     }
 
     try {
