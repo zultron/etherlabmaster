@@ -2844,8 +2844,8 @@ before others) inside the init script code, LSB defines a special comment
 block. System tools can extract this information to insert the EtherCAT init
 script at the correct place in the startup sequence:
 
-\lstinputlisting[firstline=38,lastline=48]
-    {../script/init.d/ethercat}
+\lstinputlisting[firstline=36,lastline=46,basicstyle=\ttfamily\scriptsize]
+    {../script/init.d/ethercat.in}
 
 \subsection{Sysconfig File}
 \label{sec:sysconfig}
@@ -2857,8 +2857,8 @@ mandatory for the init script. The sysconfig file contains all configuration
 variables needed to operate one or more masters. The documentation is inside
 the file and included below:
 
-\lstinputlisting[numbers=left,firstline=9,basicstyle=\ttfamily\scriptsize]
-    {../script/sysconfig/ethercat}
+\lstinputlisting[numbers=left,firstline=11,basicstyle=\ttfamily\scriptsize,language=sh,escapechar={}]
+    {../script/ethercat.conf}
 
 For systems managed by systemd (see \autoref{sec:systemd}), the sysconfig file
 has moved to \lstinline+/etc/ethercat.conf+. Both versions are part of the
@@ -2894,19 +2894,18 @@ the EtherCAT master. It has to be executed with one of the parameters
 
 Distributions using \textit{systemd} instead of the SysV init system are using service files to describe how a service is to be maintained. \autoref{lst:service} lists the master's service file:
 
-\lstinputlisting[basicstyle=\ttfamily\footnotesize,caption=Service file,
-label=lst:service]{../script/ethercat.service}
+\lstinputlisting[basicstyle=\ttfamily\scriptsize,caption=Service file,label=lst:service]
+    {../script/ethercat.service.in}
 
-The \textit{ethercatctl} command is used to load and unload the master and
+The \textit{systemctl} command is used to load and unload the master and
 network driver modules in a similar way to the former init script
-(\autoref{sec:init}). Because it is installed into the \textit{sbin/}
-directory, it can also be used separately:
+(\autoref{sec:init}).
 
 \begin{lstlisting}[gobble=2]
-  # `\textbf{ethercatctl start}`
+  # `\textbf{systemctl start ethercat}`
 \end{lstlisting}
 
-When using systemd and/or the \textit{ethercatctl} command, the master
+When using systemd and/or the \textit{systemctl} command, the master
 configuration must be in \texttt{/etc/ethercat.conf} instead of
 \texttt{/etc/sysconfig/ethercat}! The latter is ignored. The configuration
 options are exactly the same.
@@ -3303,16 +3302,17 @@ Interface''.
 
 \section{Installing the Software}
 
-The below commands have to be entered as \textit{root}: The first one will
-install the EtherCAT header, init script, sysconfig file and the userspace
+The below commands have to be entered as \textit{root}: the first one will
+install the EtherCAT header, service scripts (systemd or init.d) and the userspace
 tool to the prefix path. The second one will install the kernel modules to the
 kernel's modules directory. The final \lstinline+depmod+ call is necessary to
 include the kernel modules into the \textit{modules.dep} file to make it
-available to the \lstinline+modprobe+ command, used in the init script.
+available to the \lstinline+modprobe+ command, used by the service scripts.
 
 \begin{lstlisting}
 # `\textbf{make install}`
 # `\textbf{make modules\_install}`
+# `\textbf{depmod}`
 \end{lstlisting}
 
 If the target kernel's modules directory is not under \textit{/lib/modules}, a
@@ -3326,21 +3326,6 @@ make variable. For example:
 This command will install the compiled kernel modules to
 \textit{/vol/nfs/root/lib/modules}, prepended by the kernel release.
 
-If the EtherCAT master shall be run as a service\footnote{Even if the EtherCAT
-master shall not be loaded on system startup, the use of the init script is
-recommended for manual (un-)loading.} (see \autoref{sec:system}), the init
-script and the sysconfig file (or the systemd service file, respectively) have
-to be copied (or linked) to the appropriate locations. The below example is
-suitable for SUSE Linux. It may vary for other distributions.
-
-% FIXME relative ln -s?
-\begin{lstlisting}
-# `\textbf{cd /opt/etherlab}`
-# `\textbf{cp etc/sysconfig/ethercat /etc/sysconfig/}`
-# `\textbf{ln -s etc/init.d/ethercat /etc/init.d/}`
-# `\textbf{insserv ethercat}`
-\end{lstlisting}
-
 Now the sysconfig file \texttt{/etc/sysconfig/ethercat} (see
 \autoref{sec:sysconfig}), or the configuration file
 \textit{/etc/ethercat.conf}, if using systemd, has to be customized. The
@@ -3353,13 +3338,13 @@ After the basic configuration is done, the master can be started with the
 below command:
 
 \begin{lstlisting}
-# `\textbf{/etc/init.d/ethercat start}`
+# `\textbf{systemctl start ethercat}`
 \end{lstlisting}
 
-When using systemd, the following command can be used alternatively:
+When using init.d, the following command can be used alternatively:
 
 \begin{lstlisting}
-# `\textbf{ethercatctl start}`
+# `\textbf{/etc/init.d/ethercat start}`
 \end{lstlisting}
 
 At this time, the operation of the master can be observed by viewing the

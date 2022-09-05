@@ -3120,8 +3120,8 @@ bloc sp\'ecial de commentaires.  Les outils syst\`emes peuvent
 extraire cette information pour ins\'erer le script d'initialisation
 EtherCAT \`a la bonne position dans la s\'equence de d\'emarrage:
 
-\lstinputlisting[firstline=38,lastline=48]
-    {../script/init.d/ethercat}
+\lstinputlisting[firstline=36,lastline=46,basicstyle=\ttfamily\scriptsize]
+    {../script/init.d/ethercat.in}
 
 \subsection{Fichier sysconfig}
 \label{sec:sysconfig}
@@ -3134,8 +3134,8 @@ sysconfig contient toutes les variables de configuration requises pour
 op\'erer un ou plusieurs ma\^itres. La documentation se trouve dans le
 fichier et elle est reproduite ci-dessous:
 
-\lstinputlisting[numbers=left,firstline=9,basicstyle=\ttfamily\scriptsize]
-    {../script/sysconfig/ethercat}
+\lstinputlisting[numbers=left,firstline=11,basicstyle=\ttfamily\scriptsize,language=sh,escapechar={}]
+    {../script/ethercat.conf}
 
     Pour les syst\`emes g\'er\'es par systemd (voir \autoref{sec:systemd}),
     le fichier sysconfig a \'et\'e d\'eplac\'e dans \lstinline+/etc/ethercat.conf+.
@@ -3178,20 +3178,19 @@ d'initialisation SysV utilisent des fichiers de service pour d\'ecrire
 comment un service doit \^etre maintenu.  \autoref{lst:service} liste
 le fichier de service du ma\^itre:
 
-\lstinputlisting[basicstyle=\ttfamily\footnotesize,caption=Service
-  file, label=lst:service]{../script/ethercat.service}
+\lstinputlisting[basicstyle=\ttfamily\scriptsize,caption=Service file,label=lst:service]
+    {../script/ethercat.service.in}
 
-La commande \textit{ethercatctl} est utilis\'ee pour charger et
+La commande \textit{systemctl} est utilis\'ee pour charger et
 d\'echarger le ma\^itre et les modules des pilotes r\'eseaux de la
 m\^eme mani\`ere que l'ancien script d'initialisation
-(\autoref{sec:init}). Puisqu'il est install\'e dans le dossier
-\textit{sbin/}, il peut aussi \^etre utilis\'e s\'epar\'ement:
+(\autoref{sec:init}).
 
 \begin{lstlisting}[gobble=2]
-  # `\textbf{ethercatctl start}`
+  # `\textbf{systemctl start ethercat}`
 \end{lstlisting}
 
-Lorsqu'on utilise systemd et/ou la commande \textit{ethercatctl}, le
+Lorsqu'on utilise systemd et/ou la commande \textit{systemctl}, le
 fichier de configuration du ma\^itre doit \^etre dans
 \texttt{/etc/ethercat.conf} au lieu de
 \texttt{/etc/sysconfig/ethercat}!  Celui-ci est ignor\'e. Les options
@@ -3651,6 +3650,7 @@ script d'initialisation.
 \begin{lstlisting}
 # `\textbf{make install}`
 # `\textbf{make modules\_install}`
+# `\textbf{depmod}`
 \end{lstlisting}
 
 Si le dossier de destination des modules noyaux ne se trouve dans
@@ -3665,23 +3665,6 @@ Ce commande installe les modules noyaux compil\'es dans
 \textit{/vol/nfs/root/lib/modules}, auquel on ajoute la version du
 noyau.
 
-Si le ma\^itre EtherCAT doit s'ex\'ecuter en tant que
-service\footnote{ m\^eme si le ma\^itre EtherCAT ne doit pas \^etre
-  charg\'e au d\'emarrage, l'utilisation du script d'initialisation
-  est recommand\'e pour le (d\'e-)chargement manuel.} (voir
-\autoref{sec:system}), le script d'initialisation et le fichier
-sysconfig (ou le fichier de service systemd, respectivement) doivent
-\^etre copi\'es (ou li\'e) dans les emplacements appropri\'es.
-L'exemple ci-dessous convient pour SUSE Linux.  Il peut \^etre
-diff\'erent pour les autres distributions.
-
-% FIXME relative ln -s?
-\begin{lstlisting}
-# `\textbf{cd /opt/etherlab}`
-# `\textbf{cp etc/sysconfig/ethercat /etc/sysconfig/}`
-# `\textbf{ln -s etc/init.d/ethercat /etc/init.d/}`
-# `\textbf{insserv ethercat}`
-\end{lstlisting}
 
 Maintenant le fichier de configuration
 \texttt{/etc/sysconfig/ethercat} (voir \autoref{sec:sysconfig}) ou
@@ -3697,14 +3680,14 @@ Apr\`es que la d\'efinition de la configuration de base, le ma\^itre
 peut \^etre d\'emarr\'e avec la commande ci-dessous:
 
 \begin{lstlisting}
-# `\textbf{/etc/init.d/ethercat start}`
+# `\textbf{systemctl start ethercat}`
 \end{lstlisting}
 
-Lorsqu'on utilise systemd, la commande suivante peut \^etre utilis\'ee
+Lorsqu'on utilise init.d, la commande suivante peut \^etre utilis\'ee
 \`a la place:
 
 \begin{lstlisting}
-# `\textbf{ethercatctl start}`
+# `\textbf{/etc/init.d/ethercat start}`
 \end{lstlisting}
 
 A partir de cet instant, l'op\'eration du ma\^itre peut \^etre oberv\'ee
