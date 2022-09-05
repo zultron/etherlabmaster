@@ -1423,9 +1423,9 @@ int ecrt_slave_config_flag(ec_slave_config_t *sc, const char *key,
             return ret;
         }
 
-        down(&sc->master->master_sem);
+        ec_lock_down(&sc->master->master_sem);
         list_add_tail(&flag->list, &sc->flags);
-        up(&sc->master->master_sem);
+        ec_lock_up(&sc->master->master_sem);
     }
     return 0;
 }

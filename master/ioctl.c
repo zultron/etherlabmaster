@@ -1531,14 +1531,14 @@ static ATTRIBUTES int ec_ioctl_config_flag(
         return -EFAULT;
     }
 
-    if (down_interruptible(&master->master_sem)) {
+    if (ec_lock_down_interruptible(&master->master_sem)) {
         kfree(ioctl);
         return -EINTR;
     }
 
     if (!(sc = ec_master_get_config_const(
                     master, ioctl->config_index))) {
-        up(&master->master_sem);
+        ec_lock_up(&master->master_sem);
         EC_MASTER_ERR(master, "Slave config %u does not exist!\n",
                 ioctl->config_index);
         kfree(ioctl);
@@ -1547,7 +1547,7 @@ static ATTRIBUTES int ec_ioctl_config_flag(
 
     if (!(flag = ec_slave_config_get_flag_by_pos_const(
                     sc, ioctl->flag_pos))) {
-        up(&master->master_sem);
+        ec_lock_up(&master->master_sem);
         EC_MASTER_ERR(master, "Invalid flag position!\n");
         kfree(ioctl);
         return -EINVAL;
@@ -1558,7 +1558,7 @@ static ATTRIBUTES int ec_ioctl_config_flag(
     ioctl->key[size] = 0x00;
     ioctl->value = flag->value;
 
-    up(&master->master_sem);
+    ec_lock_up(&master->master_sem);
 
     if (copy_to_user((void __user *) arg, ioctl, sizeof(*ioctl))) {
         kfree(ioctl);
@@ -3369,18 +3369,18 @@ static ATTRIBUTES int ec_ioctl_sc_flag(
         return -EFAULT;
     }
 
-    if (down_interruptible(&master->master_sem)) {
+    if (ec_lock_down_interruptible(&master->master_sem)) {
         kfree(key);
         return -EINTR;
     }
 
     if (!(sc = ec_master_get_config(master, ioctl.config_index))) {
-        up(&master->master_sem);
+        ec_lock_up(&master->master_sem);
         kfree(key);
         return -ENOENT;
     }
 
-    up(&master->master_sem); /** \todo sc could be invalidated */
+    ec_lock_up(&master->master_sem); /** \todo sc could be invalidated */
 
     ret = ecrt_slave_config_flag(sc, key, ioctl.value);
     kfree(key);
