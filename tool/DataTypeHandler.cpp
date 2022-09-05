@@ -1,8 +1,6 @@
 /*****************************************************************************
  *
- *  $Id$
- *
- *  Copyright (C) 2006-2009  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2022  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -66,19 +64,19 @@ const DataTypeHandler::DataType *DataTypeHandler::findDataType(
 
 string DataTypeHandler::typeInfo()
 {
-	stringstream s;
+    stringstream s;
 
-	s
-		<< "These are valid data types to use with" << endl
-		<< "the --type option:" << endl
-		<< "  bool," << endl
-		<< "  int8, int16, int32, int64," << endl
-		<< "  uint8, uint16, uint32, uint64," << endl
-		<< "  float, double," << endl
-		<< "  string, octet_string, unicode_string." << endl
+    s
+        << "These are valid data types to use with" << endl
+        << "the --type option:" << endl
+        << "  bool," << endl
+        << "  int8, int16, int32, int64," << endl
+        << "  uint8, uint16, uint32, uint64," << endl
+        << "  float, double," << endl
+        << "  string, octet_string, unicode_string." << endl
         << "For sign-and-magnitude coding, use the following types:" << endl
         << "  sm8, sm16, sm32, sm64" << endl;
-	return s.str();
+    return s.str();
 }
 
 /****************************************************************************/
@@ -107,7 +105,7 @@ size_t DataTypeHandler::interpretAsType(
     size_t dataSize = type->byteSize;
 
 #if DEBUG
-	cerr << __func__ << "(targetSize=" << targetSize << ")" << endl;
+    cerr << __func__ << "(targetSize=" << targetSize << ")" << endl;
 #endif
 
     str << source;
@@ -115,7 +113,7 @@ size_t DataTypeHandler::interpretAsType(
     str.exceptions(ios::failbit);
 
 #if DEBUG
-	cerr << "code=" << type->code << endl;
+    cerr << "code=" << (int) type->code << endl;
 #endif
 
     switch (type->code) {
@@ -179,7 +177,7 @@ size_t DataTypeHandler::interpretAsType(
                 float val;
                 str >> val;
                 *(uint32_t *) target =
-					cpu_to_le32(*(uint32_t *) (void *) &val);
+                        cpu_to_le32(*(uint32_t *) (void *) &val);
                 break;
             }
         case 0x0009: // string
@@ -199,7 +197,7 @@ size_t DataTypeHandler::interpretAsType(
                 double val;
                 str >> val;
                 *(uint64_t *) target =
-					cpu_to_le64(*(uint64_t *) (void *) &val);
+                        cpu_to_le64(*(uint64_t *) (void *) &val);
                 break;
             }
             break;
@@ -231,7 +229,7 @@ size_t DataTypeHandler::interpretAsType(
             {
                 stringstream err;
                 err << "Non-native integer type " << type->name
-					<< " is not yet implemented.";
+                        << " is not yet implemented.";
                 throw runtime_error(err.str());
             }
 
@@ -255,7 +253,7 @@ size_t DataTypeHandler::interpretAsType(
     }
 
 #if DEBUG
-	printRawData(cerr, (const uint8_t *) target, dataSize);
+    printRawData(cerr, (const uint8_t *) target, dataSize);
 #endif
 
     return dataSize;
@@ -340,7 +338,7 @@ void DataTypeHandler::outputData(
         case 0x0008: // float
             {
                 uint32_t val = le32_to_cpup(data);
-				float fval = *(float *) (void *) &val;
+                float fval = *(float *) (void *) &val;
                 o << fval << endl;
             }
             break;
@@ -351,13 +349,13 @@ void DataTypeHandler::outputData(
             o << string((const char *) data, dataSize) << flush;
             break;
         case 0x000b: // unicode_string
-			// FIXME encoding
+                     // FIXME encoding
             o << string((const char *) data, dataSize) << endl;
             break;
         case 0x0011: // double
             {
                 uint64_t val = le64_to_cpup(data);
-				double fval = *(double *) (void *) &val;
+                double fval = *(double *) (void *) &val;
                 o << fval << endl;
             }
             break;
@@ -450,7 +448,7 @@ const DataTypeHandler::DataType DataTypeHandler::dataTypes[] = {
     {"string",         0x0009, 0}, // a. k. a. visible_string
     {"octet_string",   0x000a, 0},
     {"unicode_string", 0x000b, 0},
-	// ... not implemented yet
+    // ... not implemented yet
     {"int24",          0x0010, 3},
     {"double",         0x0011, 8},
     {"int40",          0x0012, 5},
@@ -458,12 +456,12 @@ const DataTypeHandler::DataType DataTypeHandler::dataTypes[] = {
     {"int56",          0x0014, 7},
     {"int64",          0x0015, 8},
     {"uint24",         0x0016, 3},
-	// reserved        0x0017
+    // reserved        0x0017
     {"uint40",         0x0018, 5},
     {"uint48",         0x0019, 6},
     {"uint56",         0x001a, 7},
     {"uint64",         0x001b, 8},
-	// reserved        0x001c-0x001f
+    // reserved        0x001c-0x001f
     {"sm8",            0xfffb, 1}, // sign-and-magnitude coding
     {"sm16",           0xfffc, 2}, // sign-and-magnitude coding
     {"sm32",           0xfffd, 4}, // sign-and-magnitude coding
