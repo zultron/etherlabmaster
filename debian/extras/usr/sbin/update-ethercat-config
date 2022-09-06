@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #------------------------------------------------------------------------------
 
@@ -147,7 +147,10 @@ while true; do
 done
 
 # configure master module
-echo "options ec_master main_devices=${DEVICES} backup_devices=${BACKUPS}" >> ${MODCONF}
+MASTER_OPTIONS="main_devices=${DEVICES} backup_devices=${BACKUPS}"
+test -z "$PCAP_SIZE_MB" ||
+    MASTER_OPTIONS+=" pcap_size=$(expr ${PCAP_SIZE_MB} '*' 1048576)"
+echo "options ec_master ${MASTER_OPTIONS}" >> ${MODCONF}
 
 # reload master and network drivers
 if [ -n "${MASTER_LOADED}" ]; then
