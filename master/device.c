@@ -333,7 +333,10 @@ static void pcap_record(
 #ifdef EC_RTDM
             jiffies_to_timespec64(device->jiffies_poll, &ts);
 #else
-            ts = device->timespec64_poll;
+            /* ts = device->timespec64_poll; */
+            // FIXME `ethercat pcap` puts same timestamps on incoming & outgoing
+            // pkts
+            ktime_get_ts64(&ts);
 #endif
             pcaphdr->ts_sec   = ts.tv_sec;
             pcaphdr->ts_usec  = ts.tv_nsec/1000;
