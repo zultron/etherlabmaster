@@ -35,6 +35,7 @@ clean: kbuild-clean
 	fi
 
 kbuild-clean:
-	$(KBUILD) clean
+	test -z "$(LINUX_SOURCE_DIR)" || \
+	    $(KBUILD) clean
 
 .PHONY: kbuild-clean
