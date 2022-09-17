@@ -2,4 +2,4 @@ usr/include/*.h
 usr/lib/*/*.a
 usr/lib/*/*.la
 usr/lib/*/pkgconfig/libethercat.pc
-usr/lib/*/cmake/EtherCATConfig.cmake
+usr/lib/*/cmake/ethercat/ethercat-config.cmake
