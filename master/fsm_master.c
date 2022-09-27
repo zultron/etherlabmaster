@@ -986,7 +986,6 @@ void ec_fsm_master_state_clear_addresses(
 {
     ec_master_t *master = fsm->master;
     ec_datagram_t *datagram = fsm->datagram;
-    ec_slave_t *slave;
 
     if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--) {
         return;
@@ -1027,6 +1026,7 @@ void ec_fsm_master_state_dc_measure_delays(
 {
     ec_master_t *master = fsm->master;
     ec_datagram_t *datagram = fsm->datagram;
+    ec_slave_t *slave;
 
     if (datagram->state == EC_DATAGRAM_TIMED_OUT && fsm->retries--) {
         return;
