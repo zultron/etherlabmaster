@@ -134,7 +134,7 @@ start)
     # load master module
     if ! ${MODPROBE} ${MODPROBE_FLAGS} ec_master \
             main_devices="${DEVICES}" backup_devices="${BACKUPS}" \
-            "${EOE_INTERFACES_CMD}" "${EOE_AUTOCREATE_CMD}" "${PCAP_SIZE_CMD}"; then
+            ${EOE_INTERFACES_CMD} ${EOE_AUTOCREATE_CMD} ${PCAP_SIZE_CMD}; then
         exit 1
     fi
 

@@ -1817,14 +1817,14 @@ static ATTRIBUTES int ec_ioctl_config_flag(
         return -EFAULT;
     }
 
-    if (down_interruptible(&master->master_sem)) {
+    if (ec_lock_down_interruptible(&master->master_sem)) {
         kfree(ioctl);
         return -EINTR;
     }
 
     if (!(sc = ec_master_get_config_const(
                     master, ioctl->config_index))) {
-        up(&master->master_sem);
+        ec_lock_up(&master->master_sem);
         EC_MASTER_ERR(master, "Slave config %u does not exist!\n",
                 ioctl->config_index);
         kfree(ioctl);
@@ -1833,7 +1833,7 @@ static ATTRIBUTES int ec_ioctl_config_flag(
 
     if (!(flag = ec_slave_config_get_flag_by_pos_const(
                     sc, ioctl->flag_pos))) {
-        up(&master->master_sem);
+        ec_lock_up(&master->master_sem);
         EC_MASTER_ERR(master, "Invalid flag position!\n");
         kfree(ioctl);
         return -EINVAL;
@@ -1844,7 +1844,7 @@ static ATTRIBUTES int ec_ioctl_config_flag(
     ioctl->key[size] = 0x00;
     ioctl->value = flag->value;
 
-    up(&master->master_sem);
+    ec_lock_up(&master->master_sem);
 
     if (copy_to_user((void __user *) arg, ioctl, sizeof(*ioctl))) {
         kfree(ioctl);
@@ -2651,9 +2651,9 @@ static ATTRIBUTES int ec_ioctl_sync_ref(
         return -EPERM;
     }
 
-    down( & master->io_sem );
+    ec_lock_down( & master->io_sem );
     ecrt_master_sync_reference_clock(master);
-    up( & master->io_sem );
+    ec_lock_up( & master->io_sem );
     return 0;
 }
 
@@ -2678,9 +2678,9 @@ static ATTRIBUTES int ec_ioctl_sync_ref_to(
         return -EFAULT;
     }
 
-    down( & master->io_sem );
+    ec_lock_down( & master->io_sem );
     ecrt_master_sync_reference_clock_to(master, time);
-    up( & master->io_sem );
+    ec_lock_up( & master->io_sem );
     return 0;
 }
 
@@ -2700,9 +2700,9 @@ static ATTRIBUTES int ec_ioctl_sync_slaves(
         return -EPERM;
     }
 
-    down( & master->io_sem );
+    ec_lock_down( & master->io_sem );
     ecrt_master_sync_slave_clocks(master);
-    up( & master->io_sem );
+    ec_lock_up( & master->io_sem );
     return 0;
 }
 
@@ -2804,9 +2804,9 @@ static ATTRIBUTES int ec_ioctl_sync_mon_queue(
         return -EPERM;
     }
 
-    down( & master->io_sem );
+    ec_lock_down( & master->io_sem );
     ecrt_master_sync_monitor_queue(master);
-    up( & master->io_sem );
+    ec_lock_up( & master->io_sem );
     return 0;
 }
 
@@ -3878,18 +3878,18 @@ static ATTRIBUTES int ec_ioctl_sc_flag(
         return -EFAULT;
     }
 
-    if (down_interruptible(&master->master_sem)) {
+    if (ec_lock_down_interruptible(&master->master_sem)) {
         kfree(key);
         return -EINTR;
     }
 
     if (!(sc = ec_master_get_config(master, ioctl.config_index))) {
-        up(&master->master_sem);
+        ec_lock_up(&master->master_sem);
         kfree(key);
         return -ENOENT;
     }
 
-    up(&master->master_sem); /** \todo sc could be invalidated */
+    ec_lock_up(&master->master_sem); /** \todo sc could be invalidated */
 
     ret = ecrt_slave_config_flag(sc, key, ioctl.value);
     kfree(key);
@@ -4024,9 +4024,9 @@ static ATTRIBUTES int ec_ioctl_domain_queue(
         return -ENOENT;
     }
 
-    down( & master->io_sem );
+    ec_lock_down( & master->io_sem );
     ecrt_domain_queue(domain);
-    up( & master->io_sem );
+    ec_lock_up( & master->io_sem );
     ec_ioctl_lock_up(&master->master_sem);
     return 0;
 }
@@ -5042,9 +5042,9 @@ static ATTRIBUTES int ec_ioctl_voe_exec(
         return -ENOENT;
     }
 
-    down( & master->io_sem );
+    ec_lock_down( & master->io_sem );
     data.state = ecrt_voe_handler_execute(voe);
-    up( & master->io_sem );
+    ec_lock_up( & master->io_sem );
     if (data.state == EC_REQUEST_SUCCESS && voe->dir == EC_DIR_INPUT)
         data.size = ecrt_voe_handler_data_size(voe);
     else

@@ -803,7 +803,7 @@ void ec_fsm_slave_config_state_boot_preop(
             return;
         }
 
-        ec_fsm_slave_config_enter_sdo_conf(fsm);
+        ec_fsm_slave_config_enter_sdo_conf(fsm, datagram);
     }
     else {
         EC_SLAVE_DBG(slave, 1, "Assigning SII access back to EtherCAT.\n");
