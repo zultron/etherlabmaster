@@ -4725,7 +4725,6 @@ static void ec_poll(struct net_device *dev)
         }
 
 	if (jiffies - tp->ec_watchdog_jiffies >= 2 * HZ) {
-            void __iomem *ioaddr = tp->mmio_addr;
             ecdev_set_link(tp->ecdev, netif_carrier_ok(dev) ? 1 : 0);
             tp->ec_watchdog_jiffies = jiffies;
 	}
