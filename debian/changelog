@@ -1,3 +1,9 @@
+etherlabmaster (1:1.5~6.gitbd0612d6+gl20190904+mds20210617) unstable; urgency=medium
+
+  * Rebase onto latest upstream stable-1.5 branch
+
+ -- John Morris <john@zultron.com>  Tue, 27 Sep 2022 01:05:12 -0500
+
 etherlabmaster (1:1.5~git20190614.1+gl20190904.1+mds20210617.4) unstable; urgency=medium
 
   * Restore support for older Ubuntu Trusty 14.04 distribution:
