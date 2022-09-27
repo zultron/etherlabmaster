@@ -1,4 +1,4 @@
 debian/extras/* /
-etc/sysconfig/* etc/default/
+etc/ethercat.conf
 usr/sbin/*
 lib/systemd/system/
