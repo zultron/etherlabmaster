@@ -40,8 +40,8 @@ override_dh_missing:
 
 override_dh_install:
 #	Clean up and check for omissions
-	rm -f	debian/tmp/etc/ethercat.conf \
-		debian/tmp/etc/init.d/ethercat
+	rm -rf	debian/tmp/etc/sysconfig \
+		debian/tmp/etc/init.d
 	if test -f debian/tmp/usr/lib/pkgconfig/libethercat.pc; then \
 	    mkdir -p debian/tmp/usr/lib/$(DEB_BUILD_GNU_TYPE)/pkgconfig; \
 	    mv debian/tmp/usr/lib/pkgconfig/libethercat.pc \
