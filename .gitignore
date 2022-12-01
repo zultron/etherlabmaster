@@ -45,6 +45,7 @@ stamp-h1
 tool/ethercat
 mailbox_gateway/ethercat_mbg
 debian/*.debhelper
+debian/*.init
 debian/*.log
 debian/*.service
 debian/*.substvars
