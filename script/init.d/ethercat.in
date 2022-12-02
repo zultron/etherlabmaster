@@ -56,7 +56,7 @@ MASTER_ARGS=
 
 #------------------------------------------------------------------------------
 
-ETHERCAT_CONFIG=/etc/sysconfig/ethercat
+ETHERCAT_CONFIG=@sysconfdir@/ethercat.conf
 
 if [ ! -r ${ETHERCAT_CONFIG} ]; then
     echo ${ETHERCAT_CONFIG} not existing;
