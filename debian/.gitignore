@@ -1,0 +1,12 @@
+/*.debhelper
+/*.log
+/*.service
+/*.substvars
+/autoreconf.*
+/debhelper-build-stamp
+/etherlabmaster-dev/
+/etherlabmaster-dkms/
+/etherlabmaster-tools/
+/files
+/libethercat/
+/tmp
