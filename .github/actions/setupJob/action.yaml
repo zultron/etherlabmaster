@@ -1,0 +1,43 @@
+name: Prepare data used in subsequent jobs
+description: Set up build matrix and check configuration
+inputs:
+  cloudsmithAPIKey:
+    description:  Secret Cloudsmith API key
+    required: false
+outputs:
+  MainMatrix:
+    description: The GitHub Actions job matrix
+    value: ${{ steps.data_matrix_normalizer.outputs.matrix }}
+runs:
+  using: "composite"
+  steps:
+  - uses: actions/setup-python@v4
+    with:
+      python-version: '3.8'
+      # cache: 'pip' # caching pip dependencies
+
+  - name:  Install Python libs
+    shell: bash {0}
+    run: |
+      echo ::group::Install Python packages
+      pip3 install sh
+      pip3 install pyyaml
+      echo ::endgroup::
+
+  - name: Show GitHub context as a JSON
+    shell: bash {0}
+    env:
+      GITHUB_CONTEXT: ${{ toJson(github) }}
+    run: |
+      echo ::group::Show GitHub context
+      echo "$GITHUB_CONTEXT"
+      echo ::endgroup::
+
+  - name: Prepare matrix from JSON
+    id: data_matrix_normalizer
+    shell: bash -e {0}
+    run: |
+      echo "matrix=$(.github/querybuild.py github_main_matrix)" >> $GITHUB_OUTPUT
+      echo ::group::Show job matrix
+      .github/querybuild.py --pretty --format yaml github_main_matrix
+      echo ::endgroup::

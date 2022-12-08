@@ -1,0 +1,41 @@
+name: Push built packages to Cloudsmith
+inputs:
+  cloudsmithAPIKey:
+    description: Secret Cloudsmith API key
+    required: true
+  cloudsmithNamespace:
+    description: Cloudsmith namespace (org name)
+    required: false
+  artifactDirectory:
+    description: Directory containing package artifacts
+    required: true
+runs:
+  using: "composite"
+  steps:
+
+  - uses: actions/setup-python@v4
+    with:
+      python-version: '3.8'
+      # cache: 'pip' # caching pip dependencies
+
+  - name:  Install Python libs
+    shell: bash {0}
+    run: |
+      echo ::group::Install Python packages
+      pip3 install sh
+      pip3 install pyyaml
+      pip3 install cloudsmith-cli
+      echo ::endgroup::
+
+  - name:  List build artifacts
+    env:
+      ARTIFACT_DIRECTORY: ${{ inputs.artifactDirectory }}
+    shell: /bin/bash -ex {0}
+    run: find $ARTIFACT_DIRECTORY -type f
+
+  - name: Upload packages to Cloudsmith
+    env:
+      CLOUDSMITH_API_KEY: ${{ inputs.cloudsmithAPIKey }}
+      ARTIFACT_DIRECTORY: ${{ inputs.artifactDirectory }}
+    shell: /bin/bash -ex {0}
+    run: .github/cloudsmithupload.py --package-directory $ARTIFACT_DIRECTORY
