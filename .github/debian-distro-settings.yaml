@@ -1,0 +1,44 @@
+# Package name
+package: etherlabmaster
+
+# Project name for human-readable output
+projectName: IgH EtherCAT Master
+
+# Cloudsmith repo namespace (org name); also may be set in $CLOUDSMITH_NAMESPACE
+cloudsmith_repo_namespace: zultron
+# Cloudsmith repo slug, if not the same as `package`
+# cloudsmith_repo_slug: etherlabmaster
+cloudsmith_repo_slug: etherlabmaster-test
+
+matrix:
+  # List of Debian and Ubuntu OS version configuration data
+  - baseImage: debian:buster
+    codename: Buster
+    vendor: Debian
+    release: 10
+    architectures:
+      - amd64
+      - arm64
+      - armhf
+  - baseImage: debian:bullseye
+    codename: Bullseye
+    vendor: Debian
+    release: 11
+    architectures:
+      - amd64
+      - arm64
+      - armhf
+  - baseImage: ubuntu:focal
+    codename: Focal
+    vendor: Ubuntu
+    release: 20.04
+    architectures:
+      - amd64
+      - arm64
+      - armhf
+  - baseImage: ubuntu:trusty
+    codename: Trusty
+    vendor: Ubuntu
+    release: 14.04
+    architectures:
+      - amd64

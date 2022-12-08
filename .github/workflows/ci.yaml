@@ -1,0 +1,146 @@
+---
+name: cloudsmith.io packages
+on:
+  - push
+  - pull_request
+jobs:
+  setup:
+    name:  Set up reusable job matrix
+    runs-on: ubuntu-latest
+    outputs:
+      MainMatrix: ${{ steps.setup.outputs.MainMatrix }}
+
+    steps:
+      - name: Clone git repository
+        uses: actions/checkout@v3
+
+      - name: Set up run
+        id: setup
+        uses: ./.github/actions/setupJob
+        with:
+          CloudsmithAPIKey: ${{ secrets.CLOUDSMITH_API_KEY }}
+
+  buildPackages:
+    name: ${{ matrix.vendor }} ${{ matrix.codename }} ${{ matrix.architecture }}
+    runs-on: ubuntu-latest
+    needs:  setup
+    strategy:
+      matrix: ${{ fromJson(needs.setup.outputs.MainMatrix) }}
+
+    steps:
+
+      - name: Clone git repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+        with:
+          buildkitd-flags: --debug
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ matrix.codename }}.${{ matrix.architecture }}
+          push: true
+          build-args: |
+            DEBIAN_DISTRO_BASE=${{ matrix.baseImage }}
+            ARCHITECTURE=${{ matrix.architecture }}
+            CODENAME=${{ matrix.codename }}
+            ENTRYPOINT=/usr/bin/entrypoint
+            DEBIAN_DIR=debian
+          labels: |
+            os_vendor=${{ matrix.vendor }}
+            os_codename=${{ matrix.codename }}
+            os_release=${{ matrix.release }}
+            os_architecture=${{ matrix.architecture }}
+          file: .github/Dockerfile
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+
+      - name: Build packages
+        id: build_packages
+        shell: bash
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+          DOCKER_TAG: ghcr.io/${{ github.repository }}:${{ matrix.codename }}.${{
+            matrix.architecture }}
+        run: |
+          set -e
+
+          PKG_VER="$(dpkg-parsechangelog -S version | sed 's/^[0-9]*://')"
+          echo "PKG_VER=${PKG_VER}" >> $GITHUB_ENV
+          PKG_VER_ARCH=${PKG_VER}_${ARCHITECTURE}
+          echo "PKG_VER_ARCH=${PKG_VER_ARCH}" >> $GITHUB_ENV
+          echo "Package version:  $PKG_VER"
+
+          echo ::group::Build debian packages
+
+          docker run \
+              -v ${HOME}:${HOME} \
+              -e UID_OUT=$(id -u) -e GID_OUT=$(id -g) \
+              -e HOME=${HOME} \
+              -e PATH=/usr/lib/ccache:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+              -e CCACHE_DIR=${PWD}/.ccache \
+              $DOCKER_TAG \
+              bash -xec "cd ${PWD}; dpkg-buildpackage -uc -us -a${ARCHITECTURE}"
+
+          echo ::endgroup::
+
+      - name: Ready packages for upload
+        shell: bash
+        run: |
+          set -e
+          echo ::group::Preparing build artifacts for upload
+
+          mkdir -p pkgs
+          ls -l ..
+          mv ../*${PKG_VER}* pkgs/
+
+          echo "Final packages for upload:"
+          ls -l pkgs/
+
+          echo ::endgroup::
+
+      - name: >
+          Artifacts ${{ matrix.codename}} ${{ matrix.architecture }}
+        uses: actions/upload-artifact@v3
+        env:
+          NAME_BASE: ${{ matrix.codename }}-${{ env.PKG_VER_ARCH }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REPO: ${{ github.event.repository.name }}
+        with:
+          name: ${{ env.NAME_BASE }}-${{ env.GITHUB_SHA }}
+          path: pkgs
+          if-no-files-found: error
+
+  pushPackages:
+    needs: buildPackages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone git repository
+        uses: actions/checkout@v3
+
+      - name: Download built packages from build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./pkgs
+
+      - name: Upload packages to Cloudsmith
+        uses: ./.github/actions/pushCloudsmith
+        with:
+          cloudsmithAPIKey: ${{ secrets.CLOUDSMITH_API_KEY }}
+          cloudsmithNamespace:  ${{ secrets.CLOUDSMITH_NAMESPACE }}
+          artifactDirectory: ./pkgs

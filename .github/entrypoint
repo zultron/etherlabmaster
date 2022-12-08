@@ -1,0 +1,69 @@
+#!/bin/bash -e
+
+#####################################################################
+# Description:  base-entrypoint.sh
+#
+#               This file, 'base-entrypoint.sh', implements Docker entrypoint
+#               script used for Machinekit-HAL varieté of images
+#
+# Copyright (C) 2020            Jakub Fišer  <jakub DOT fiser AT eryaf DOT com>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+# License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+#
+######################################################################
+
+if test -z "$UID_OUT" -o -z "$GID_OUT"; then
+    echo "Error:  required UID_OUT and GID_OUT unset" >&2
+    exit 1
+fi
+UID_IN=$(id -u ${USER})
+GID_IN=$(id -g ${USER})
+
+# Be sure $HOME is set
+test -n "$HOME" || export HOME=$(getent passwd "${USER}" cut -d : -f 6)
+
+# Replace possibly stale passwd and group entries to match outside user
+sed -i /etc/passwd -e "/^${USER}:/ d"
+echo "${USER}:x:${UID_OUT}:${GID_OUT}::${HOME}:/bin/bash" >>/etc/passwd
+sed -i /etc/shadow -e "/^${USER}:/ d" # Clean stale entries
+echo "${USER}:*:18463:0:99999:7:::" >>/etc/shadow
+sed -i /etc/group -e "/^${USER}:/ d" # Clean stale entries
+echo "${USER}:x:${GID_OUT}:" >>/etc/group
+sed -i /etc/gshadow -e "/^${USER}:/ d" # Clean stale entries
+echo "${USER}:*::" >>/etc/gshadow
+
+# Compiler environment
+if test "$(dpkg --print-architecture)" == "amd64" \
+        -a "$ARCHITECTURE" == "i386" \
+        -a "$(lsb_release -cs)" == "stretch"; then
+    export CC="gcc -m32"
+    export CXX="g++ -m32"
+    export LDEMULATION="elf_i386"
+else
+    _HOST_GNU_TYPE=$(dpkg-architecture -a${ARCHITECTURE} -qDEB_HOST_GNU_TYPE)
+    export CC=${_HOST_GNU_TYPE}-gcc
+    export CXX=${_HOST_GNU_TYPE}-g++
+fi
+
+# Debian package environment
+set -a
+eval "$(dpkg-architecture -a${ARCHITECTURE} -s)"
+set +a
+
+# If no command is given, run a shell
+test -n "$*" || set bash
+
+echo -e "ENTRYPOINT END\n==============================================" >&2
+exec "$@"
