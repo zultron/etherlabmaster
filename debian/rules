@@ -4,8 +4,8 @@ VERSION ?= $(shell dpkg-parsechangelog --show-field Version | sed 's/.*://')
 
 include /usr/share/dpkg/architecture.mk
 
-# Mint 17 can't install systemd pkg, but etherlabmaster-dkms.install
-# is static; detect OS version and do some ugly hacks
+# Mint 17, based on Ubuntu Trusty, can't install systemd pkg; detect
+# OS version and do some ugly hacks
 OS_VERSION = $(shell bash -c 'source /etc/os-release; echo $$VERSION_ID')
 HAVE_SYSTEMD = $(if $(filter 14.04,$(OS_VERSION)),,1)
 DH_WITH_SYSTEMD = ,systemd  # The comma in the value necessitates this  :P
@@ -41,41 +41,46 @@ override_dh_auto_configure:
 	dh_auto_configure -- \
 		$(CONFFLAGS)
 
-override_dh_missing:
-	dh_missing --fail-missing
-
 override_dh_install:
-#	Clean up and check for omissions
-	rm -rf	debian/tmp/etc/sysconfig \
-		debian/tmp/etc/init.d
+#	# Move pkg-config conf to arch-specific directory
 	if test -f debian/tmp/usr/lib/pkgconfig/libethercat.pc; then \
 	    mkdir -p debian/tmp/usr/lib/$(DEB_BUILD_GNU_TYPE)/pkgconfig; \
 	    mv debian/tmp/usr/lib/pkgconfig/libethercat.pc \
 	        debian/tmp/usr/lib/$(DEB_BUILD_GNU_TYPE)/pkgconfig/; \
 	fi
 
-ifeq ($(HAVE_SYSTEMD),)
-#	- On Mint 17, install empty systemd unit file to keep
-#	  dh_install happy
-	mkdir -p debian/tmp/lib/systemd/system/
-	touch debian/tmp/lib/systemd/system/ethercat
-endif
-
 	dh_install --
 
-	dh_install -petherlabmaster-dkms config.h globals.h Kbuild usr/src/etherlabmaster-$(VERSION)
-	dh_install -petherlabmaster-dkms -X.o -X.ko -XMakefile -X.in -X.am \
-	    examples/ include/ master/ tty/ devices/ usr/src/etherlabmaster-$(VERSION)
-	dh_install -petherlabmaster-dkms debian/dkms/* usr/src/etherlabmaster-$(VERSION)
+#	# Manually install DKMS sources
+	dh_install -petherlabmaster-dkms \
+	    config.h globals.h Kbuild \
+	    -X.o -X.ko -XMakefile -X.in -X.am \
+	    examples/ include/ master/ tty/ devices/ \
+	    debian/dkms/* \
+	    usr/src/etherlabmaster-$(VERSION)
+
+ifneq ($(HAVE_SYSTEMD),)
+# Once we ditch support for Trusty & raise compat level, switch this
+# to dh_installsystemd
+override_dh_installinit:
+	mv debian/tmp/lib/systemd/system/ethercat.service \
+	    debian/etherlabmaster-dkms.ethercat.service
+	dh_installinit -petherlabmaster-dkms --name=ethercat
+endif
 
 ifeq ($(HAVE_SYSTEMD),)
+# On Ubuntu Trusty & Mint 17, install init script.  dh_installinit
+# prints ugly "Use of uninitialized value" messages, but does still
+# work
 override_dh_installinit:
-#	- On Mint 17, install init script
-#	- dh_installinit prints ugly "Use of uninitialized value"
-#	  messages, but does still work
 	cp script/init.d/ethercat debian/etherlabmaster-dkms.ethercat.init
 	dh_installinit -petherlabmaster-dkms --name=ethercat
 endif
+
+override_dh_missing:
+	rm -rf	debian/tmp/etc/sysconfig \
+		debian/tmp/etc/init.d
+	dh_missing --fail-missing
 
 override_dh_dkms:
 	dh_dkms -V $(VERSION)

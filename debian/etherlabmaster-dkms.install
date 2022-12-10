@@ -1,4 +1,3 @@
 debian/extras/* /
 etc/ethercat.conf
 usr/sbin/*
-lib/systemd/system/
