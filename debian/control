@@ -10,7 +10,8 @@ Build-Depends: debhelper (>= 9),
                autoconf,
                automake,
                libtool,
-               quilt
+               quilt,
+               pkg-config
 Standards-Version: 2.1.0
 
 Package: libethercat
