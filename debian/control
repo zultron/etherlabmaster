@@ -38,6 +38,7 @@ Package: etherlabmaster-dev
 Replaces: ethercat-dev, etherlabmaster-dev
 Conflicts: ethercat-dev, etherlabmaster-dev
 Provides: ethercat-dev, etherlabmaster-dev
+Depends: libethercat
 Architecture: any
 Description: IgH EtherCAT master for Linux (development files)
 
