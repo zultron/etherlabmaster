@@ -54,8 +54,6 @@ jobs:
           build-args: |
             DEBIAN_DISTRO_BASE=${{ matrix.baseImage }}
             ARCHITECTURE=${{ matrix.architecture }}
-            CODENAME=${{ matrix.codename }}
-            ENTRYPOINT=/usr/bin/entrypoint
             DEBIAN_DIR=debian
           labels: |
             os_vendor=${{ matrix.vendor }}
