@@ -20,25 +20,25 @@ matrix:
       - amd64
       - arm64
       - armhf
-  # - baseImage: debian:bullseye
-  #   codename: Bullseye
-  #   vendor: Debian
-  #   release: 11
-  #   architectures:
-  #     - amd64
-  #     - arm64
-  #     - armhf
-  # - baseImage: ubuntu:focal
-  #   codename: Focal
-  #   vendor: Ubuntu
-  #   release: 20.04
-  #   architectures:
-  #     - amd64
-  #     - arm64
-  #     - armhf
-  # - baseImage: ubuntu:trusty
-  #   codename: Trusty
-  #   vendor: Ubuntu
-  #   release: 14.04
-  #   architectures:
-  #     - amd64
+  - baseImage: debian:bullseye
+    codename: Bullseye
+    vendor: Debian
+    release: 11
+    architectures:
+      - amd64
+      - arm64
+      - armhf
+  - baseImage: ubuntu:focal
+    codename: Focal
+    vendor: Ubuntu
+    release: 20.04
+    architectures:
+      - amd64
+      - arm64
+      - armhf
+  - baseImage: ubuntu:trusty
+    codename: Trusty
+    vendor: Ubuntu
+    release: 14.04
+    architectures:
+      - amd64
