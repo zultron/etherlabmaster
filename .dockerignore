@@ -1,0 +1,5 @@
+/.git
+/debian/etherlabmaster-dev/
+/debian/etherlabmaster-dkms/
+/debian/etherlabmaster-tools/
+/debian/libethercat/
