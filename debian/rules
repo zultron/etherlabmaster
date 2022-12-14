@@ -84,3 +84,8 @@ override_dh_missing:
 
 override_dh_dkms:
 	dh_dkms -V $(VERSION)
+
+ifneq ($(DEB_HOST_ARCH),$(DEB_BUILD_ARCH))
+override_dh_shlibdeps:
+	dh_shlibdeps -l /usr/$(DEB_HOST_MULTIARCH)/lib
+endif
