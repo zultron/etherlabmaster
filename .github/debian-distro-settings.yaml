@@ -36,6 +36,14 @@ matrix:
       - amd64
       - arm64
       - armhf
+  - baseImage: ubuntu:jammy
+    codename: Jammy
+    vendor: Ubuntu
+    release: 22.04
+    architectures:
+      - amd64
+      - arm64
+      - armhf
   - baseImage: ubuntu:trusty
     codename: Trusty
     vendor: Ubuntu
