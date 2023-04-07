@@ -1,3 +1,9 @@
+etherlabmaster (1:1.5.2~gitbd0612d6+gl20190904+mds20210617.6) unstable; urgency=medium
+
+  * Build for Ubuntu Jammy
+
+ -- John Morris <john@zultron.com>  Fri, 07 Apr 2023 16:12:06 -0500
+
 etherlabmaster (1:1.5.2~gitbd0612d6+gl20190904+mds20210617.5) unstable; urgency=medium
 
   * Rebase onto latest upstream stable-1.5 branch
