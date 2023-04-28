@@ -1,3 +1,10 @@
+etherlabmaster (2:1.5.2~1~gitbd0612d6+gl20190904+mds20210617) unstable; urgency=medium
+
+  * Bump EC_IOCTL_VERSION_MAGIC to 40
+  * Bump epoch and add pkg version ~1 to fix updates
+
+ -- John Morris <john@zultron.com>  Sun, 30 Apr 2023 17:47:42 -0500
+
 etherlabmaster (1:1.5.2~gitbd0612d6+gl20190904+mds20210617.6) unstable; urgency=medium
 
   * Build for Ubuntu Jammy
