@@ -33,7 +33,6 @@ add_module() {
     test ! -f "$SOURCE_TREE/$TEST_FILE_3" || BUILD=true KVER=$KVER3
     test "$TEST_FILE_2" != always || BUILD=true KVER=all
     if ! $BUILD; then
-        echo "Skipping ${NAME}:  No match for kernel $KVER2 (or $KVER3)" >&2
         MAKE[0]+=" ENABLE_${NAME^^}=0"
         return
     fi
@@ -41,7 +40,6 @@ add_module() {
     BUILT_MODULE_NAME[$IX]=$_BUILT_MODULE_NAME
     DEST_MODULE_NAME[$IX]=$_DEST_MODULE_NAME
     DEST_MODULE_LOCATION[$IX]=/updates/dkms
-    echo "Added ${DEST_MODULE_NAME[$IX]} at index $IX, kver $KVER" >&2
     IX=$((IX+1))
 }
 
