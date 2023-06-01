@@ -25,7 +25,7 @@ Replaces: ethercat, etherlabmaster
 Conflicts: ethercat, etherlabmaster
 Provides: ethercat, etherlabmaster
 Architecture: any
-Depends: ${shlibs:Depends}, dkms, procps, ifupdown
+Depends: ${shlibs:Depends}, dkms, procps, ifupdown, initramfs-tools
 Recommends:  linux-headers-rt-amd64
 Description: IgH EtherCAT master for Linux
 
