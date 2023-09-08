@@ -12,15 +12,17 @@ cloudsmith_repo_slug: etherlabmaster-test
 
 matrix:
   # List of Debian and Ubuntu OS version configuration data
-  - baseImage: debian:buster
-    codename: Buster
+  - baseImage: debian:bookworm
+    # When EOL? https://www.debian.org/releases/bookworm/
+    codename: Bookworm
     vendor: Debian
-    release: 10
+    release: 12
     architectures:
       - amd64
       - arm64
       - armhf
   - baseImage: debian:bullseye
+    # When EOL? https://www.debian.org/releases/bullseye/
     codename: Bullseye
     vendor: Debian
     release: 11
@@ -28,15 +30,17 @@ matrix:
       - amd64
       - arm64
       - armhf
-  - baseImage: ubuntu:focal
-    codename: Focal
-    vendor: Ubuntu
-    release: 20.04
+  - baseImage: debian:buster
+    # EOL 2024-07-01 https://www.debian.org/releases/buster/
+    codename: Buster
+    vendor: Debian
+    release: 10
     architectures:
       - amd64
       - arm64
       - armhf
   - baseImage: ubuntu:jammy
+    # EOL 04-2032  https://ubuntu.com/about/release-cycle
     codename: Jammy
     vendor: Ubuntu
     release: 22.04
@@ -44,7 +48,17 @@ matrix:
       - amd64
       - arm64
       - armhf
+  - baseImage: ubuntu:focal
+    # EOL 04-2030  https://ubuntu.com/about/release-cycle
+    codename: Focal
+    vendor: Ubuntu
+    release: 20.04
+    architectures:
+      - amd64
+      - arm64
+      - armhf
   - baseImage: ubuntu:trusty
+    # EOL 04-2024  https://ubuntu.com/about/release-cycle
     codename: Trusty
     vendor: Ubuntu
     release: 14.04
