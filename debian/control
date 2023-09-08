@@ -5,7 +5,7 @@ Maintainer: Jakub Fišer <jakub.fiser@eryaf.com>
 Build-Depends: debhelper (>= 9),
                dh-autoreconf,
 	       dh-systemd (>= 1.5) | debhelper (>= 9.20160709),
-               dkms,
+               dh-dkms (>= 3.0) | dkms (< 3.0),
                gettext,
                autoconf,
                automake,

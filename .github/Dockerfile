@@ -67,7 +67,6 @@ RUN apt-get update \
         python3-debian \
         python3-setuptools \
         python3-pip \
-        dpkg-sig \
         git \
         lsb-release \
     # Mint 17 has no systemd package
