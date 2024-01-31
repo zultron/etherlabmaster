@@ -1,3 +1,9 @@
+etherlabmaster (2:1.5.2~4~gitbd0612d6+gl20190904+mds20210617) unstable; urgency=medium
+
+  * Don't start service after package install
+
+ -- John Morris <john@zultron.com>  Tue, 30 Jan 2024 18:17:00 -0600
+
 etherlabmaster (2:1.5.2~3~gitbd0612d6+gl20190904+mds20210617) unstable; urgency=medium
 
   * Add `Depends: initramfs-tools` to DKMS package for `update-ethercat-config`
