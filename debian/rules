@@ -65,7 +65,7 @@ ifneq ($(HAVE_SYSTEMD),)
 override_dh_installinit:
 	mv debian/tmp/lib/systemd/system/ethercat.service \
 	    debian/etherlabmaster-dkms.ethercat.service
-	dh_installinit -petherlabmaster-dkms --name=ethercat
+	dh_installinit -petherlabmaster-dkms --name=ethercat --no-start
 endif
 
 ifeq ($(HAVE_SYSTEMD),)
@@ -74,7 +74,7 @@ ifeq ($(HAVE_SYSTEMD),)
 # work
 override_dh_installinit:
 	cp script/init.d/ethercat debian/etherlabmaster-dkms.ethercat.init
-	dh_installinit -petherlabmaster-dkms --name=ethercat
+	dh_installinit -petherlabmaster-dkms --name=ethercat --no-start
 endif
 
 override_dh_missing:
