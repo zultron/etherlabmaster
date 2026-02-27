@@ -1,3 +1,9 @@
+# Since Version 1.6.8
+
+- Added SII caching functionality with
+    - kernel module parameter `sii_caching`
+    - configuration variable `SII_CACHING`
+
 # Version 1.6.8
 
 - Fixed usage of `FAKE_EC_HOMEDIR` variable in fake library.
