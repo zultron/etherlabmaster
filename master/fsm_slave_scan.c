@@ -39,6 +39,7 @@
 int ec_fsm_slave_scan_running(const ec_fsm_slave_scan_t *);
 void ec_fsm_slave_scan_enter_sii_size(ec_fsm_slave_scan_t *);
 void ec_fsm_slave_scan_enter_assign_sii(ec_fsm_slave_scan_t *);
+void ec_fsm_slave_scan_enter_sii_ident(ec_fsm_slave_scan_t *);
 void ec_fsm_slave_scan_enter_datalink(ec_fsm_slave_scan_t *);
 #ifdef EC_REGALIAS
 void ec_fsm_slave_scan_enter_regalias(ec_fsm_slave_scan_t *);
@@ -58,6 +59,7 @@ void ec_fsm_slave_scan_state_datalink(ec_fsm_slave_scan_t *);
 #ifdef EC_SII_ASSIGN
 void ec_fsm_slave_scan_state_assign_sii(ec_fsm_slave_scan_t *);
 #endif
+void ec_fsm_slave_scan_state_sii_ident(ec_fsm_slave_scan_t *);
 void ec_fsm_slave_scan_state_sii_size(ec_fsm_slave_scan_t *);
 void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *);
 #ifdef EC_REGALIAS
@@ -69,6 +71,10 @@ void ec_fsm_slave_scan_state_pdos(ec_fsm_slave_scan_t *);
 
 void ec_fsm_slave_scan_state_end(ec_fsm_slave_scan_t *);
 void ec_fsm_slave_scan_state_error(ec_fsm_slave_scan_t *);
+
+/****************************************************************************/
+
+#define EC_SII_WORD_OFFSET_VENDOR 0x0008
 
 /****************************************************************************/
 
@@ -493,6 +499,26 @@ void ec_fsm_slave_scan_enter_assign_sii(
 
 /****************************************************************************/
 
+/** Enter slave scan state SII ident.
+ */
+void ec_fsm_slave_scan_enter_sii_ident(
+        ec_fsm_slave_scan_t *fsm /**< slave state machine */
+        )
+{
+    // Start fetching SII identification (vendor/product/revision/serial)
+    // to check for possible SII cache hits
+
+    EC_SLAVE_DBG(fsm->slave, 1, "Loading SII identification words.\n");
+
+    fsm->sii_offset = EC_SII_WORD_OFFSET_VENDOR;
+    ec_fsm_sii_read(&fsm->fsm_sii, fsm->slave, fsm->sii_offset,
+            EC_FSM_SII_USE_CONFIGURED_ADDRESS);
+    fsm->state = ec_fsm_slave_scan_state_sii_ident;
+    fsm->state(fsm); // execute state immediately
+}
+
+/****************************************************************************/
+
 /**
    Slave scan state: DATALINK.
 */
@@ -537,7 +563,12 @@ void ec_fsm_slave_scan_state_datalink(
 #ifdef EC_SII_ASSIGN
     ec_fsm_slave_scan_enter_assign_sii(fsm);
 #else
-    ec_fsm_slave_scan_enter_sii_size(fsm);
+    if (fsm->slave->master->sii_caching != EC_SII_DISABLE_CACHING) {
+        ec_fsm_slave_scan_enter_sii_ident(fsm);
+    }
+    else {
+        ec_fsm_slave_scan_enter_sii_size(fsm);
+    }
 #endif
 }
 
@@ -574,10 +605,69 @@ void ec_fsm_slave_scan_state_assign_sii(
     }
 
 continue_with_sii_size:
-    ec_fsm_slave_scan_enter_sii_size(fsm);
+    if (fsm->slave->master->sii_caching != EC_SII_DISABLE_CACHING) {
+        ec_fsm_slave_scan_enter_sii_ident(fsm);
+    }
+    else {
+        ec_fsm_slave_scan_enter_sii_size(fsm);
+    }
 }
 
 #endif
+
+/****************************************************************************/
+
+/**
+   Slave scan state: SII ident.
+*/
+
+void ec_fsm_slave_scan_state_sii_ident(
+        ec_fsm_slave_scan_t *fsm /**< slave state machine */
+        )
+{
+    ec_slave_t *slave = fsm->slave;
+
+    if (ec_fsm_sii_exec(&fsm->fsm_sii)) {
+        return;
+    }
+
+    if (!ec_fsm_sii_success(&fsm->fsm_sii)) {
+        fsm->slave->error_flag = 1;
+        fsm->state = ec_fsm_slave_scan_state_error;
+        EC_SLAVE_ERR(slave, "Failed to fetch SII identification.\n");
+        return;
+    }
+
+    // 2 or 4 words fetched?
+    unsigned int words_fitting =
+        EC_NUM_SII_IDENT_WORDS + EC_SII_WORD_OFFSET_VENDOR - fsm->sii_offset;
+    int words_to_copy = min(words_fitting, fsm->fsm_sii.read_word_count);
+    memcpy(fsm->sii_ident + fsm->sii_offset - EC_SII_WORD_OFFSET_VENDOR,
+            fsm->fsm_sii.value, words_to_copy * 2);
+
+    if (fsm->sii_offset - EC_SII_WORD_OFFSET_VENDOR
+            + fsm->fsm_sii.read_word_count < EC_NUM_SII_IDENT_WORDS) {
+        // fetch the next words
+        fsm->sii_offset += fsm->fsm_sii.read_word_count;
+        ec_fsm_sii_read(&fsm->fsm_sii, slave, fsm->sii_offset,
+                        EC_FSM_SII_USE_CONFIGURED_ADDRESS);
+        ec_fsm_sii_exec(&fsm->fsm_sii); // execute state immediately
+        return;
+    }
+
+    uint32_t vendor = EC_READ_U32(fsm->sii_ident);
+    uint32_t product = EC_READ_U32(fsm->sii_ident + 4);
+    uint32_t revision = EC_READ_U32(fsm->sii_ident + 8);
+    uint32_t serial = EC_READ_U32(fsm->sii_ident + 12);
+
+    // all identification words read
+    EC_SLAVE_DBG(slave, 1,
+            "Identification 0x%02x / 0x%02x / 0x%02x / 0x%02x\n",
+            vendor, product, revision, serial);
+
+    // TODO check for cache hit, otherwise fetch complete SII
+    ec_fsm_slave_scan_enter_sii_size(fsm);
+}
 
 /****************************************************************************/
 
@@ -700,7 +790,7 @@ void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *fsm
         EC_READ_U16(slave->sii_words + 0x0004);
     slave->effective_alias = slave->sii.alias;
     slave->sii.vendor_id =
-        EC_READ_U32(slave->sii_words + 0x0008);
+        EC_READ_U32(slave->sii_words + EC_SII_WORD_OFFSET_VENDOR);
     slave->sii.product_code =
         EC_READ_U32(slave->sii_words + 0x000A);
     slave->sii.revision_number =
