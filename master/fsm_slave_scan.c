@@ -677,17 +677,15 @@ void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *fsm
         return;
     }
 
-    // 2 words fetched
+    // 2 or 4 words fetched?
+    unsigned int words_fitting = slave->sii_nwords - fsm->sii_offset;
+    int words_to_copy = min(words_fitting, fsm->fsm_sii.read_word_count);
+    memcpy(slave->sii_words + fsm->sii_offset, fsm->fsm_sii.value,
+            words_to_copy * 2);
 
-    if (fsm->sii_offset + 2 <= slave->sii_nwords) { // 2 words fit
-        memcpy(slave->sii_words + fsm->sii_offset, fsm->fsm_sii.value, 4);
-    } else { // copy the last word
-        memcpy(slave->sii_words + fsm->sii_offset, fsm->fsm_sii.value, 2);
-    }
-
-    if (fsm->sii_offset + 2 < slave->sii_nwords) {
-        // fetch the next 2 words
-        fsm->sii_offset += 2;
+    if (fsm->sii_offset + fsm->fsm_sii.read_word_count < slave->sii_nwords) {
+        // fetch the next words
+        fsm->sii_offset += fsm->fsm_sii.read_word_count;
         ec_fsm_sii_read(&fsm->fsm_sii, slave, fsm->sii_offset,
                         EC_FSM_SII_USE_CONFIGURED_ADDRESS);
         ec_fsm_sii_exec(&fsm->fsm_sii); // execute state immediately
