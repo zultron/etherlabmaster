@@ -1,8 +1,9 @@
 # Since Version 1.6.8
 
 - Added SII caching functionality with
-    - kernel module parameter `sii_caching`
-    - configuration variable `SII_CACHING`
+    - the kernel module parameter `sii_caching`,
+    - the configuration variable `SII_CACHING`,
+    - and the API method `ecrt_master_sii_caching()`.
 
 # Version 1.6.8
 
