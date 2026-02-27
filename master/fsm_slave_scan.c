@@ -1,6 +1,6 @@
 /*****************************************************************************
  *
- *  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2026  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -94,7 +94,9 @@ void ec_fsm_slave_scan_init(
 
 /** Destructor.
  */
-void ec_fsm_slave_scan_clear(ec_fsm_slave_scan_t *fsm /**< slave state machine */)
+void ec_fsm_slave_scan_clear(
+        ec_fsm_slave_scan_t *fsm /**< slave state machine */
+        )
 {
     // clear sub state machines
     ec_fsm_sii_clear(&fsm->fsm_sii);
@@ -138,7 +140,9 @@ int ec_fsm_slave_scan_running(
    \return false, if state machine has terminated
 */
 
-int ec_fsm_slave_scan_exec(ec_fsm_slave_scan_t *fsm /**< slave state machine */)
+int ec_fsm_slave_scan_exec(
+        ec_fsm_slave_scan_t *fsm /**< slave state machine */
+        )
 {
     if (fsm->datagram->state == EC_DATAGRAM_SENT
         || fsm->datagram->state == EC_DATAGRAM_QUEUED) {
@@ -156,7 +160,9 @@ int ec_fsm_slave_scan_exec(ec_fsm_slave_scan_t *fsm /**< slave state machine */)
    \return true, if the state machine terminated gracefully
 */
 
-int ec_fsm_slave_scan_success(const ec_fsm_slave_scan_t *fsm /**< slave state machine */)
+int ec_fsm_slave_scan_success(
+        const ec_fsm_slave_scan_t *fsm /**< slave state machine */
+        )
 {
     return fsm->state == ec_fsm_slave_scan_state_end;
 }
@@ -171,7 +177,9 @@ int ec_fsm_slave_scan_success(const ec_fsm_slave_scan_t *fsm /**< slave state ma
    slave, according to its ring position.
 */
 
-void ec_fsm_slave_scan_state_start(ec_fsm_slave_scan_t *fsm /**< slave state machine */)
+void ec_fsm_slave_scan_state_start(
+        ec_fsm_slave_scan_t *fsm /**< slave state machine */
+        )
 {
     // write station address
     ec_datagram_apwr(fsm->datagram, fsm->slave->ring_position, 0x0010, 2);
