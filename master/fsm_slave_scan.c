@@ -646,7 +646,7 @@ void ec_fsm_slave_scan_state_sii_ident(
         slave->sii.alias = EC_READ_U16(fsm->fsm_sii.value);
         slave->effective_alias = slave->sii.alias;
 
-        EC_SLAVE_DBG(slave, 1, "Alias 0x%04X\n", slave->sii.alias);
+        EC_SLAVE_DBG(slave, 1, "Alias %u\n", slave->sii.alias);
 
         // Continue with vendor ID
         fsm->sii_offset = EC_SII_WORD_OFFSET_VENDOR;
