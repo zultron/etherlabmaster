@@ -1,6 +1,6 @@
 /*****************************************************************************
  *
- *  Copyright (C) 2006-2020  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2026  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -162,7 +162,8 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
         dev_t device_number, /**< Character device number. */
         struct class *class, /**< Device class. */
         unsigned int debug_level, /**< Debug level (module parameter). */
-        unsigned int run_on_cpu /**< bind created kernel threads to a cpu */
+        unsigned int run_on_cpu, /**< Bind created kernel threads to a cpu. */
+        unsigned int sii_caching /**< SII caching mode. */
         )
 {
     int ret;
@@ -242,6 +243,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 
     master->debug_level = debug_level;
     master->run_on_cpu = run_on_cpu;
+    master->sii_caching = sii_caching;
     master->stats.timeouts = 0;
     master->stats.corrupted = 0;
     master->stats.unmatched = 0;

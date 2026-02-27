@@ -1,6 +1,6 @@
 /*****************************************************************************
  *
- *  Copyright (C) 2006-2024  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2026  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -273,7 +273,8 @@ struct ec_master {
     unsigned int fsm_exec_count; /**< Number of entries in execution list. */
 
     unsigned int debug_level; /**< Master debug level. */
-    unsigned int run_on_cpu;  /**< bind kernel threads to this cpu */
+    unsigned int run_on_cpu;  /**< Bind kernel threads to this cpu. */
+    unsigned int sii_caching;  /**< SII caching mode. */
     ec_stats_t stats; /**< Cyclic statistics. */
 
     struct task_struct *thread; /**< Master thread. */
@@ -312,7 +313,8 @@ void ec_master_init_static(void);
 
 // master creation/deletion
 int ec_master_init(ec_master_t *, unsigned int, const uint8_t *,
-        const uint8_t *, dev_t, struct class *, unsigned int, unsigned int);
+        const uint8_t *, dev_t, struct class *, unsigned int, unsigned int,
+        unsigned int);
 void ec_master_clear(ec_master_t *);
 
 /** Number of Ethernet devices.
