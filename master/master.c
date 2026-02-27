@@ -53,7 +53,8 @@
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0) || \
-    (defined(CONFIG_PREEMPT_RT_FULL) && LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0))
+    (defined(CONFIG_PREEMPT_RT_FULL) && \
+     LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0))
 #  define ec_rt_lock_interruptible(lock) \
           rt_mutex_lock_interruptible(lock)
 #else
@@ -75,6 +76,11 @@
 
 /** SDO injection timeout in microseconds. */
 #define EC_SDO_INJECTION_TIMEOUT 10000
+
+/** SII caching mask (combination of valid flags). */
+#define EC_SII_CACHING_MASK \
+    (EC_SII_VENDOR | EC_SII_PRODUCT | \
+     EC_SII_REVISION | EC_SII_SERIAL | EC_SII_ALIAS)
 
 #ifdef EC_HAVE_CYCLES
 
@@ -243,7 +249,7 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 
     master->debug_level = debug_level;
     master->run_on_cpu = run_on_cpu;
-    master->sii_caching = sii_caching;
+    master->sii_caching = sii_caching & EC_SII_CACHING_MASK;
     master->stats.timeouts = 0;
     master->stats.corrupted = 0;
     master->stats.unmatched = 0;
@@ -598,8 +604,9 @@ int ec_master_thread_start(
         return err;
     }
     if (0xffffffff != master->run_on_cpu) {
-        EC_MASTER_INFO(master, " binding thread to cpu %u\n",master->run_on_cpu);
-        kthread_bind(master->thread,master->run_on_cpu);
+        EC_MASTER_INFO(master, " binding thread to cpu %u\n",
+                master->run_on_cpu);
+        kthread_bind(master->thread, master->run_on_cpu);
     }
     /* Ignoring return value of wake_up_process */
     (void) wake_up_process(master->thread);
@@ -3296,6 +3303,24 @@ int ecrt_master_reset(ec_master_t *master)
 
 /****************************************************************************/
 
+int ecrt_master_sii_caching(ec_master_t *master,
+        ec_sii_caching_fields_t fields)
+{
+    fields &= EC_SII_CACHING_MASK;
+
+    if (master->sii_caching == fields) {
+        // no changes
+        return 0;
+    }
+
+    EC_MASTER_DBG(master, 1, "Setting SII caching fields to %u.\n",
+            fields);
+    master->sii_caching = fields;
+    return 0;
+}
+
+/****************************************************************************/
+
 static void sc_reset_task_kicker(struct irq_work *work)
 {
     struct ec_master *master =
@@ -3346,6 +3371,7 @@ EXPORT_SYMBOL(ecrt_master_sdo_upload);
 EXPORT_SYMBOL(ecrt_master_write_idn);
 EXPORT_SYMBOL(ecrt_master_read_idn);
 EXPORT_SYMBOL(ecrt_master_reset);
+EXPORT_SYMBOL(ecrt_master_sii_caching);
 
 /** \endcond */
 
