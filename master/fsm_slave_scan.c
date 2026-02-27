@@ -74,7 +74,8 @@ void ec_fsm_slave_scan_state_error(ec_fsm_slave_scan_t *);
 
 /****************************************************************************/
 
-#define EC_SII_WORD_OFFSET_VENDOR 0x0008
+#define EC_SII_WORD_OFFSET_ALIAS  (0x0004)
+#define EC_SII_WORD_OFFSET_VENDOR (0x0008)
 
 /****************************************************************************/
 
@@ -505,12 +506,12 @@ void ec_fsm_slave_scan_enter_sii_ident(
         ec_fsm_slave_scan_t *fsm /**< slave state machine */
         )
 {
-    // Start fetching SII identification (vendor/product/revision/serial)
+    // Start fetching identification (alias/vendor/product/revision/serial)
     // to check for possible SII cache hits
 
     EC_SLAVE_DBG(fsm->slave, 1, "Loading SII identification words.\n");
 
-    fsm->sii_offset = EC_SII_WORD_OFFSET_VENDOR;
+    fsm->sii_offset = EC_SII_WORD_OFFSET_ALIAS;
     ec_fsm_sii_read(&fsm->fsm_sii, fsm->slave, fsm->sii_offset,
             EC_FSM_SII_USE_CONFIGURED_ADDRESS);
     fsm->state = ec_fsm_slave_scan_state_sii_ident;
@@ -638,31 +639,50 @@ void ec_fsm_slave_scan_state_sii_ident(
         return;
     }
 
-    // 2 or 4 words fetched?
-    unsigned int words_fitting =
-        EC_NUM_SII_IDENT_WORDS + EC_SII_WORD_OFFSET_VENDOR - fsm->sii_offset;
-    int words_to_copy = min(words_fitting, fsm->fsm_sii.read_word_count);
-    memcpy(fsm->sii_ident + fsm->sii_offset - EC_SII_WORD_OFFSET_VENDOR,
-            fsm->fsm_sii.value, words_to_copy * 2);
+    if (fsm->sii_offset == EC_SII_WORD_OFFSET_ALIAS) {
+        // First step: Fetch alias from 0x0004, then go to 0x0008
+        // unfortunately it makes no sense to read through, if only 2 words
+        // are read in parallel (depends on the slave)
+        slave->sii.alias = EC_READ_U16(fsm->fsm_sii.value);
+        slave->effective_alias = slave->sii.alias;
 
-    if (fsm->sii_offset - EC_SII_WORD_OFFSET_VENDOR
-            + fsm->fsm_sii.read_word_count < EC_NUM_SII_IDENT_WORDS) {
-        // fetch the next words
-        fsm->sii_offset += fsm->fsm_sii.read_word_count;
+        EC_SLAVE_DBG(slave, 1, "Alias 0x%04X\n", slave->sii.alias);
+
+        // Continue with vendor ID
+        fsm->sii_offset = EC_SII_WORD_OFFSET_VENDOR;
         ec_fsm_sii_read(&fsm->fsm_sii, slave, fsm->sii_offset,
                         EC_FSM_SII_USE_CONFIGURED_ADDRESS);
         ec_fsm_sii_exec(&fsm->fsm_sii); // execute state immediately
         return;
     }
 
+    // Vendor ID and following
+    unsigned int words_fitting =
+        EC_NUM_SII_IDENT_WORDS + EC_SII_WORD_OFFSET_VENDOR
+        - fsm->sii_offset;
+    int words_to_copy = min(words_fitting, fsm->fsm_sii.read_word_count);
+    memcpy(fsm->sii_ident + fsm->sii_offset - EC_SII_WORD_OFFSET_VENDOR,
+            fsm->fsm_sii.value, words_to_copy * 2);
+
+    if (fsm->sii_offset - EC_SII_WORD_OFFSET_VENDOR
+            + fsm->fsm_sii.read_word_count < EC_NUM_SII_IDENT_WORDS) {
+        // fetch the remaining words
+        fsm->sii_offset += fsm->fsm_sii.read_word_count;
+        ec_fsm_sii_read(&fsm->fsm_sii, slave, fsm->sii_offset,
+                EC_FSM_SII_USE_CONFIGURED_ADDRESS);
+        ec_fsm_sii_exec(&fsm->fsm_sii); // execute state immediately
+        return;
+    }
+
+    // All identification words read
+
     uint32_t vendor = EC_READ_U32(fsm->sii_ident);
     uint32_t product = EC_READ_U32(fsm->sii_ident + 4);
     uint32_t revision = EC_READ_U32(fsm->sii_ident + 8);
     uint32_t serial = EC_READ_U32(fsm->sii_ident + 12);
 
-    // all identification words read
     EC_SLAVE_DBG(slave, 1,
-            "Identification 0x%02x / 0x%02x / 0x%02x / 0x%02x\n",
+            "Identification 0x%08X / 0x%08X / 0x%08X / 0x%08X\n",
             vendor, product, revision, serial);
 
     // TODO check for cache hit, otherwise fetch complete SII
@@ -787,7 +807,7 @@ void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *fsm
     ec_slave_clear_sync_managers(slave);
 
     slave->sii.alias =
-        EC_READ_U16(slave->sii_words + 0x0004);
+        EC_READ_U16(slave->sii_words + EC_SII_WORD_OFFSET_ALIAS);
     slave->effective_alias = slave->sii.alias;
     slave->sii.vendor_id =
         EC_READ_U32(slave->sii_words + EC_SII_WORD_OFFSET_VENDOR);
