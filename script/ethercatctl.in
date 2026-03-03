@@ -25,13 +25,13 @@
 #
 #------------------------------------------------------------------------------
 
-LSMOD=/sbin/lsmod
-MODPROBE=/sbin/modprobe
-RMMOD=/sbin/rmmod
-MODINFO=/sbin/modinfo
-IP=/bin/ip
+LSMOD="@kmoddir@/lsmod"
+MODPROBE="@kmoddir@/modprobe"
+RMMOD="@kmoddir@/rmmod"
+MODINFO="@kmoddir@/modinfo"
+IP="@ipcmd@"
 
-ETHERCAT=@bindir@/ethercat
+ETHERCAT="@bindir@/ethercat"
 
 #------------------------------------------------------------------------------
 
@@ -39,7 +39,7 @@ if [ "$1" = "-c" ]; then
     ETHERCAT_CONFIG="$2"
     COMMAND="$3"
 else
-    ETHERCAT_CONFIG=@sysconfdir@/ethercat.conf
+    ETHERCAT_CONFIG="@sysconfdir@/ethercat.conf"
     COMMAND="$1"
 fi
 
