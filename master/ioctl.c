@@ -287,6 +287,7 @@ static ATTRIBUTES int ec_ioctl_slave(
     data.sync_count = slave->sii.sync_count;
     data.sdo_count = ec_slave_sdo_count(slave);
     data.sii_nwords = slave->sii_nwords;
+    data.sii_parallel_words = slave->sii_parallel_words;
     ec_ioctl_strcpy(data.group, slave->sii.group);
     ec_ioctl_strcpy(data.image, slave->sii.image);
     ec_ioctl_strcpy(data.order, slave->sii.order);

@@ -1,6 +1,6 @@
 /*****************************************************************************
  *
- *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2026  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -210,6 +210,9 @@ struct ec_slave
     // SII
     uint16_t *sii_words; /**< Complete SII image. */
     size_t sii_nwords; /**< Size of the SII contents in words. */
+    unsigned int sii_parallel_words; /**< How many SII words the slave can
+                                       read at once. Zero means that this
+                                       information is not available yet. */
 
     // Slave information interface
     ec_sii_t sii; /**< Extracted SII data. */

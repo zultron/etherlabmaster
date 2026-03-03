@@ -111,6 +111,7 @@ void ec_slave_init(
 
     slave->sii_words = NULL;
     slave->sii_nwords = 0;
+    slave->sii_parallel_words = 0;
 
     slave->sii.alias = 0x0000;
     slave->sii.vendor_id = 0x00000000;

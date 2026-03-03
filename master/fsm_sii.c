@@ -307,8 +307,11 @@ void ec_fsm_sii_state_read_fetch(
         return;
     }
 
-    // if 0x0502.6 is set, we have read 8 bytes (instead of 4)
+    // if 0x0502.6 is set, we have read 4 words (instead of 2)
     fsm->read_word_count = EC_READ_U8(datagram->data) & 0x40 ? 4 : 2;
+    if (fsm->read_word_count > fsm->slave->sii_parallel_words) {
+        fsm->slave->sii_parallel_words = fsm->read_word_count;
+    }
 
     // SII value received.
     memcpy(fsm->value, datagram->data + 6, fsm->read_word_count * 2);

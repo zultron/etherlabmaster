@@ -258,6 +258,7 @@ typedef struct {
     uint8_t sync_count;
     uint16_t sdo_count;
     uint32_t sii_nwords;
+    uint32_t sii_parallel_words;
     char group[EC_IOCTL_STRING_SIZE];
     char image[EC_IOCTL_STRING_SIZE];
     char order[EC_IOCTL_STRING_SIZE];
