@@ -1,6 +1,6 @@
 /*****************************************************************************
  *
- *  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2026  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -62,9 +62,9 @@ struct ec_fsm_slave_scan
 
     ec_fsm_sii_t fsm_sii; /**< SII state machine. */
 
-    uint8_t sii_ident[EC_NUM_SII_IDENT_WORDS * 2]; // temporary storage for
-                                                   // slave identification
-                                                   // objects
+    uint8_t sii_ident[EC_NUM_SII_IDENT_WORDS * 2]; /**< Temporary storage for
+                                                     slave identification
+                                                     objects. */
 };
 
 /****************************************************************************/
