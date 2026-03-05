@@ -627,6 +627,9 @@ void ec_fsm_slave_scan_state_sii_ident(
         )
 {
     ec_slave_t *slave = fsm->slave;
+    unsigned int words_fitting;
+    int words_to_copy;
+    uint32_t vendor, product, revision, serial;
 
     if (ec_fsm_sii_exec(&fsm->fsm_sii)) {
         return;
@@ -657,10 +660,9 @@ void ec_fsm_slave_scan_state_sii_ident(
     }
 
     // Vendor ID and following
-    unsigned int words_fitting =
-        EC_NUM_SII_IDENT_WORDS + EC_SII_WORD_OFFSET_VENDOR
+    words_fitting = EC_NUM_SII_IDENT_WORDS + EC_SII_WORD_OFFSET_VENDOR
         - fsm->sii_offset;
-    int words_to_copy = min(words_fitting, fsm->fsm_sii.read_word_count);
+    words_to_copy = min(words_fitting, fsm->fsm_sii.read_word_count);
     memcpy(fsm->sii_ident + fsm->sii_offset - EC_SII_WORD_OFFSET_VENDOR,
             fsm->fsm_sii.value, words_to_copy * 2);
 
@@ -676,10 +678,10 @@ void ec_fsm_slave_scan_state_sii_ident(
 
     // All identification words read
 
-    uint32_t vendor = EC_READ_U32(fsm->sii_ident);
-    uint32_t product = EC_READ_U32(fsm->sii_ident + 4);
-    uint32_t revision = EC_READ_U32(fsm->sii_ident + 8);
-    uint32_t serial = EC_READ_U32(fsm->sii_ident + 12);
+    vendor = EC_READ_U32(fsm->sii_ident);
+    product = EC_READ_U32(fsm->sii_ident + 4);
+    revision = EC_READ_U32(fsm->sii_ident + 8);
+    serial = EC_READ_U32(fsm->sii_ident + 12);
 
     EC_SLAVE_DBG(slave, 1,
             "Identification 0x%08X / 0x%08X / 0x%08X / 0x%08X\n",
@@ -777,6 +779,8 @@ void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *fsm
 {
     ec_slave_t *slave = fsm->slave;
     uint16_t *cat_word, cat_type, cat_size;
+    unsigned int words_fitting;
+    int words_to_copy;
 
     if (ec_fsm_sii_exec(&fsm->fsm_sii)) return;
 
@@ -788,8 +792,8 @@ void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *fsm
     }
 
     // 2 or 4 words fetched?
-    unsigned int words_fitting = slave->sii_nwords - fsm->sii_offset;
-    int words_to_copy = min(words_fitting, fsm->fsm_sii.read_word_count);
+    words_fitting = slave->sii_nwords - fsm->sii_offset;
+    words_to_copy = min(words_fitting, fsm->fsm_sii.read_word_count);
     memcpy(slave->sii_words + fsm->sii_offset, fsm->fsm_sii.value,
             words_to_copy * 2);
 
