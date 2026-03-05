@@ -664,8 +664,8 @@ void ec_fsm_slave_scan_state_sii_ident(
     words_fitting = EC_NUM_SII_IDENT_WORDS + EC_SII_WORD_OFFSET_VENDOR
         - fsm->sii_offset;
     words_to_copy = min(words_fitting, fsm->fsm_sii.read_word_count);
-    memcpy(fsm->sii_ident + fsm->sii_offset - EC_SII_WORD_OFFSET_VENDOR,
-            fsm->fsm_sii.value, words_to_copy * 2);
+    memcpy(fsm->sii_ident + (fsm->sii_offset - EC_SII_WORD_OFFSET_VENDOR) * 2,
+                    fsm->fsm_sii.value, words_to_copy * 2);
 
     if (fsm->sii_offset - EC_SII_WORD_OFFSET_VENDOR
             + fsm->fsm_sii.read_word_count < EC_NUM_SII_IDENT_WORDS) {
