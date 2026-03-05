@@ -74,11 +74,6 @@ void ec_fsm_slave_scan_state_error(ec_fsm_slave_scan_t *);
 
 /****************************************************************************/
 
-#define EC_SII_WORD_OFFSET_ALIAS  (0x0004)
-#define EC_SII_WORD_OFFSET_VENDOR (0x0008)
-
-/****************************************************************************/
-
 /** Constructor.
  */
 void ec_fsm_slave_scan_init(
@@ -635,6 +630,7 @@ void ec_fsm_slave_scan_state_sii_ident(
     unsigned int words_fitting;
     int words_to_copy;
     uint32_t vendor, product, revision, serial;
+    ec_sii_page_t *cached;
 
     if (ec_fsm_sii_exec(&fsm->fsm_sii)) {
         return;
@@ -692,7 +688,43 @@ void ec_fsm_slave_scan_state_sii_ident(
             "Identification 0x%08X / 0x%08X / 0x%08X / 0x%08X\n",
             vendor, product, revision, serial);
 
-    // TODO check for cache hit, otherwise fetch complete SII
+    cached = ec_master_find_cached_sii_page(slave->master, vendor,
+            product, revision, serial, slave->sii.alias);
+    if (cached) {
+        EC_SLAVE_DBG(slave, 1, "Found matching SII page in cache.\n");
+
+        int ret = ec_sii_page_copy(&slave->sii_page, cached);
+        if (ret) {
+            EC_SLAVE_ERR(slave, "Failed to copy cached SII page.\n");
+            fsm->slave->error_flag = 1;
+            fsm->state = ec_fsm_slave_scan_state_error;
+            return;
+        }
+
+        slave->sii_page.origin = EC_SII_PAGE_CACHED;
+
+        // Evaluate the (cached) SII contents...
+        if (ec_slave_analyze_sii_data(slave)) {
+            EC_SLAVE_ERR(slave, "Failed to analyze category data.\n");
+            fsm->slave->error_flag = 1;
+            fsm->state = ec_fsm_slave_scan_state_error;
+            return;
+        }
+
+#ifdef EC_REGALIAS
+        ec_fsm_slave_scan_enter_regalias(fsm);
+#else
+        if (slave->sii.mailbox_protocols & EC_MBOX_COE) {
+            ec_fsm_slave_scan_enter_preop(fsm);
+        } else {
+            fsm->state = ec_fsm_slave_scan_state_end;
+        }
+#endif
+        return;
+    }
+
+    EC_SLAVE_DBG(slave, 1, "No matching SII page found in cache.\n");
+    // We will have to read it out by ourselves. Sigh...
     ec_fsm_slave_scan_enter_sii_size(fsm);
 }
 
@@ -758,8 +790,6 @@ alloc_sii:
         return;
     }
 
-    slave->sii_page.origin = EC_SII_PAGE_FETCHED;
-
     // Start fetching SII contents
 
     fsm->state = ec_fsm_slave_scan_state_sii_data;
@@ -775,11 +805,11 @@ alloc_sii:
    Slave scan state: SII DATA.
 */
 
-void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *fsm
-        /**< slave state machine */)
+void ec_fsm_slave_scan_state_sii_data(
+        ec_fsm_slave_scan_t *fsm /**< slave state machine */
+        )
 {
     ec_slave_t *slave = fsm->slave;
-    uint16_t *cat_word, cat_type, cat_size;
     unsigned int words_fitting;
     int words_to_copy;
 
@@ -792,7 +822,7 @@ void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *fsm
         return;
     }
 
-    // 2 or 4 words fetched?
+    // Did we get 2 or 4 words?
     words_fitting = slave->sii_page.word_count - fsm->sii_offset;
     words_to_copy = min(words_fitting, fsm->fsm_sii.read_word_count);
     memcpy(slave->sii_page.words + fsm->sii_offset, fsm->fsm_sii.value,
@@ -808,179 +838,17 @@ void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *fsm
         return;
     }
 
-    // Evaluate SII contents
+    slave->sii_page.origin = EC_SII_PAGE_FETCHED;
 
-    ec_slave_clear_sync_managers(slave);
-
-    slave->sii.alias =
-        EC_READ_U16(slave->sii_page.words + EC_SII_WORD_OFFSET_ALIAS);
-    slave->effective_alias = slave->sii.alias;
-    slave->sii.vendor_id =
-        EC_READ_U32(slave->sii_page.words + EC_SII_WORD_OFFSET_VENDOR);
-    slave->sii.product_code =
-        EC_READ_U32(slave->sii_page.words + 0x000A);
-    slave->sii.revision_number =
-        EC_READ_U32(slave->sii_page.words + 0x000C);
-    slave->sii.serial_number =
-        EC_READ_U32(slave->sii_page.words + 0x000E);
-    slave->sii.boot_rx_mailbox_offset =
-        EC_READ_U16(slave->sii_page.words + 0x0014);
-    slave->sii.boot_rx_mailbox_size =
-        EC_READ_U16(slave->sii_page.words + 0x0015);
-    slave->sii.boot_tx_mailbox_offset =
-        EC_READ_U16(slave->sii_page.words + 0x0016);
-    slave->sii.boot_tx_mailbox_size =
-        EC_READ_U16(slave->sii_page.words + 0x0017);
-    slave->sii.std_rx_mailbox_offset =
-        EC_READ_U16(slave->sii_page.words + 0x0018);
-    slave->sii.std_rx_mailbox_size =
-        EC_READ_U16(slave->sii_page.words + 0x0019);
-    slave->sii.std_tx_mailbox_offset =
-        EC_READ_U16(slave->sii_page.words + 0x001A);
-    slave->sii.std_tx_mailbox_size =
-        EC_READ_U16(slave->sii_page.words + 0x001B);
-    slave->sii.mailbox_protocols =
-        EC_READ_U16(slave->sii_page.words + 0x001C);
-    if (slave->sii.mailbox_protocols) {
-        int need_delim = 0;
-        uint16_t all = EC_MBOX_AOE | EC_MBOX_COE | EC_MBOX_FOE |
-            EC_MBOX_SOE | EC_MBOX_VOE;
-        if ((slave->sii.mailbox_protocols & all) &&
-                slave->master->debug_level >= 1) {
-            EC_SLAVE_DBG(slave, 1, "Slave announces to support ");
-            if (slave->sii.mailbox_protocols & EC_MBOX_AOE) {
-                printk(KERN_CONT "AoE");
-                need_delim = 1;
-            }
-            if (slave->sii.mailbox_protocols & EC_MBOX_COE) {
-                if (need_delim) {
-                    printk(KERN_CONT ", ");
-                }
-                printk(KERN_CONT "CoE");
-                need_delim = 1;
-            }
-            if (slave->sii.mailbox_protocols & EC_MBOX_FOE) {
-                if (need_delim) {
-                    printk(KERN_CONT ", ");
-                }
-                printk(KERN_CONT "FoE");
-                need_delim = 1;
-            }
-            if (slave->sii.mailbox_protocols & EC_MBOX_SOE) {
-                if (need_delim) {
-                    printk(KERN_CONT ", ");
-                }
-                printk(KERN_CONT "SoE");
-                need_delim = 1;
-            }
-            if (slave->sii.mailbox_protocols & EC_MBOX_VOE) {
-                if (need_delim) {
-                    printk(KERN_CONT ", ");
-                }
-                printk(KERN_CONT "VoE");
-                need_delim = 1;
-            }
-            printk(KERN_CONT ".\n");
-        }
-        if (slave->sii.mailbox_protocols & ~all) {
-            EC_SLAVE_DBG(slave, 1, "Slave announces to support unknown"
-                    " mailbox protocols 0x%04X.",
-                    slave->sii.mailbox_protocols & ~all);
-        }
-    }
-    else {
-        EC_SLAVE_DBG(slave, 1, "Slave announces to support no mailbox"
-                " protocols.");
+    // All words read. Evaluate the SII contents...
+    if (ec_slave_analyze_sii_data(slave)) {
+        EC_SLAVE_ERR(slave, "Failed to analyze category data.\n");
+        fsm->slave->error_flag = 1;
+        fsm->state = ec_fsm_slave_scan_state_error;
     }
 
-    if (slave->sii.boot_rx_mailbox_offset == 0xffff ||
-            slave->sii.boot_rx_mailbox_size == 0xffff ||
-            slave->sii.boot_tx_mailbox_offset == 0xffff ||
-            slave->sii.boot_tx_mailbox_size == 0xffff ||
-            slave->sii.std_rx_mailbox_offset == 0xffff ||
-            slave->sii.std_rx_mailbox_size == 0xffff ||
-            slave->sii.std_tx_mailbox_offset == 0xffff ||
-            slave->sii.std_tx_mailbox_size == 0xffff) {
-        slave->sii.mailbox_protocols = 0x0000;
-        EC_SLAVE_ERR(slave, "Invalid mailbox settings in SII."
-                " Disabling mailbox communication.");
-    }
-
-    if (slave->sii_page.word_count == EC_FIRST_SII_CATEGORY_OFFSET) {
-        // sii does not contain category data
-        fsm->state = ec_fsm_slave_scan_state_end;
-        return;
-    }
-
-    if (slave->sii_page.word_count < EC_FIRST_SII_CATEGORY_OFFSET + 1) {
-        EC_SLAVE_ERR(slave, "Unexpected end of SII data:"
-                " First category header missing.\n");
-        goto end;
-    }
-
-    // evaluate category data
-    cat_word = slave->sii_page.words + EC_FIRST_SII_CATEGORY_OFFSET;
-    while (EC_READ_U16(cat_word) != 0xFFFF) {
-
-        // type and size words must fit
-        if (cat_word + 2 - slave->sii_page.words
-                > slave->sii_page.word_count) {
-            EC_SLAVE_ERR(slave, "Unexpected end of SII data:"
-                    " Category header incomplete.\n");
-            goto end;
-        }
-
-        cat_type = EC_READ_U16(cat_word) & 0x7FFF;
-        cat_size = EC_READ_U16(cat_word + 1);
-        cat_word += 2;
-
-        if (cat_word + cat_size - slave->sii_page.words
-                > slave->sii_page.word_count) {
-            EC_SLAVE_WARN(slave, "Unexpected end of SII data:"
-                    " Category data incomplete.\n");
-            goto end;
-        }
-
-        switch (cat_type) {
-            case 0x000A:
-                if (ec_slave_fetch_sii_strings(slave, (uint8_t *) cat_word,
-                            cat_size * 2))
-                    goto end;
-                break;
-            case 0x001E:
-                if (ec_slave_fetch_sii_general(slave, (uint8_t *) cat_word,
-                            cat_size * 2))
-                    goto end;
-                break;
-            case 0x0028:
-                break;
-            case 0x0029:
-                if (ec_slave_fetch_sii_syncs(slave, (uint8_t *) cat_word,
-                            cat_size * 2))
-                    goto end;
-                break;
-            case 0x0032:
-                if (ec_slave_fetch_sii_pdos( slave, (uint8_t *) cat_word,
-                            cat_size * 2, EC_DIR_INPUT)) // TxPDO
-                    goto end;
-                break;
-            case 0x0033:
-                if (ec_slave_fetch_sii_pdos( slave, (uint8_t *) cat_word,
-                            cat_size * 2, EC_DIR_OUTPUT)) // RxPDO
-                    goto end;
-                break;
-            default:
-                EC_SLAVE_DBG(slave, 1, "Unknown category type 0x%04X.\n",
-                        cat_type);
-        }
-
-        cat_word += cat_size;
-        if (cat_word - slave->sii_page.words >= slave->sii_page.word_count) {
-            EC_SLAVE_WARN(slave, "Unexpected end of SII data:"
-                    " Next category header missing.\n");
-            goto end;
-        }
-    }
+    // Add the page that we just read to the cache
+    ec_master_cache_sii_page(slave->master, &slave->sii_page);
 
 #ifdef EC_REGALIAS
     ec_fsm_slave_scan_enter_regalias(fsm);
@@ -991,12 +859,6 @@ void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *fsm
         fsm->state = ec_fsm_slave_scan_state_end;
     }
 #endif
-    return;
-
-end:
-    EC_SLAVE_ERR(slave, "Failed to analyze category data.\n");
-    fsm->slave->error_flag = 1;
-    fsm->state = ec_fsm_slave_scan_state_error;
 }
 
 /****************************************************************************/

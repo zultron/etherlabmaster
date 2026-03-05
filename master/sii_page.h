@@ -30,6 +30,7 @@
 #define __EC_SII_PAGE_H__
 
 #include <linux/types.h>
+#include <linux/list.h>
 
 /****************************************************************************/
 
@@ -45,6 +46,8 @@ typedef enum {
  */
 typedef struct ec_sii_page
 {
+    struct list_head list; /**< List item (for cache). */
+
     // Identification for caching
     uint32_t vendor_id; /**< Vendor ID. */
     uint32_t product_code; /**< Vendor-specific product code. */
@@ -65,6 +68,7 @@ void ec_sii_page_init(ec_sii_page_t *);
 void ec_sii_page_clear(ec_sii_page_t *);
 
 int ec_sii_page_alloc(ec_sii_page_t *, size_t);
+int ec_sii_page_copy(ec_sii_page_t *, const ec_sii_page_t *);
 
 /****************************************************************************/
 

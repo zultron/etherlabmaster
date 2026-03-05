@@ -93,3 +93,32 @@ int ec_sii_page_alloc(
 }
 
 /****************************************************************************/
+
+/**
+ * Copy contents from other page.
+ */
+int ec_sii_page_copy(
+        ec_sii_page_t *page, /**< Target. */
+        const ec_sii_page_t *from /**< Source. */
+        )
+{
+    int ret;
+
+    page->vendor_id = from->vendor_id;
+    page->product_code = from->product_code;
+    page->revision_number = from->revision_number;
+    page->serial_number = from->serial_number;
+    page->alias = from->alias;
+
+    page->origin = from->origin;
+
+    ret = ec_sii_page_alloc(page, from->word_count);
+    if (ret) {
+        return ret;
+    }
+
+    memcpy(page->words, from->words, page->word_count * 2);
+    return 0;
+}
+
+/****************************************************************************/

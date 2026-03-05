@@ -113,6 +113,7 @@ const unsigned int rate_intervals[] = {
 /****************************************************************************/
 
 void ec_master_clear_config(ec_master_t *);
+void ec_master_clear_sii_cache(ec_master_t *);
 void ec_master_clear_slave_configs(ec_master_t *);
 void ec_master_clear_domains(ec_master_t *);
 int ec_master_thread_start(ec_master_t *, int (*)(void *), const char *);
@@ -133,6 +134,9 @@ void ec_master_find_dc_ref_clock(ec_master_t *);
 void ec_master_clear_device_stats(ec_master_t *);
 void ec_master_update_device_stats(ec_master_t *);
 void ec_master_nanosleep(const unsigned long);
+int ec_master_cached_sii_page_matches(const ec_master_t *,
+        const ec_sii_page_t *, uint32_t, uint32_t, uint32_t, uint32_t,
+        uint16_t);
 static void sc_reset_task_kicker(struct irq_work *work);
 static void sc_reset_task(struct work_struct *work);
 
@@ -207,6 +211,8 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 
     master->slaves = NULL;
     master->slave_count = 0;
+
+    INIT_LIST_HEAD(&master->sii_cache);
 
     INIT_LIST_HEAD(&master->configs);
     INIT_LIST_HEAD(&master->domains);
@@ -427,6 +433,7 @@ void ec_master_clear(
     ec_master_clear_domains(master);
     ec_master_clear_slave_configs(master);
     ec_master_clear_slaves(master);
+    ec_master_clear_sii_cache(master);
 
     ec_datagram_clear(&master->sync_mon_datagram);
     ec_datagram_clear(&master->sync_datagram);
@@ -463,6 +470,21 @@ void ec_master_clear_eoe_handlers(
     }
 }
 #endif
+
+/****************************************************************************/
+
+/** Clear SII page cache.
+ */
+void ec_master_clear_sii_cache(ec_master_t *master)
+{
+    ec_sii_page_t *page, *next;
+
+    list_for_each_entry_safe(page, next, &master->sii_cache, list) {
+        list_del(&page->list);
+        ec_sii_page_clear(page);
+        kfree(page);
+    }
+}
 
 /****************************************************************************/
 
@@ -2243,6 +2265,143 @@ void ec_master_request_op(
     }
 }
 
+/****************************************************************************/
+
+/** Check if a cached SII page is matching the caching criteria.
+ *
+ * Returns non-zero if matching.
+ */
+int ec_master_cached_sii_page_matches(
+        const ec_master_t *master, /**< EtherCAT master. */
+        const ec_sii_page_t *cached_page, /**< SII page. */
+        uint32_t vendor_id,
+        uint32_t product_code,
+        uint32_t revision,
+        uint32_t serial,
+        uint16_t alias)
+{
+    if (!master->sii_caching) {
+        return 0;
+    }
+
+    if ((master->sii_caching & EC_SII_VENDOR) &&
+            cached_page->vendor_id != vendor_id) {
+        return 0;
+    }
+
+    if ((master->sii_caching & EC_SII_PRODUCT) &&
+            cached_page->product_code != product_code) {
+        return 0;
+    }
+
+    if ((master->sii_caching & EC_SII_REVISION) &&
+            cached_page->revision_number != revision) {
+        return 0;
+    }
+
+    if ((master->sii_caching & EC_SII_SERIAL) &&
+            (!serial || cached_page->serial_number != serial)) {
+        return 0;
+    }
+
+    if ((master->sii_caching & EC_SII_ALIAS) &&
+            (!alias || cached_page->alias != alias)) {
+        return 0;
+    }
+
+    return 1;
+}
+
+/****************************************************************************/
+
+/** Find a matching cached SII page.
+ *
+ * Returns pointer to the cached page, or zero if nothing usable found.
+ */
+ec_sii_page_t *ec_master_find_cached_sii_page(
+        const ec_master_t *master, /**< EtherCAT master. */
+        uint32_t vendor_id,
+        uint32_t product_code,
+        uint32_t revision,
+        uint32_t serial,
+        uint16_t alias)
+{
+    ec_sii_page_t *cached_page;
+
+    list_for_each_entry(cached_page, &master->sii_cache, list) {
+        if (ec_master_cached_sii_page_matches(master, cached_page,
+                    vendor_id, product_code, revision, serial, alias)) {
+            return cached_page;
+        }
+    }
+
+    return NULL;
+}
+
+/****************************************************************************/
+
+/** Add an SII page to the cache.
+ *
+ * If caching is disabled or the page already exists, it is not added.
+ *
+ * Returns non-zero on error.
+ */
+int ec_master_cache_sii_page(
+        ec_master_t *master, /**< EtherCAT master. */
+        const ec_sii_page_t *page /**< SII page. */
+        )
+{
+    ec_sii_page_t *cached_page;
+    int ret;
+
+    if (!master->sii_caching) {
+        return 0;
+    }
+
+    if ((master->sii_caching & EC_SII_SERIAL) && !page->serial_number) {
+        // only caching non-zero serial numbers
+        return 0;
+    }
+
+    if ((master->sii_caching & EC_SII_ALIAS) && !page->alias) {
+        // not caching non-zero alias addresses
+        return 0;
+    }
+
+    list_for_each_entry(cached_page, &master->sii_cache, list) {
+        if (ec_master_cached_sii_page_matches(master, cached_page,
+                    page->vendor_id, page->product_code,
+                    page->revision_number, page->serial_number,
+                    page->alias)) {
+            EC_MASTER_WARN(master, "Matching SII page already existing.\n");
+            return 0;
+        }
+    }
+
+    EC_MASTER_DBG(master, 1,
+            "Caching SII page for 0x%08X / 0x%08X / 0x%08X / 0x%08X / %u\n",
+            page->vendor_id, page->product_code, page->revision_number,
+            page->serial_number, page->alias);
+
+    if (!(cached_page = (ec_sii_page_t *)
+                kmalloc(sizeof(ec_sii_page_t), GFP_KERNEL))) {
+        EC_MASTER_ERR(master, "Error allocating SII page memory!\n");
+        return -ENOMEM;
+    }
+
+    ec_sii_page_init(cached_page);
+    cached_page->origin = EC_SII_PAGE_CACHED;
+
+    ret = ec_sii_page_copy(cached_page, page);
+    if (ret) {
+        EC_MASTER_ERR(master, "Failed to copy SII page!\n");
+        return ret;
+    }
+
+    list_add_tail(&cached_page->list, &master->sii_cache);
+    return 0;
+}
+
 /*****************************************************************************
  *  Application interface
  ****************************************************************************/
@@ -3318,6 +3477,12 @@ int ecrt_master_sii_caching(ec_master_t *master,
     EC_MASTER_DBG(master, 1, "Setting SII caching fields to %u.\n",
             fields);
     master->sii_caching = fields;
+
+    if (!master->sii_caching) {
+        EC_MASTER_DBG(master, 1, "Clearing SII page cache.\n");
+        ec_master_clear_sii_cache(master);
+    }
+
     return 0;
 }
 
