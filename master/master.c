@@ -250,6 +250,8 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
     master->debug_level = debug_level;
     master->run_on_cpu = run_on_cpu;
     master->sii_caching = sii_caching & EC_SII_CACHING_MASK;
+    EC_MASTER_INFO(master, "Initialising master with SII caching set to %u.",
+		    master->sii_caching);
     master->stats.timeouts = 0;
     master->stats.corrupted = 0;
     master->stats.unmatched = 0;
