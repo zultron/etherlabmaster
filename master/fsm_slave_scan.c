@@ -89,9 +89,14 @@ void ec_fsm_slave_scan_init(
         ec_fsm_pdo_t *fsm_pdo /**< PDO configuration machine to use. */
         )
 {
+    fsm->slave = NULL;
     fsm->datagram = datagram;
     fsm->fsm_slave_config = fsm_slave_config;
     fsm->fsm_pdo = fsm_pdo;
+
+    fsm->retries = 0;
+    fsm->state = NULL;
+    fsm->sii_offset = 0;
 
     // init sub state machines
     ec_fsm_sii_init(&fsm->fsm_sii, fsm->datagram);
@@ -703,6 +708,7 @@ void ec_fsm_slave_scan_state_sii_size(
 {
     ec_slave_t *slave = fsm->slave;
     uint16_t cat_type, cat_size;
+    size_t word_count = 0;
 
     if (ec_fsm_sii_exec(&fsm->fsm_sii))
         return;
@@ -713,7 +719,7 @@ void ec_fsm_slave_scan_state_sii_size(
         EC_SLAVE_ERR(slave, "Failed to determine SII content size:"
                 " Reading word offset 0x%04x failed. Assuming %u words.\n",
                 fsm->sii_offset, EC_FIRST_SII_CATEGORY_OFFSET);
-        slave->sii_nwords = EC_FIRST_SII_CATEGORY_OFFSET;
+        word_count = EC_FIRST_SII_CATEGORY_OFFSET;
         goto alloc_sii;
     }
 
@@ -731,7 +737,7 @@ void ec_fsm_slave_scan_state_sii_size(
             EC_SLAVE_WARN(slave, "SII size exceeds %u words"
                     " (0xffff limiter missing?).\n", EC_MAX_SII_SIZE);
             // cut off category data...
-            slave->sii_nwords = EC_FIRST_SII_CATEGORY_OFFSET;
+            word_count = EC_FIRST_SII_CATEGORY_OFFSET;
             goto alloc_sii;
         }
         fsm->sii_offset = next_offset;
@@ -741,23 +747,18 @@ void ec_fsm_slave_scan_state_sii_size(
         return;
     }
 
-    slave->sii_nwords = fsm->sii_offset + 1;
+    word_count = fsm->sii_offset + 1;
 
 alloc_sii:
-    if (slave->sii_words) {
-        EC_SLAVE_WARN(slave, "Freeing old SII data...\n");
-        kfree(slave->sii_words);
-    }
-
-    if (!(slave->sii_words =
-                (uint16_t *) kmalloc(slave->sii_nwords * 2, GFP_KERNEL))) {
+    if (ec_sii_page_alloc(&slave->sii_page, word_count)) {
         EC_SLAVE_ERR(slave, "Failed to allocate %zu words of SII data.\n",
-               slave->sii_nwords);
-        slave->sii_nwords = 0;
+               word_count);
         slave->error_flag = 1;
         fsm->state = ec_fsm_slave_scan_state_error;
         return;
     }
+
+    slave->sii_page.origin = EC_SII_PAGE_FETCHED;
 
     // Start fetching SII contents
 
@@ -792,12 +793,13 @@ void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *fsm
     }
 
     // 2 or 4 words fetched?
-    words_fitting = slave->sii_nwords - fsm->sii_offset;
+    words_fitting = slave->sii_page.word_count - fsm->sii_offset;
     words_to_copy = min(words_fitting, fsm->fsm_sii.read_word_count);
-    memcpy(slave->sii_words + fsm->sii_offset, fsm->fsm_sii.value,
+    memcpy(slave->sii_page.words + fsm->sii_offset, fsm->fsm_sii.value,
             words_to_copy * 2);
 
-    if (fsm->sii_offset + fsm->fsm_sii.read_word_count < slave->sii_nwords) {
+    if (fsm->sii_offset + fsm->fsm_sii.read_word_count
+            < slave->sii_page.word_count) {
         // fetch the next words
         fsm->sii_offset += fsm->fsm_sii.read_word_count;
         ec_fsm_sii_read(&fsm->fsm_sii, slave, fsm->sii_offset,
@@ -811,34 +813,34 @@ void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *fsm
     ec_slave_clear_sync_managers(slave);
 
     slave->sii.alias =
-        EC_READ_U16(slave->sii_words + EC_SII_WORD_OFFSET_ALIAS);
+        EC_READ_U16(slave->sii_page.words + EC_SII_WORD_OFFSET_ALIAS);
     slave->effective_alias = slave->sii.alias;
     slave->sii.vendor_id =
-        EC_READ_U32(slave->sii_words + EC_SII_WORD_OFFSET_VENDOR);
+        EC_READ_U32(slave->sii_page.words + EC_SII_WORD_OFFSET_VENDOR);
     slave->sii.product_code =
-        EC_READ_U32(slave->sii_words + 0x000A);
+        EC_READ_U32(slave->sii_page.words + 0x000A);
     slave->sii.revision_number =
-        EC_READ_U32(slave->sii_words + 0x000C);
+        EC_READ_U32(slave->sii_page.words + 0x000C);
     slave->sii.serial_number =
-        EC_READ_U32(slave->sii_words + 0x000E);
+        EC_READ_U32(slave->sii_page.words + 0x000E);
     slave->sii.boot_rx_mailbox_offset =
-        EC_READ_U16(slave->sii_words + 0x0014);
+        EC_READ_U16(slave->sii_page.words + 0x0014);
     slave->sii.boot_rx_mailbox_size =
-        EC_READ_U16(slave->sii_words + 0x0015);
+        EC_READ_U16(slave->sii_page.words + 0x0015);
     slave->sii.boot_tx_mailbox_offset =
-        EC_READ_U16(slave->sii_words + 0x0016);
+        EC_READ_U16(slave->sii_page.words + 0x0016);
     slave->sii.boot_tx_mailbox_size =
-        EC_READ_U16(slave->sii_words + 0x0017);
+        EC_READ_U16(slave->sii_page.words + 0x0017);
     slave->sii.std_rx_mailbox_offset =
-        EC_READ_U16(slave->sii_words + 0x0018);
+        EC_READ_U16(slave->sii_page.words + 0x0018);
     slave->sii.std_rx_mailbox_size =
-        EC_READ_U16(slave->sii_words + 0x0019);
+        EC_READ_U16(slave->sii_page.words + 0x0019);
     slave->sii.std_tx_mailbox_offset =
-        EC_READ_U16(slave->sii_words + 0x001A);
+        EC_READ_U16(slave->sii_page.words + 0x001A);
     slave->sii.std_tx_mailbox_size =
-        EC_READ_U16(slave->sii_words + 0x001B);
+        EC_READ_U16(slave->sii_page.words + 0x001B);
     slave->sii.mailbox_protocols =
-        EC_READ_U16(slave->sii_words + 0x001C);
+        EC_READ_U16(slave->sii_page.words + 0x001C);
     if (slave->sii.mailbox_protocols) {
         int need_delim = 0;
         uint16_t all = EC_MBOX_AOE | EC_MBOX_COE | EC_MBOX_FOE |
@@ -904,24 +906,25 @@ void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *fsm
                 " Disabling mailbox communication.");
     }
 
-    if (slave->sii_nwords == EC_FIRST_SII_CATEGORY_OFFSET) {
+    if (slave->sii_page.word_count == EC_FIRST_SII_CATEGORY_OFFSET) {
         // sii does not contain category data
         fsm->state = ec_fsm_slave_scan_state_end;
         return;
     }
 
-    if (slave->sii_nwords < EC_FIRST_SII_CATEGORY_OFFSET + 1) {
+    if (slave->sii_page.word_count < EC_FIRST_SII_CATEGORY_OFFSET + 1) {
         EC_SLAVE_ERR(slave, "Unexpected end of SII data:"
                 " First category header missing.\n");
         goto end;
     }
 
     // evaluate category data
-    cat_word = slave->sii_words + EC_FIRST_SII_CATEGORY_OFFSET;
+    cat_word = slave->sii_page.words + EC_FIRST_SII_CATEGORY_OFFSET;
     while (EC_READ_U16(cat_word) != 0xFFFF) {
 
         // type and size words must fit
-        if (cat_word + 2 - slave->sii_words > slave->sii_nwords) {
+        if (cat_word + 2 - slave->sii_page.words
+                > slave->sii_page.word_count) {
             EC_SLAVE_ERR(slave, "Unexpected end of SII data:"
                     " Category header incomplete.\n");
             goto end;
@@ -931,7 +934,8 @@ void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *fsm
         cat_size = EC_READ_U16(cat_word + 1);
         cat_word += 2;
 
-        if (cat_word + cat_size - slave->sii_words > slave->sii_nwords) {
+        if (cat_word + cat_size - slave->sii_page.words
+                > slave->sii_page.word_count) {
             EC_SLAVE_WARN(slave, "Unexpected end of SII data:"
                     " Category data incomplete.\n");
             goto end;
@@ -971,7 +975,7 @@ void ec_fsm_slave_scan_state_sii_data(ec_fsm_slave_scan_t *fsm
         }
 
         cat_word += cat_size;
-        if (cat_word - slave->sii_words >= slave->sii_nwords) {
+        if (cat_word - slave->sii_page.words >= slave->sii_page.word_count) {
             EC_SLAVE_WARN(slave, "Unexpected end of SII data:"
                     " Next category header missing.\n");
             goto end;

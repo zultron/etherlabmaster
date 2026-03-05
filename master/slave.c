@@ -1,6 +1,6 @@
 /*****************************************************************************
  *
- *  Copyright (C) 2006-2012  Florian Pose, Ingenieurgemeinschaft IgH
+ *  Copyright (C) 2006-2026  Florian Pose, Ingenieurgemeinschaft IgH
  *
  *  This file is part of the IgH EtherCAT Master.
  *
@@ -109,8 +109,7 @@ void ec_slave_init(
     slave->has_dc_system_time = 0;
     slave->transmission_delay = 0U;
 
-    slave->sii_words = NULL;
-    slave->sii_nwords = 0;
+    ec_sii_page_init(&slave->sii_page);
     slave->sii_parallel_words = 0;
 
     slave->sii.alias = 0x0000;
@@ -252,10 +251,7 @@ void ec_slave_clear(ec_slave_t *slave /**< EtherCAT slave */)
         kfree(pdo);
     }
 
-    if (slave->sii_words) {
-        kfree(slave->sii_words);
-    }
-
+    ec_sii_page_clear(&slave->sii_page);
     ec_fsm_slave_clear(&slave->fsm);
 }
 

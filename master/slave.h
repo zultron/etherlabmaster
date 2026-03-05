@@ -38,6 +38,7 @@
 #include "sync.h"
 #include "sdo.h"
 #include "fsm_slave.h"
+#include "sii_page.h"
 
 /****************************************************************************/
 
@@ -207,14 +208,12 @@ struct ec_slave
     uint32_t transmission_delay; /**< DC system time transmission delay
                                    (offset from reference clock). */
 
-    // SII
-    uint16_t *sii_words; /**< Complete SII image. */
-    size_t sii_nwords; /**< Size of the SII contents in words. */
+    // Slave information interface (SII)
+    ec_sii_page_t sii_page; /**< The SII contents, either fetched or taken
+                              from the cache. */
     unsigned int sii_parallel_words; /**< How many SII words the slave can
                                        read at once. Zero means that this
                                        information is not available yet. */
-
-    // Slave information interface
     ec_sii_t sii; /**< Extracted SII data. */
 
     struct list_head sdo_dictionary; /**< SDO dictionary list */
