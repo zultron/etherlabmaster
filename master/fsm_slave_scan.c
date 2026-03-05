@@ -691,9 +691,11 @@ void ec_fsm_slave_scan_state_sii_ident(
     cached = ec_master_find_cached_sii_page(slave->master, vendor,
             product, revision, serial, slave->sii.alias);
     if (cached) {
+        int ret;
+
         EC_SLAVE_DBG(slave, 1, "Found matching SII page in cache.\n");
 
-        int ret = ec_sii_page_copy(&slave->sii_page, cached);
+        ret = ec_sii_page_copy(&slave->sii_page, cached);
         if (ret) {
             EC_SLAVE_ERR(slave, "Failed to copy cached SII page.\n");
             fsm->slave->error_flag = 1;
