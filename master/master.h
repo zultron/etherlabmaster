@@ -216,6 +216,7 @@ struct ec_master {
                                       for the FSM side. */
     unsigned int injection_seq_rt; /**< Datagram injection sequence number
                                      for the realtime side. */
+    struct semaphore injection_sem; /**< Injection semaphore. */
 
     ec_slave_t *slaves; /**< Array of slaves on the bus. */
     unsigned int slave_count; /**< Number of slaves on the bus. */
