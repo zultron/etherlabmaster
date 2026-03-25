@@ -61,6 +61,25 @@
           rt_mutex_lock_interruptible(lock, 0)
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 47)
+
+#define smp_store_release(p, v) \
+do { \
+	compiletime_assert_atomic_type(*p); \
+	smp_mb(); \
+	ACCESS_ONCE(*p) = (v); \
+} while (0)
+
+#define smp_load_acquire(p)	\
+({ \
+	typeof(*p) ___p1 = ACCESS_ONCE(*p); \
+	compiletime_assert_atomic_type(*p); \
+	smp_mb(); \
+	___p1; \
+})
+
+#endif
+
 #include "master.h"
 
 /****************************************************************************/
