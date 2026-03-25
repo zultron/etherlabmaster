@@ -198,7 +198,6 @@ int ec_master_init(ec_master_t *master, /**< EtherCAT master */
 
     master->injection_seq_fsm = 0;
     master->injection_seq_rt = 0;
-    sema_init(&master->injection_sem, 1);
 
     master->slaves = NULL;
     master->slave_count = 0;
@@ -1598,7 +1597,7 @@ static int ec_master_idle_thread(void *priv_data)
 static int ec_master_operation_thread(void *priv_data)
 {
     ec_master_t *master = (ec_master_t *) priv_data;
-    int injected;
+    unsigned int seq_rt;
 
     EC_MASTER_DBG(master, 1, "Operation thread running"
             " with fsm interval = %u us, max data size=%zu\n",
@@ -1607,11 +1606,11 @@ static int ec_master_operation_thread(void *priv_data)
     while (!kthread_should_stop()) {
         ec_datagram_output_stats(&master->fsm_datagram);
 
-        down(&master->injection_sem);
-        injected = master->injection_seq_rt == master->injection_seq_fsm;
-        up(&master->injection_sem);
+        /* Use smp_load_acquire() to prevent re-ordering.
+         * https://gitlab.com/etherlab.org/ethercat/-/work_items/168 */
+        seq_rt = smp_load_acquire(&master->injection_seq_rt);
+        if (seq_rt == master->injection_seq_fsm) { // was injected
 
-        if (injected) {
             // output statistics
             ec_master_output_stats(master);
 
@@ -1620,19 +1619,17 @@ static int ec_master_operation_thread(void *priv_data)
                 break;
             }
 
-            injected = ec_fsm_master_exec(&master->fsm);
+            if (ec_fsm_master_exec(&master->fsm)) {
+                // Inject datagrams (let the RT thread queue them, see
+                // ecrt_master_send())
+                // re-ordering-safe version of `master->injection_seq_fsm++`
+                smp_store_release(&master->injection_seq_fsm,
+                        master->injection_seq_fsm + 1);
+            }
 
             ec_master_exec_slave_fsms(master);
 
             up(&master->master_sem);
-
-            if (injected) {
-                // Inject datagrams (let the RT thread queue them, see
-                // ecrt_master_send())
-                down(&master->injection_sem);
-                master->injection_seq_fsm++;
-                up(&master->injection_sem);
-            }
         }
 
 #ifdef EC_USE_HRTIMER
@@ -2340,10 +2337,8 @@ int ecrt_master_activate(ec_master_t *master)
 
     EC_MASTER_DBG(master, 1, "FSM datagram is %p.\n", &master->fsm_datagram);
 
-    down(&master->injection_sem);
     master->injection_seq_fsm = 0;
     master->injection_seq_rt = 0;
-    up(&master->injection_sem);
 
     master->send_cb = master->app_send_cb;
     master->receive_cb = master->app_receive_cb;
@@ -2449,19 +2444,14 @@ int ecrt_master_send(ec_master_t *master)
 {
     ec_datagram_t *datagram, *n;
     ec_device_index_t dev_idx;
-    int injected;
+    unsigned int seq_fsm;
 
-    down(&master->injection_sem);
-    injected = master->injection_seq_rt != master->injection_seq_fsm;
-    up(&master->injection_sem);
-
-    if (injected) {
+    seq_fsm = smp_load_acquire(&master->injection_seq_fsm);
+    if (master->injection_seq_rt != seq_fsm) {
         // inject datagram produced by master FSM
         ec_master_queue_datagram(master, &master->fsm_datagram);
 
-        down(&master->injection_sem);
-        master->injection_seq_rt = master->injection_seq_fsm;
-        up(&master->injection_sem);
+        smp_store_release(&master->injection_seq_rt, seq_fsm);
     }
 
     ec_master_inject_external_datagrams(master);
