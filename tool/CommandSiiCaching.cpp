@@ -24,7 +24,7 @@
 #include <cstdlib>
 using namespace std;
 
-#include "CommandCache.h"
+#include "CommandSiiCaching.h"
 #include "MasterDevice.h"
 
 /****************************************************************************/
