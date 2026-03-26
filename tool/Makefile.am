@@ -1,6 +1,6 @@
 #-----------------------------------------------------------------------------
 #
-#  Copyright (C) 2006-2008  Florian Pose, Ingenieurgemeinschaft IgH
+#  Copyright (C) 2006-2026  Florian Pose, Ingenieurgemeinschaft IgH
 #
 #  This file is part of the IgH EtherCAT Master.
 #
@@ -30,10 +30,9 @@ bin_PROGRAMS = ethercat
 ethercat_SOURCES = \
 	Command.cpp \
 	CommandAlias.cpp \
-	CommandCache.cpp \
-	CommandCrc.cpp \
 	CommandCStruct.cpp \
 	CommandConfig.cpp \
+	CommandCrc.cpp \
 	CommandData.cpp \
 	CommandDebug.cpp \
 	CommandDomains.cpp \
@@ -47,6 +46,7 @@ ethercat_SOURCES = \
 	CommandRegWrite.cpp \
 	CommandRescan.cpp \
 	CommandSdos.cpp \
+	CommandSiiCaching.cpp \
 	CommandSiiRead.cpp \
 	CommandSiiWrite.cpp \
 	CommandSlaves.cpp \
@@ -74,10 +74,9 @@ endif
 noinst_HEADERS = \
 	Command.h \
 	CommandAlias.h \
-	CommandCache.h \
-	CommandCrc.h \
 	CommandCStruct.h \
 	CommandConfig.h \
+	CommandCrc.h \
 	CommandData.h \
 	CommandDebug.h \
 	CommandDomains.h \
@@ -91,6 +90,7 @@ noinst_HEADERS = \
 	CommandRegWrite.h \
 	CommandRescan.h \
 	CommandSdos.h \
+	CommandSiiCaching.h \
 	CommandSiiRead.h \
 	CommandSiiWrite.h \
 	CommandSlaves.h \
