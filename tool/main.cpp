@@ -83,6 +83,7 @@ Command::Verbosity verbosity = Command::Normal;
 bool force = false;
 bool emergency = false;
 bool helpRequested = false;
+bool reset = false;
 string outputFile;
 string skin;
 
@@ -157,7 +158,7 @@ void getOptions(int argc, char **argv)
     };
 
     do {
-        c = getopt_long(argc, argv, "m:a:p:d:t:o:s:efqvh", longOptions, NULL);
+        c = getopt_long(argc, argv, "m:a:p:d:t:o:s:efrqvh", longOptions, NULL);
 
         switch (c) {
             case 'm':
@@ -194,6 +195,10 @@ void getOptions(int argc, char **argv)
 
             case 'f':
                 force = true;
+                break;
+
+            case 'r':
+                reset = true;
                 break;
 
             case 'q':
@@ -327,6 +332,7 @@ int main(int argc, char **argv)
                     cmd->setSkin(skin);
                     cmd->setEmergency(emergency);
                     cmd->setForce(force);
+                    cmd->setReset(reset);
                     cmd->execute(commandArgs);
                 } catch (InvalidUsageException &e) {
                     cerr << e.what() << endl << endl;

@@ -212,6 +212,13 @@ void Command::setForce(bool f)
 
 /****************************************************************************/
 
+void Command::setReset(bool r)
+{
+    reset = r;
+};
+
+/****************************************************************************/
+
 void Command::setOutputFile(const string &f)
 {
     outputFile = f;
