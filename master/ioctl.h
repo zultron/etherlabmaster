@@ -47,7 +47,8 @@
  *
  * Increment this when changing the ioctl interface!
  */
-#define EC_IOCTL_VERSION_MAGIC 38
+// Tormach:  add 100 for our custom changes
+#define EC_IOCTL_VERSION_MAGIC 138
 
 // Command-line tool
 #define EC_IOCTL_MODULE                EC_IOR(0x00, ec_ioctl_module_t)
