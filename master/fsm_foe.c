@@ -336,6 +336,7 @@ void ec_fsm_foe_state_ack_check(
         ec_datagram_t *datagram /**< Datagram to use. */
         )
 {
+  unsigned long diff_ms;
     ec_slave_t *slave = fsm->slave;
 
 #ifdef DEBUG_FOE
@@ -370,7 +371,7 @@ void ec_fsm_foe_state_ack_check(
             return;
         }
 
-        unsigned long diff_ms = (fsm->datagram->jiffies_received -
+        diff_ms = (fsm->datagram->jiffies_received -
                 fsm->jiffies_start) * 1000 / HZ;
         if (diff_ms >= EC_FSM_FOE_TIMEOUT) {
             ec_foe_set_tx_error(fsm, FOE_TIMEOUT_ERROR);
@@ -746,6 +747,7 @@ void ec_fsm_foe_state_data_check(
         ec_datagram_t *datagram /**< Datagram to use. */
         )
 {
+    unsigned long diff_ms;
     ec_slave_t *slave = fsm->slave;
 
 #ifdef DEBUG_FOE
@@ -777,7 +779,7 @@ void ec_fsm_foe_state_data_check(
             return;
         }
 
-        unsigned long diff_ms = (fsm->datagram->jiffies_received -
+        diff_ms = (fsm->datagram->jiffies_received -
                 fsm->jiffies_start) * 1000 / HZ;
         if (diff_ms >= EC_FSM_FOE_TIMEOUT) {
             ec_foe_set_tx_error(fsm, FOE_TIMEOUT_ERROR);
