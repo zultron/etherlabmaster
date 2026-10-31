@@ -119,4 +119,8 @@ LIBETHERCAT_1.6 {
 LIBETHERCAT_1.7 {
 	global:
 		ecrt_master_sii_caching;
+		ecrt_master_deactivate_slaves;
+		ecrt_master_setup_domain_memory;
+		ecrt_slave_config_overlapping_pdos;
+		ecrt_reg_request_readwrite;
 } LIBETHERCAT_1.6;

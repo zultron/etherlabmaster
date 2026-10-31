@@ -800,7 +800,7 @@ EC_PUBLIC_API ec_domain_t *ecrt_master_create_domain(
  *
  * \return 0 on success, else non-zero.
  */
-int ecrt_master_setup_domain_memory(
+EC_PUBLIC_API int ecrt_master_setup_domain_memory(
         ec_master_t *master /**< EtherCAT master. */
         );
 
@@ -1112,7 +1112,7 @@ EC_PUBLIC_API int ecrt_master_activate(
  *
  * Note: EoE slaves will not be changed to PREOP.
  */
-void ecrt_master_deactivate_slaves(
+EC_PUBLIC_API void ecrt_master_deactivate_slaves(
         ec_master_t *master /**< EtherCAT master. */
         );
 
@@ -1478,7 +1478,7 @@ EC_PUBLIC_API int ecrt_slave_config_watchdog(
  * Overlapping PDOs allows inputs to use the same space as outputs on the frame.
  * This reduces the frame length.
  */
-void ecrt_slave_config_overlapping_pdos(
+EC_PUBLIC_API void ecrt_slave_config_overlapping_pdos(
         ec_slave_config_t *sc, /**< Slave configuration. */
         uint8_t allow_overlapping_pdos /**< Allow overlapping PDOs */
         );
