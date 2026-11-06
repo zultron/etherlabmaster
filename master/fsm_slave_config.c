@@ -1510,9 +1510,21 @@ void ec_fsm_slave_config_state_dc_sync_check(
             u64 diff, start;
             u32 remainder, cycle;
 
-            diff = start_time - master->dc_ref_time;
             cycle = sync0->cycle_time + sync1->cycle_time;
-            remainder = do_div(diff, cycle);
+            if (start_time >= master->dc_ref_time) {
+                diff = start_time - master->dc_ref_time;
+                remainder = do_div(diff, cycle);
+            } else {
+                // The application time can be behind the reference time
+                // (e.g. when the application steps its clock back to follow
+                // the reference clock). Wrapping the unsigned difference
+                // would shift the phase by 2^64 mod cycle.
+                diff = master->dc_ref_time - start_time;
+                remainder = do_div(diff, cycle);
+                if (remainder) {
+                    remainder = cycle - remainder;
+                }
+            }
 
             start = start_time + cycle - remainder + sync0->shift_time;
 
